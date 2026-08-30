@@ -34,6 +34,8 @@ import 'package:canil_gcm/features/nutrition/presentation/screens/feeding_regist
 import 'package:canil_gcm/features/profiles/presentation/screens/handler_profile_page.dart';
 import 'package:canil_gcm/features/profiles/presentation/screens/k9_profile_page.dart';
 import 'package:canil_gcm/core/services/dog_fitness_service.dart';
+import 'package:canil_gcm/features/shifts/domain/shift_authorization.dart';
+import 'package:canil_gcm/features/shifts/presentation/widgets/shift_authorization_prompts.dart';
 
 part 'active_shift_header.dart';
 part 'active_shift_indicators_card.dart';

@@ -12,7 +12,9 @@ import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/permission_service.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
+import 'package:canil_gcm/features/shifts/domain/shift_authorization.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
+import 'package:canil_gcm/features/shifts/presentation/widgets/shift_authorization_prompts.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 
 part 'shift_assumption_header.dart';
@@ -51,14 +53,11 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
       ra: currentRa,
       firebaseUser: fbUser,
     );
-    final fitness = _fitnessService.evaluate(dog);
-
-    // Se não apto, pedir confirmação
-    if (fitness.status == DogFitnessStatus.unfit) {
-      final confirmed = await _showUnfitConfirmation(dog);
-      if (confirmed != true) return;
-    }
-
+    // HEALTH-V1-OP-AUTH: a aptidão clínica NÃO é decidida aqui. O antigo
+    // diálogo "Assumir mesmo assim" foi removido — ele permitia contornar uma
+    // avaliação de inaptidão. A autoridade é o backend, sobre
+    // `operational_restrictions`. O fitness legado segue apenas como exibição
+    // de pendências nos cards (vacina/antipulgas), sem poder de liberação.
     HapticFeedback.mediumImpact();
     setState(() => _startingDogId = dog.id);
 
@@ -70,16 +69,11 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
     if (!mounted) return;
     setState(() => _startingDogId = null);
 
-    if (shiftVM.error != null) {
-      AppFeedback.error(
-        context,
-        shiftVM.error!,
-        fallback:
-            'Nao foi possivel iniciar o turno. Confira sua conexao e tente novamente.',
-      );
-    }
+    await _handleAuthorizationOutcome(shiftVM, dog);
   }
 
+  /// Turno SEM K9: não introduz associação operacional de cão, portanto não há
+  /// restrição clínica a validar. Preservado como estava (classificação D).
   Future<void> _startShiftWithoutK9() async {
     if (_startingDogId != null || _startingWithoutK9) return;
 
@@ -113,46 +107,114 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
     }
   }
 
-  Future<bool?> _showUnfitConfirmation(Dog dog) {
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surfacePanel,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: Text(
-          'Assumir ${dog.name} com pendências?',
-          style: GoogleFonts.inter(
-            color: AppTheme.textPrimary,
-            fontWeight: FontWeight.w700,
-            fontSize: 16,
-          ),
-        ),
-        content: Text(
-          'Este cão possui pendências críticas. O plantão será registrado com aviso.',
-          style: GoogleFonts.inter(color: AppTheme.textSecondary, fontSize: 13),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(
-              'Cancelar',
-              style: GoogleFonts.inter(color: AppTheme.textTertiary),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              'Assumir mesmo assim',
-              style: GoogleFonts.inter(
-                color: AppTheme.warning,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
+  /// Apresenta a decisão do backend conforme a natureza real do resultado.
+  Future<void> _handleAuthorizationOutcome(
+    ShiftViewModel shiftVM,
+    Dog dog,
+  ) async {
+    final failure = shiftVM.authorizationFailure;
+
+    if (failure == null) {
+      // Autorizado. Restrição informativa (attention) vira aviso não bloqueante.
+      final notices = shiftVM.activeNoticeRestrictions;
+      if (notices.isNotEmpty && mounted) {
+        AppFeedback.info(
+          context,
+          'Turno iniciado. ${dog.name} possui '
+          '${notices.length == 1 ? 'uma observação' : 'observações'} '
+          'de saúde registrada${notices.length == 1 ? '' : 's'}.',
+        );
+      }
+      if (shiftVM.error != null && mounted) {
+        AppFeedback.error(
+          context,
+          shiftVM.error!,
+          fallback:
+              'Nao foi possivel iniciar o turno. Confira sua conexao e tente novamente.',
+        );
+      }
+      return;
+    }
+
+    switch (failure.kind) {
+      case ShiftAuthorizationFailureKind.absoluteRestriction:
+      case ShiftAuthorizationFailureKind.activityRestricted:
+        // Bloqueio clínico definitivo: sem opção de prosseguir.
+        await _showRestrictionBlockedDialog(dog, failure);
+      case ShiftAuthorizationFailureKind.acknowledgementRequired:
+        await _showPartialAcknowledgementDialog(shiftVM, dog, failure);
+      case ShiftAuthorizationFailureKind.restrictionsUnavailable:
+        // Falha técnica de verificação. NÃO é "sem restrição", e não é queda de
+        // conexão — o servidor respondeu dizendo que não pôde verificar.
+        if (mounted) {
+          AppFeedback.error(
+            context,
+            'Não foi possível verificar as restrições operacionais de '
+            '${dog.name}. Por segurança, o turno não foi iniciado. '
+            'Tente novamente.',
+          );
+        }
+      case ShiftAuthorizationFailureKind.network:
+        if (mounted) {
+          AppFeedback.error(
+            context,
+            'Sem comunicação com o servidor. Confira sua conexão e '
+            'tente novamente.',
+          );
+        }
+      default:
+        if (mounted) {
+          AppFeedback.error(context, failure.message);
+        }
+    }
+
+    shiftVM.clearAuthorizationFeedback();
+  }
+
+
+  /// Bloqueio por restrição operacional. Delegado ao prompt compartilhado para
+  /// que iniciar turno e trocar K9 apresentem a MESMA decisão igualmente.
+  Future<void> _showRestrictionBlockedDialog(
+    Dog dog,
+    ShiftAuthorizationFailure failure,
+  ) async {
+    if (!mounted) return;
+    await ShiftAuthorizationPrompts.showBlocked(
+      context,
+      dogName: dog.name,
+      failure: failure,
     );
   }
+
+  /// Restrição parcial: coleta ciência e reenvia a MESMA operação ao backend.
+  Future<void> _showPartialAcknowledgementDialog(
+    ShiftViewModel shiftVM,
+    Dog dog,
+    ShiftAuthorizationFailure failure,
+  ) async {
+    if (!mounted) return;
+    final acknowledged = await ShiftAuthorizationPrompts.confirmPartial(
+      context,
+      dogName: dog.name,
+      failure: failure,
+    );
+    if (!acknowledged) {
+      shiftVM.clearAuthorizationFeedback();
+      return;
+    }
+
+    // A ciência é registrada pelo BACKEND ao reexecutar a operação. O aceite
+    // não altera a restrição nem o summary — apenas documenta a ciência.
+    setState(() => _startingDogId = dog.id);
+    final authorized = await shiftVM.acknowledgePartialRestrictions();
+    if (!mounted) return;
+    setState(() => _startingDogId = null);
+
+    if (!authorized && shiftVM.error != null) {
+      AppFeedback.error(context, shiftVM.error!);
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {

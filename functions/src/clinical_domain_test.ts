@@ -1,0 +1,1244 @@
+/**
+ * Clinical server-domain parity — exhaustive test matrix (CLIN-WRITER-1.W1).
+ *
+ * Proves the TypeScript module reproduces the Dart Clinical state machines
+ * EXACTLY. The transition matrices below are transcribed independently from the
+ * Dart source (health_v1_transitions.dart / health_v1_enums.dart /
+ * health_v1_models.dart) so the test is a real cross-check, not a tautology
+ * against the module's own tables.
+ *
+ * Harness idiom matches the existing functions tests: `node:assert`, a local
+ * `test()` helper, single `main()`, non-zero exit on failure.
+ */
+
+import * as assert from "assert";
+import {
+  CLINICAL_CASE_CLOSURE_TYPES,
+  CLINICAL_CASE_OPENING_TYPES,
+  CLINICAL_CASE_STATUSES,
+  CLINICAL_EVENT_STATUSES,
+  CLINICAL_EVENT_TYPES,
+  ClinicalCaseStatus,
+  ClinicalDomainError,
+  ClinicalEventStatus,
+  allowedCaseTransitions,
+  assertCaseClosureConsistency,
+  assertCaseReopen,
+  assertCaseReopenConsistency,
+  assertCaseTransition,
+  assertClinicalActor,
+  assertClinicalCaseClosureType,
+  assertEventCancellationConsistency,
+  assertEventTransition,
+  caseReopenDestinations,
+  canTransitionCase,
+  canTransitionEvent,
+  isCaseReopenDestination,
+  isClinicalCaseClosureType,
+  isEventContentEditable,
+  isEventContentImmutable,
+  isTerminalCaseStatus,
+  isTerminalEventStatus,
+  parseClinicalCaseOpeningType,
+  parseClinicalCaseStatus,
+  parseClinicalEventStatus,
+  parseClinicalEventType,
+} from "./clinical_domain";
+
+let failed = 0;
+let passed = 0;
+
+function test(name: string, body: () => void): void {
+  try {
+    body();
+    passed++;
+  } catch (error) {
+    failed++;
+    console.error(`✗ ${name}`);
+    console.error(error);
+  }
+}
+
+function expectDomainError(
+  body: () => void,
+  code: string,
+  kind: "invalid_value" | "illegal_transition",
+): void {
+  try {
+    body();
+  } catch (error) {
+    assert.ok(
+      error instanceof ClinicalDomainError,
+      `expected ClinicalDomainError, got ${error}`,
+    );
+    assert.strictEqual(error.code, code, "error code mismatch");
+    assert.strictEqual(error.kind, kind, "error kind mismatch");
+    return;
+  }
+  throw new assert.AssertionError({message: `expected throw with code ${code}`});
+}
+
+const ACTOR = {uid: "u1", name: "Vet", internalRole: "veterinario"};
+const T = new Date("2026-08-24T12:00:00.000Z");
+
+// ── Independent transcription of the Dart truth tables ───────────────────────
+
+const DART_CASE_TRANSITIONS: Record<string, string[]> = {
+  open: [
+    "under_investigation",
+    "under_treatment",
+    "monitoring",
+    "discharged",
+    "cancelled",
+  ],
+  under_investigation: [
+    "open",
+    "under_treatment",
+    "monitoring",
+    "discharged",
+    "cancelled",
+  ],
+  under_treatment: ["under_investigation", "monitoring", "discharged", "cancelled"],
+  monitoring: ["under_investigation", "under_treatment", "discharged", "cancelled"],
+  discharged: [],
+  cancelled: [],
+};
+
+const DART_CASE_REOPEN_DESTINATIONS = [
+  "open",
+  "under_investigation",
+  "under_treatment",
+  "monitoring",
+];
+
+// Reopen ORIGIN authority, transcribed independently from the Dart guard in
+// health_v1_transitions.dart (`current.status != ClinicalCaseStatus.discharged`
+// throws invalid_case_reopen). `cancelled` is terminal and never reopens —
+// only `discharged` does.
+const DART_CASE_REOPEN_ORIGINS = ["discharged"];
+
+const DART_EVENT_TRANSITIONS: Record<string, string[]> = {
+  draft: ["final", "cancelled"],
+  final: ["cancelled"],
+  cancelled: [],
+};
+
+// ── Vocabulary parity ────────────────────────────────────────────────────────
+
+function main(): void {
+  test("case status vocabulary matches Dart wire values", () => {
+    assert.deepStrictEqual([...CLINICAL_CASE_STATUSES], [
+      "open",
+      "under_investigation",
+      "under_treatment",
+      "monitoring",
+      "discharged",
+      "cancelled",
+    ]);
+  });
+
+  test("event status vocabulary uses wire value 'final' not 'finalised'", () => {
+    assert.deepStrictEqual([...CLINICAL_EVENT_STATUSES], ["draft", "final", "cancelled"]);
+  });
+
+  test("opening type vocabulary matches Dart", () => {
+    assert.deepStrictEqual([...CLINICAL_CASE_OPENING_TYPES], [
+      "incident",
+      "consultation",
+      "preventive",
+      "administrative",
+    ]);
+  });
+
+  test("event type vocabulary is the 18 canonical wire values in order", () => {
+    assert.strictEqual(CLINICAL_EVENT_TYPES.length, 18);
+    assert.deepStrictEqual([...CLINICAL_EVENT_TYPES], [
+      "consultation",
+      "incident",
+      "vaccination",
+      "exam_request",
+      "exam_collection",
+      "exam_result",
+      "exam_interpretation",
+      "treatment_start",
+      "treatment_note",
+      "dose_note",
+      "reevaluation",
+      "discharge",
+      "reopen",
+      "restriction_issued",
+      "restriction_ended",
+      "surgical_note",
+      "general_note",
+      "observation",
+    ]);
+  });
+
+  // ── Strict parsers ──────────────────────────────────────────────────────────
+
+  test("parsers accept every canonical value round-trip", () => {
+    for (const s of CLINICAL_CASE_STATUSES) assert.strictEqual(parseClinicalCaseStatus(s), s);
+    for (const s of CLINICAL_EVENT_STATUSES) assert.strictEqual(parseClinicalEventStatus(s), s);
+    for (const t of CLINICAL_EVENT_TYPES) assert.strictEqual(parseClinicalEventType(t), t);
+    for (const o of CLINICAL_CASE_OPENING_TYPES) {
+      assert.strictEqual(parseClinicalCaseOpeningType(o), o);
+    }
+  });
+
+  test("parsers reject unknown / non-string as invalid_value (writer is strict)", () => {
+    expectDomainError(() => parseClinicalCaseStatus("frobnicate"), "unknown_case_status", "invalid_value");
+    expectDomainError(() => parseClinicalCaseStatus("finalised"), "unknown_case_status", "invalid_value");
+    expectDomainError(() => parseClinicalEventStatus("finalised"), "unknown_event_status", "invalid_value");
+    expectDomainError(() => parseClinicalEventType("weight"), "unknown_event_type", "invalid_value");
+    expectDomainError(() => parseClinicalCaseOpeningType("other"), "unknown_case_opening_type", "invalid_value");
+    expectDomainError(() => parseClinicalEventStatus(null), "unknown_event_status", "invalid_value");
+    expectDomainError(() => parseClinicalEventStatus(3), "unknown_event_status", "invalid_value");
+  });
+
+  // ── Case transition matrix (exhaustive 6×6) ──────────────────────────────────
+
+  test("case transition matrix matches Dart exhaustively (all 36 pairs)", () => {
+    for (const from of CLINICAL_CASE_STATUSES) {
+      const expected = DART_CASE_TRANSITIONS[from];
+      // allowedCaseTransitions returns the same SET (order not contractual)
+      assert.deepStrictEqual(
+        [...allowedCaseTransitions(from)].sort(),
+        [...expected].sort(),
+        `allowed set mismatch for ${from}`,
+      );
+      for (const to of CLINICAL_CASE_STATUSES) {
+        const shouldAllow = expected.includes(to);
+        assert.strictEqual(
+          canTransitionCase(from, to as ClinicalCaseStatus),
+          shouldAllow,
+          `canTransitionCase(${from}, ${to})`,
+        );
+        if (shouldAllow) {
+          assert.doesNotThrow(() => assertCaseTransition(from, to as ClinicalCaseStatus));
+        } else {
+          expectDomainError(
+            () => assertCaseTransition(from, to as ClinicalCaseStatus),
+            "invalid_case_transition",
+            "illegal_transition",
+          );
+        }
+      }
+    }
+  });
+
+  test("terminal case statuses are exactly discharged + cancelled", () => {
+    for (const s of CLINICAL_CASE_STATUSES) {
+      const terminal = s === "discharged" || s === "cancelled";
+      assert.strictEqual(isTerminalCaseStatus(s), terminal, `terminal(${s})`);
+    }
+  });
+
+  // ── Case reopen ───────────────────────────────────────────────────────────────
+
+  test("reopen destinations match Dart (open/investigation/treatment/monitoring)", () => {
+    assert.deepStrictEqual([...caseReopenDestinations()].sort(), [...DART_CASE_REOPEN_DESTINATIONS].sort());
+    for (const s of CLINICAL_CASE_STATUSES) {
+      assert.strictEqual(
+        isCaseReopenDestination(s),
+        DART_CASE_REOPEN_DESTINATIONS.includes(s),
+        `isCaseReopenDestination(${s})`,
+      );
+    }
+  });
+
+  test("reopen only from discharged into a permitted destination", () => {
+    for (const dest of DART_CASE_REOPEN_DESTINATIONS as ClinicalCaseStatus[]) {
+      const intent = assertCaseReopen("discharged", dest, "  recidiva  ");
+      assert.strictEqual(intent.destination, dest);
+      assert.strictEqual(intent.reason, "recidiva", "reason must be trimmed");
+    }
+    // non-discharged origin
+    expectDomainError(
+      () => assertCaseReopen("open", "under_treatment", "x"),
+      "invalid_case_reopen",
+      "illegal_transition",
+    );
+    // discharged but terminal destination
+    expectDomainError(
+      () => assertCaseReopen("discharged", "cancelled", "x"),
+      "invalid_case_reopen",
+      "illegal_transition",
+    );
+    expectDomainError(
+      () => assertCaseReopen("discharged", "discharged", "x"),
+      "invalid_case_reopen",
+      "illegal_transition",
+    );
+  });
+
+  test("cancelled never reopens into ANY destination (exhaustive origin denial)", () => {
+    // Locks the reopen ORIGIN set, not just one representative edge: every
+    // non-discharged origin — `cancelled` above all — must be rejected for
+    // every one of the four permitted destinations, with a valid non-blank
+    // reason so the failure can only come from the origin guard.
+    for (const origin of CLINICAL_CASE_STATUSES) {
+      if (DART_CASE_REOPEN_ORIGINS.includes(origin)) {
+        continue;
+      }
+      for (const dest of DART_CASE_REOPEN_DESTINATIONS as ClinicalCaseStatus[]) {
+        expectDomainError(
+          () => assertCaseReopen(origin, dest, "recidiva confirmada"),
+          "invalid_case_reopen",
+          "illegal_transition",
+        );
+      }
+    }
+  });
+
+  test("reopen origin/destination check precedes reason check (Dart order)", () => {
+    // Blank reason AND bad origin → must surface the reopen error, not the reason error.
+    expectDomainError(
+      () => assertCaseReopen("open", "open", "   "),
+      "invalid_case_reopen",
+      "illegal_transition",
+    );
+    // Valid origin/destination but blank reason → reason error.
+    expectDomainError(
+      () => assertCaseReopen("discharged", "open", "   "),
+      "missing_reopen_reason",
+      "invalid_value",
+    );
+  });
+
+  // ── Event transition matrix (exhaustive 3×3) ──────────────────────────────────
+
+  test("event transition matrix matches Dart exhaustively (all 9 pairs)", () => {
+    for (const from of CLINICAL_EVENT_STATUSES) {
+      const expected = DART_EVENT_TRANSITIONS[from];
+      for (const to of CLINICAL_EVENT_STATUSES) {
+        const shouldAllow = expected.includes(to);
+        assert.strictEqual(
+          canTransitionEvent(from, to as ClinicalEventStatus),
+          shouldAllow,
+          `canTransitionEvent(${from}, ${to})`,
+        );
+      }
+    }
+  });
+
+  test("terminal event status is exactly cancelled", () => {
+    for (const s of CLINICAL_EVENT_STATUSES) {
+      assert.strictEqual(isTerminalEventStatus(s), s === "cancelled", `terminal(${s})`);
+    }
+  });
+
+  test("draft→final is legal and requires NO cancellation metadata", () => {
+    const r = assertEventTransition("draft", "final");
+    assert.strictEqual(r.cancellation, null);
+  });
+
+  test("final→final and cancelled→* are illegal transitions", () => {
+    expectDomainError(() => assertEventTransition("final", "final"), "invalid_event_transition", "illegal_transition");
+    expectDomainError(() => assertEventTransition("draft", "draft"), "invalid_event_transition", "illegal_transition");
+    for (const to of CLINICAL_EVENT_STATUSES) {
+      expectDomainError(
+        () => assertEventTransition("cancelled", to as ClinicalEventStatus),
+        "invalid_event_transition",
+        "illegal_transition",
+      );
+    }
+  });
+
+  // ── Cancellation metadata rules on the transition path ───────────────────────
+
+  test("cancel from draft/final requires reason, then instant+actor, in order", () => {
+    for (const from of ["draft", "final"] as ClinicalEventStatus[]) {
+      // missing reason
+      expectDomainError(
+        () => assertEventTransition(from, "cancelled", {}),
+        "missing_cancel_reason",
+        "invalid_value",
+      );
+      // blank reason still missing
+      expectDomainError(
+        () => assertEventTransition(from, "cancelled", {cancelReason: "  "}),
+        "missing_cancel_reason",
+        "invalid_value",
+      );
+      // reason present but no instant/actor
+      expectDomainError(
+        () => assertEventTransition(from, "cancelled", {cancelReason: "erro"}),
+        "missing_cancellation_metadata",
+        "invalid_value",
+      );
+      expectDomainError(
+        () => assertEventTransition(from, "cancelled", {cancelReason: "erro", cancelledAt: T}),
+        "missing_cancellation_metadata",
+        "invalid_value",
+      );
+      // full metadata → success, reason trimmed
+      const r = assertEventTransition(from, "cancelled", {
+        cancelReason: "  duplicado  ",
+        cancelledAt: T,
+        cancelledBy: ACTOR,
+      });
+      assert.ok(r.cancellation);
+      assert.strictEqual(r.cancellation!.cancelReason, "duplicado");
+      assert.strictEqual(r.cancellation!.cancelledAt, T);
+      assert.deepStrictEqual(r.cancellation!.cancelledBy, ACTOR);
+    }
+  });
+
+  test("non-cancel transition forbids ANY cancellation metadata", () => {
+    expectDomainError(
+      () => assertEventTransition("draft", "final", {cancelReason: "x"}),
+      "unexpected_cancellation_metadata",
+      "invalid_value",
+    );
+    expectDomainError(
+      () => assertEventTransition("draft", "final", {cancelledAt: T}),
+      "unexpected_cancellation_metadata",
+      "invalid_value",
+    );
+    expectDomainError(
+      () => assertEventTransition("draft", "final", {cancelledBy: ACTOR}),
+      "unexpected_cancellation_metadata",
+      "invalid_value",
+    );
+  });
+
+  // ── At-rest cancellation consistency (constructor invariant) ─────────────────
+
+  test("at-rest: draft/final with no cancellation metadata is consistent", () => {
+    assert.doesNotThrow(() => assertEventCancellationConsistency("draft", {}));
+    assert.doesNotThrow(() => assertEventCancellationConsistency("final", {}));
+  });
+
+  test("at-rest: partial cancellation metadata is incomplete", () => {
+    expectDomainError(
+      () => assertEventCancellationConsistency("cancelled", {cancelReason: "x", cancelledAt: T}),
+      "missing_cancellation_metadata",
+      "invalid_value",
+    );
+  });
+
+  test("at-rest: cancelled status requires full metadata", () => {
+    expectDomainError(
+      () => assertEventCancellationConsistency("cancelled", {}),
+      "missing_cancellation_metadata",
+      "invalid_value",
+    );
+    assert.doesNotThrow(() =>
+      assertEventCancellationConsistency("cancelled", {
+        cancelReason: "x",
+        cancelledAt: T,
+        cancelledBy: ACTOR,
+      }),
+    );
+  });
+
+  test("at-rest: non-cancelled status with any metadata is unexpected", () => {
+    expectDomainError(
+      () => assertEventCancellationConsistency("final", {cancelReason: "x", cancelledAt: T, cancelledBy: ACTOR}),
+      "unexpected_cancellation_metadata",
+      "invalid_value",
+    );
+  });
+
+  test("at-rest: cancelled with blank reason fails as missing_cancel_reason", () => {
+    expectDomainError(
+      () => assertEventCancellationConsistency("cancelled", {cancelReason: "   ", cancelledAt: T, cancelledBy: ACTOR}),
+      "missing_cancel_reason",
+      "invalid_value",
+    );
+  });
+
+  // ── Finalization immutability predicate ──────────────────────────────────────
+
+  test("only draft events are content-editable; final and cancelled are immutable", () => {
+    assert.strictEqual(isEventContentEditable("draft"), true);
+    assert.strictEqual(isEventContentImmutable("draft"), false);
+    assert.strictEqual(isEventContentImmutable("final"), true);
+    assert.strictEqual(isEventContentImmutable("cancelled"), true);
+    assert.strictEqual(isEventContentEditable("final"), false);
+    assert.strictEqual(isEventContentEditable("cancelled"), false);
+  });
+
+  // ── ClinicalCase reopen HISTORY at rest (CLIN-WRITER-1.W6.P0.D1) ────────────
+  //
+  // Transcribed independently from the corrected Dart `ClinicalCase` constructor
+  // invariants. The load-bearing property: the tuple's validity does NOT depend
+  // on the case's current status, so a reopened case can still be discharged or
+  // cancelled afterwards without its history becoming unrepresentable.
+
+  const REOPEN_TUPLE = {
+    reopenedAt: T,
+    reopenedBy: ACTOR,
+    previousStatus: "discharged" as ClinicalCaseStatus,
+    reopenReason: "Alta prematura",
+    reopenedCount: 1,
+  };
+
+  test("never reopened: absent tuple with count 0 is consistent", () => {
+    assert.strictEqual(assertCaseReopenConsistency(), null);
+    assert.strictEqual(assertCaseReopenConsistency({}), null);
+    assert.strictEqual(assertCaseReopenConsistency({reopenedCount: 0}), null);
+    // Explicit nulls are the same fact as omission.
+    assert.strictEqual(
+      assertCaseReopenConsistency({
+        reopenedAt: null,
+        reopenedBy: null,
+        previousStatus: null,
+        reopenReason: null,
+        reopenedCount: null,
+      }),
+      null,
+    );
+  });
+
+  test("reopen history is valid under EVERY current case status", () => {
+    // The whole point of D1: no status participates in the at-rest check.
+    for (const status of CLINICAL_CASE_STATUSES) {
+      const history = assertCaseReopenConsistency(REOPEN_TUPLE);
+      assert.ok(history, `history must validate while case is ${status}`);
+      assert.strictEqual(history.reopenedCount, 1);
+      assert.strictEqual(history.previousStatus, "discharged");
+      assert.strictEqual(history.reopenReason, "Alta prematura");
+      assert.strictEqual(history.reopenedAt, T);
+      assert.deepStrictEqual(history.reopenedBy, ACTOR);
+    }
+  });
+
+  test("post-reopen re-discharge and cancellation histories are representable", () => {
+    // discharge #1 → reopen #1 → discharge #2 : count survives the re-closure.
+    const rediscarged = assertCaseReopenConsistency(REOPEN_TUPLE);
+    assert.strictEqual(rediscarged?.reopenedCount, 1);
+    // …and a later cancellation likewise preserves it.
+    const cancelled = assertCaseReopenConsistency(REOPEN_TUPLE);
+    assert.strictEqual(cancelled?.reopenedCount, 1);
+    // Second reopen: cumulative count, never reset.
+    const second = assertCaseReopenConsistency({
+      ...REOPEN_TUPLE,
+      reopenedCount: 2,
+    });
+    assert.strictEqual(second?.reopenedCount, 2);
+    const many = assertCaseReopenConsistency({...REOPEN_TUPLE, reopenedCount: 7});
+    assert.strictEqual(many?.reopenedCount, 7);
+  });
+
+  test("reopen history: reason is trimmed like the Dart aggregate", () => {
+    const history = assertCaseReopenConsistency({
+      ...REOPEN_TUPLE,
+      reopenReason: "  Alta prematura  ",
+    });
+    assert.strictEqual(history?.reopenReason, "Alta prematura");
+  });
+
+  test("reopen history: negative or non-integer count fails closed", () => {
+    // The code is asserted, not merely "some rejection": without this guard the
+    // tuple invariants would still reject a negative count, but as
+    // `inconsistent_reopen_metadata` / `inconsistent_reopened_count`. The count
+    // guard must be the one that answers, in every tuple configuration.
+    for (const reopenedCount of [-1, -7]) {
+      expectDomainError(
+        () => assertCaseReopenConsistency({...REOPEN_TUPLE, reopenedCount}),
+        "invalid_reopened_count",
+        "invalid_value",
+      );
+      expectDomainError(
+        () => assertCaseReopenConsistency({reopenedCount}),
+        "invalid_reopened_count",
+        "invalid_value",
+      );
+      expectDomainError(
+        () => assertCaseReopenConsistency({reopenedAt: T, reopenedCount}),
+        "invalid_reopened_count",
+        "invalid_value",
+      );
+    }
+    for (const reopenedCount of [1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expectDomainError(
+        () => assertCaseReopenConsistency({...REOPEN_TUPLE, reopenedCount}),
+        "invalid_reopened_count",
+        "invalid_value",
+      );
+    }
+  });
+
+  test("reopen history: count 0 with a tuple is inconsistent", () => {
+    expectDomainError(
+      () => assertCaseReopenConsistency({...REOPEN_TUPLE, reopenedCount: 0}),
+      "inconsistent_reopen_metadata",
+      "invalid_value",
+    );
+  });
+
+  test("reopen history: count > 0 without any tuple is inconsistent", () => {
+    expectDomainError(
+      () => assertCaseReopenConsistency({reopenedCount: 1}),
+      "inconsistent_reopened_count",
+      "invalid_value",
+    );
+    expectDomainError(
+      () => assertCaseReopenConsistency({reopenedCount: 4}),
+      "inconsistent_reopened_count",
+      "invalid_value",
+    );
+  });
+
+  test("reopen history: every partial tuple fails closed", () => {
+    const fields = [
+      "reopenedAt",
+      "reopenedBy",
+      "previousStatus",
+      "reopenReason",
+    ] as const;
+    // Each field alone.
+    for (const field of fields) {
+      expectDomainError(
+        () => assertCaseReopenConsistency({[field]: REOPEN_TUPLE[field]}),
+        "incomplete_reopen_metadata",
+        "invalid_value",
+      );
+    }
+    // Each field missing from an otherwise complete tuple.
+    for (const field of fields) {
+      const partial: Record<string, unknown> = {...REOPEN_TUPLE};
+      delete partial[field];
+      expectDomainError(
+        () => assertCaseReopenConsistency(partial),
+        "incomplete_reopen_metadata",
+        "invalid_value",
+      );
+    }
+  });
+
+  test("reopen history: previous_status must be discharged", () => {
+    for (const previousStatus of CLINICAL_CASE_STATUSES) {
+      if (previousStatus === "discharged") continue;
+      expectDomainError(
+        () => assertCaseReopenConsistency({...REOPEN_TUPLE, previousStatus}),
+        "inconsistent_reopen_metadata",
+        "invalid_value",
+      );
+    }
+  });
+
+  test("reopen history: blank reason fails closed", () => {
+    // COMPLETE tuple + blank reason: the reason guard is the one that answers.
+    for (const reopenReason of ["", "   ", "\t\n"]) {
+      expectDomainError(
+        () => assertCaseReopenConsistency({...REOPEN_TUPLE, reopenReason}),
+        "missing_reopen_reason",
+        "invalid_value",
+      );
+    }
+  });
+
+  test("reopen history: tuple completeness is decided BEFORE reason", () => {
+    // ORDER GUARD (CLIN-WRITER-1.W6.P0.D1.C1). These fixtures are the only input
+    // class that can distinguish the two orderings, because they violate BOTH
+    // completeness and the reason rule at once. Dart decides completeness first,
+    // so a TS module that checked the reason first would return
+    // `missing_reopen_reason` where the mobile aggregate returns
+    // `incomplete_reopen_metadata` — silent Dart/server divergence on the very
+    // parity this gate exists to freeze.
+    const blanks = ["", "   ", "\t\n"];
+
+    // CASE A — count > 0, INCOMPLETE tuple, blank reason.
+    for (const reopenReason of blanks) {
+      for (const present of ["reopenedAt", "reopenedBy", "previousStatus"] as const) {
+        expectDomainError(
+          () => assertCaseReopenConsistency({
+            [present]: REOPEN_TUPLE[present],
+            reopenReason,
+            reopenedCount: 1,
+          }),
+          "incomplete_reopen_metadata",
+          "invalid_value",
+        );
+      }
+      // Blank reason as the ONLY present component is still an incomplete tuple.
+      expectDomainError(
+        () => assertCaseReopenConsistency({reopenReason, reopenedCount: 1}),
+        "incomplete_reopen_metadata",
+        "invalid_value",
+      );
+      // Each single field dropped from an otherwise complete tuple.
+      for (const missing of ["reopenedAt", "reopenedBy", "previousStatus"] as const) {
+        const partial: Record<string, unknown> = {...REOPEN_TUPLE, reopenReason};
+        delete partial[missing];
+        expectDomainError(
+          () => assertCaseReopenConsistency(partial),
+          "incomplete_reopen_metadata",
+          "invalid_value",
+        );
+      }
+    }
+
+    // CASE B — count == 0, partial tuple, blank reason. Orthogonal to A: proves
+    // completeness also outranks the count/tuple coherence rule, not just reason.
+    for (const reopenReason of blanks) {
+      expectDomainError(
+        () => assertCaseReopenConsistency({
+          reopenedAt: T,
+          reopenReason,
+          reopenedCount: 0,
+        }),
+        "incomplete_reopen_metadata",
+        "invalid_value",
+      );
+    }
+
+    // And the negative count still outranks completeness, keeping the full chain
+    // pinned end to end: count → completeness → reason → prev/count → count-only.
+    expectDomainError(
+      () => assertCaseReopenConsistency({
+        reopenedAt: T,
+        reopenReason: "   ",
+        reopenedCount: -1,
+      }),
+      "invalid_reopened_count",
+      "invalid_value",
+    );
+  });
+
+  test("at-rest history consistency is NOT permission to reopen", () => {
+    // THE separation D1 exists to prove. A cancelled case may legitimately carry
+    // reopen history…
+    assert.ok(assertCaseReopenConsistency(REOPEN_TUPLE));
+    // …while the reopen ACTION remains denied from cancelled,
+    expectDomainError(
+      () => assertCaseReopen("cancelled", "open", "Erro de alta"),
+      "invalid_case_reopen",
+      "illegal_transition",
+    );
+    // denied from every active status (source must be discharged),
+    for (const from of CLINICAL_CASE_STATUSES) {
+      if (from === "discharged") continue;
+      expectDomainError(
+        () => assertCaseReopen(from, "open", "Erro de alta"),
+        "invalid_case_reopen",
+        "illegal_transition",
+      );
+    }
+    // denied into terminal destinations,
+    for (const destination of ["discharged", "cancelled"] as const) {
+      expectDomainError(
+        () => assertCaseReopen("discharged", destination, "Erro de alta"),
+        "invalid_case_reopen",
+        "illegal_transition",
+      );
+    }
+    // and allowed from discharged into each active destination.
+    for (const destination of caseReopenDestinations()) {
+      assert.deepStrictEqual(
+        assertCaseReopen("discharged", destination, " Erro de alta "),
+        {destination, reason: "Erro de alta"},
+      );
+    }
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // ClinicalActor runtime validity (CLIN-WRITER-1.W6.P0.K1)
+  //
+  // Transcribed from the Dart `RecordedBy` constructor + `_required`, NOT from
+  // the TS module's own logic, so this stays a real cross-check.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  test("actor: valid actor accepted and trimmed like Dart _required", () => {
+    assert.deepStrictEqual(
+      assertClinicalActor({
+        uid: "  u1 ",
+        name: "  Nome ",
+        internalRole: "  condutor ",
+      }),
+      {uid: "u1", name: "Nome", internalRole: "condutor"},
+    );
+    // Already-clean input is returned unchanged.
+    assert.deepStrictEqual(assertClinicalActor(ACTOR), ACTOR);
+  });
+
+  test("actor: internalRole is NOT an enum — unknown non-empty role accepted", () => {
+    // Dart accepts any non-blank string here; adding an enum would be FALSE
+    // strictness and a parity break in the opposite direction.
+    for (const role of ["xyz-nao-canonico", "admin", "condutor", "veterinario", "x"]) {
+      assert.strictEqual(
+        assertClinicalActor({uid: "u", name: "N", internalRole: role}).internalRole,
+        role,
+      );
+    }
+  });
+
+  test("actor: unknown extra keys are tolerated (required-field contract)", () => {
+    assert.deepStrictEqual(
+      assertClinicalActor({
+        uid: "u", name: "N", internalRole: "condutor",
+        rogue: 1, internal_role: "ignored", extra: {deep: true},
+      }),
+      {uid: "u", name: "N", internalRole: "condutor"},
+    );
+  });
+
+  test("actor: each blank/absent/mistyped field maps to its Dart code", () => {
+    const bad: Array<[string, unknown]> = [
+      ["missing", undefined],
+      ["null", null],
+      ["blank", ""],
+      ["whitespace", "   "],
+      ["tab/newline", "\t\n"],
+      ["number", 123],
+      ["boolean", true],
+      ["object", {}],
+      ["array", []],
+    ];
+    for (const [label, value] of bad) {
+      expectDomainError(
+        () => assertClinicalActor({...ACTOR, uid: value}),
+        "missing_uid", "invalid_value",
+      );
+      expectDomainError(
+        () => assertClinicalActor({...ACTOR, name: value}),
+        "missing_name", "invalid_value",
+      );
+      expectDomainError(
+        () => assertClinicalActor({...ACTOR, internalRole: value}),
+        "missing_internal_role", "invalid_value",
+      );
+      assert.ok(label.length > 0);
+    }
+  });
+
+  test("actor: a non-object actor fails closed through the same codes", () => {
+    // Dart cannot even CONSTRUCT RecordedBy from these, so there is no Dart code
+    // to mirror; inventing `invalid_actor` would create authority Dart lacks.
+    for (const notAnActor of [null, undefined, "actor", 7, true, [], [ACTOR]]) {
+      expectDomainError(
+        () => assertClinicalActor(notAnActor),
+        "missing_uid", "invalid_value",
+      );
+    }
+    // An ARRAY carrying actor-shaped properties is the ONLY input that tells the
+    // `Array.isArray` guard apart from a bare `value ?? {}`: a plain `[]` has no
+    // `uid` and would reject either way. Without this fixture, dropping the
+    // array check is an undetectable mutation.
+    const arrayWithActorProps: unknown[] & Record<string, unknown> =
+      [] as never;
+    arrayWithActorProps.uid = "u";
+    arrayWithActorProps.name = "N";
+    arrayWithActorProps.internalRole = "condutor";
+    expectDomainError(
+      () => assertClinicalActor(arrayWithActorProps),
+      "missing_uid", "invalid_value",
+    );
+  });
+
+  test("actor: multi-fault fixtures fail closed (order NOT frozen)", () => {
+    // Deliberately asserts only that these REJECT, never which field wins:
+    // no consumer branches on actor error order, so freezing it would be
+    // gold-plating (contrast D1.C1, where ordering WAS the audited property).
+    for (const broken of [
+      {uid: "", name: "", internalRole: ""},
+      {uid: "", name: "N", internalRole: ""},
+      {uid: 1, name: 2, internalRole: 3},
+      {},
+    ]) {
+      assert.throws(
+        () => assertClinicalActor(broken),
+        (error: unknown) => error instanceof ClinicalDomainError,
+        `multi-fault actor should reject: ${JSON.stringify(broken)}`,
+      );
+    }
+  });
+
+  test("actor: reopen history validates reopenedBy without disturbing D1 order", () => {
+    const base = {
+      reopenedAt: new Date("2026-02-01T00:00:00.000Z"),
+      previousStatus: "discharged" as ClinicalCaseStatus,
+      reopenReason: "Alta prematura",
+      reopenedCount: 1,
+    };
+    // Valid actor: accepted AND normalized on the way out.
+    assert.deepStrictEqual(
+      assertCaseReopenConsistency({
+        ...base,
+        reopenedBy: {uid: " u ", name: " N ", internalRole: " condutor "},
+      })!.reopenedBy,
+      {uid: "u", name: "N", internalRole: "condutor"},
+    );
+    // Malformed persisted actor in an otherwise COMPLETE, COHERENT tuple:
+    // this is the exact W6 read path, and it must fail closed.
+    for (const [value, code] of [
+      [{uid: "", name: "N", internalRole: "condutor"}, "missing_uid"],
+      [{uid: "u", name: "  ", internalRole: "condutor"}, "missing_name"],
+      [{uid: "u", name: "N", internalRole: ""}, "missing_internal_role"],
+      [{}, "missing_uid"],
+      // The PERSISTED shape must NOT satisfy the domain directly: the boundary
+      // adapter is responsible for snake -> camel translation.
+      [{uid: "u", name: "N", internal_role: "condutor"}, "missing_internal_role"],
+    ] as Array<[unknown, string]>) {
+      expectDomainError(
+        () => assertCaseReopenConsistency({...base, reopenedBy: value as never}),
+        code, "invalid_value",
+      );
+    }
+    // FROZEN D1 ORDER GUARD: a tuple that is incomplete or incoherent must still
+    // report its D1 code, never an actor code, even with a broken actor.
+    expectDomainError(
+      () => assertCaseReopenConsistency({
+        reopenedAt: base.reopenedAt, reopenedBy: {} as never, reopenedCount: 1,
+      }),
+      "incomplete_reopen_metadata", "invalid_value",
+    );
+    expectDomainError(
+      () => assertCaseReopenConsistency({...base, reopenedBy: {} as never, reopenedCount: 0}),
+      "inconsistent_reopen_metadata", "invalid_value",
+    );
+    expectDomainError(
+      () => assertCaseReopenConsistency({
+        ...base, reopenedBy: {} as never, previousStatus: "open",
+      }),
+      "inconsistent_reopen_metadata", "invalid_value",
+    );
+    expectDomainError(
+      () => assertCaseReopenConsistency({
+        ...base, reopenedBy: {} as never, reopenReason: "   ",
+      }),
+      "missing_reopen_reason", "invalid_value",
+    );
+    expectDomainError(
+      () => assertCaseReopenConsistency({...base, reopenedBy: {} as never, reopenedCount: -1}),
+      "invalid_reopened_count", "invalid_value",
+    );
+  });
+
+  test("actor: event cancellation validates cancelledBy on both seams", () => {
+    const at = new Date("2026-02-01T00:00:00.000Z");
+    // Transition seam: valid actor normalized into the returned cancellation.
+    assert.deepStrictEqual(
+      assertEventTransition("final", "cancelled", {
+        cancelReason: " Duplicado ",
+        cancelledAt: at,
+        cancelledBy: {uid: " u ", name: " N ", internalRole: " admin "},
+      }).cancellation!.cancelledBy,
+      {uid: "u", name: "N", internalRole: "admin"},
+    );
+    for (const [value, code] of [
+      [{uid: "", name: "N", internalRole: "condutor"}, "missing_uid"],
+      [{uid: "u", name: "", internalRole: "condutor"}, "missing_name"],
+      [{uid: "u", name: "N", internalRole: " "}, "missing_internal_role"],
+      [{uid: "u", name: "N", internal_role: "condutor"}, "missing_internal_role"],
+    ] as Array<[unknown, string]>) {
+      expectDomainError(
+        () => assertEventTransition("final", "cancelled", {
+          cancelReason: "Duplicado", cancelledAt: at, cancelledBy: value as never,
+        }),
+        code, "invalid_value",
+      );
+      // At-rest seam: a stored cancelled event with a corrupt actor fails closed.
+      expectDomainError(
+        () => assertEventCancellationConsistency("cancelled", {
+          cancelReason: "Duplicado", cancelledAt: at, cancelledBy: value as never,
+        }),
+        code, "invalid_value",
+      );
+    }
+    // FROZEN ORDER GUARD: incompleteness and reason still outrank actor validity.
+    expectDomainError(
+      () => assertEventTransition("final", "cancelled", {
+        cancelReason: "Duplicado", cancelledBy: {} as never,
+      }),
+      "missing_cancellation_metadata", "invalid_value",
+    );
+    expectDomainError(
+      () => assertEventTransition("final", "cancelled", {
+        cancelReason: "  ", cancelledAt: at, cancelledBy: {} as never,
+      }),
+      "missing_cancel_reason", "invalid_value",
+    );
+    expectDomainError(
+      () => assertEventCancellationConsistency("cancelled", {
+        cancelReason: "  ", cancelledAt: at, cancelledBy: {} as never,
+      }),
+      "missing_cancel_reason", "invalid_value",
+    );
+    // A non-cancelled event carrying metadata is still the unexpected-metadata
+    // fault, not an actor fault.
+    expectDomainError(
+      () => assertEventCancellationConsistency("final", {
+        cancelReason: "x", cancelledAt: at, cancelledBy: {} as never,
+      }),
+      "unexpected_cancellation_metadata", "invalid_value",
+    );
+  });
+
+  test("case closure: assertClinicalCaseClosureType parses known types and rejects unknown", () => {
+    assert.deepStrictEqual(CLINICAL_CASE_CLOSURE_TYPES, ["discharge", "cancelled"]);
+    assert.strictEqual(assertClinicalCaseClosureType("discharge"), "discharge");
+    assert.strictEqual(assertClinicalCaseClosureType("cancelled"), "cancelled");
+    assert.strictEqual(isClinicalCaseClosureType("discharge"), true);
+    assert.strictEqual(isClinicalCaseClosureType("cancelled"), true);
+    assert.strictEqual(isClinicalCaseClosureType("administrative"), false);
+    assert.strictEqual(isClinicalCaseClosureType("unknown"), false);
+    expectDomainError(
+      () => assertClinicalCaseClosureType("administrative"),
+      "unknown_closure_type",
+      "invalid_value",
+    );
+    expectDomainError(
+      () => assertClinicalCaseClosureType("xyz"),
+      "unknown_closure_type",
+      "invalid_value",
+    );
+  });
+
+  test("case closure: active cases must have NO closure metadata (unexpected_closure_metadata)", () => {
+    const activeStatuses: ClinicalCaseStatus[] = [
+      "open",
+      "under_investigation",
+      "under_treatment",
+      "monitoring",
+    ];
+    const validActor = {uid: "u1", name: "Dr. Vet", internalRole: "veterinario"};
+    const now = new Date("2026-08-28T00:00:00Z");
+
+    for (const status of activeStatuses) {
+      // Clean active case has null closure result
+      assert.strictEqual(assertCaseClosureConsistency(status, {}), null);
+      assert.strictEqual(
+        assertCaseClosureConsistency(status, {
+          closedAt: null,
+          closedBy: null,
+          closureType: null,
+          closureReason: null,
+        }),
+        null,
+      );
+
+      // Any present field throws unexpected_closure_metadata
+      expectDomainError(
+        () => assertCaseClosureConsistency(status, {closedAt: now}),
+        "unexpected_closure_metadata",
+        "invalid_value",
+      );
+      expectDomainError(
+        () => assertCaseClosureConsistency(status, {closedBy: validActor}),
+        "unexpected_closure_metadata",
+        "invalid_value",
+      );
+      expectDomainError(
+        () => assertCaseClosureConsistency(status, {closureType: "discharge"}),
+        "unexpected_closure_metadata",
+        "invalid_value",
+      );
+      expectDomainError(
+        () => assertCaseClosureConsistency(status, {closureReason: "Motivo"}),
+        "unexpected_closure_metadata",
+        "invalid_value",
+      );
+    }
+  });
+
+  test("case closure: discharged case requires valid closedAt, closedBy, and closureType=discharge", () => {
+    const validActor = {uid: "u1", name: "Dr. Vet", internalRole: "veterinario"};
+    const now = new Date("2026-08-28T00:00:00Z");
+
+    // Valid without reason
+    const result1 = assertCaseClosureConsistency("discharged", {
+      closedAt: now,
+      closedBy: validActor,
+      closureType: "discharge",
+    });
+    assert.deepStrictEqual(result1, {
+      closedAt: now,
+      closedBy: {uid: "u1", name: "Dr. Vet", internalRole: "veterinario"},
+      closureType: "discharge",
+    });
+
+    // Valid with trimmed reason
+    const result2 = assertCaseClosureConsistency("discharged", {
+      closedAt: now,
+      closedBy: validActor,
+      closureType: "discharge",
+      closureReason: "  Paciente recuperado integralmente  ",
+    });
+    assert.deepStrictEqual(result2, {
+      closedAt: now,
+      closedBy: {uid: "u1", name: "Dr. Vet", internalRole: "veterinario"},
+      closureType: "discharge",
+      closureReason: "Paciente recuperado integralmente",
+    });
+
+    // Missing closedAt
+    expectDomainError(
+      () => assertCaseClosureConsistency("discharged", {
+        closedBy: validActor,
+        closureType: "discharge",
+      }),
+      "incomplete_closure_metadata",
+      "invalid_value",
+    );
+
+    // Missing closedBy
+    expectDomainError(
+      () => assertCaseClosureConsistency("discharged", {
+        closedAt: now,
+        closureType: "discharge",
+      }),
+      "incomplete_closure_metadata",
+      "invalid_value",
+    );
+
+    // Missing closureType
+    expectDomainError(
+      () => assertCaseClosureConsistency("discharged", {
+        closedAt: now,
+        closedBy: validActor,
+      }),
+      "incomplete_closure_metadata",
+      "invalid_value",
+    );
+
+    // Wrong closureType ("cancelled")
+    expectDomainError(
+      () => assertCaseClosureConsistency("discharged", {
+        closedAt: now,
+        closedBy: validActor,
+        closureType: "cancelled",
+      }),
+      "inconsistent_closure_metadata",
+      "invalid_value",
+    );
+
+    // Unsupported closureType ("administrative")
+    expectDomainError(
+      () => assertCaseClosureConsistency("discharged", {
+        closedAt: now,
+        closedBy: validActor,
+        closureType: "administrative" as never,
+      }),
+      "inconsistent_closure_metadata",
+      "invalid_value",
+    );
+
+    // Whitespace-only reason fails when provided
+    expectDomainError(
+      () => assertCaseClosureConsistency("discharged", {
+        closedAt: now,
+        closedBy: validActor,
+        closureType: "discharge",
+        closureReason: "   ",
+      }),
+      "missing_closure_reason",
+      "invalid_value",
+    );
+  });
+
+  test("case closure: cancelled case requires valid closedAt, closedBy, closureType=cancelled, and non-empty closureReason", () => {
+    const validActor = {uid: "u2", name: "Admin GCM", internalRole: "admin"};
+    const now = new Date("2026-08-28T00:00:00Z");
+
+    // Valid cancelled closure
+    const result = assertCaseClosureConsistency("cancelled", {
+      closedAt: now,
+      closedBy: validActor,
+      closureType: "cancelled",
+      closureReason: "  Caso aberto em duplicidade  ",
+    });
+    assert.deepStrictEqual(result, {
+      closedAt: now,
+      closedBy: {uid: "u2", name: "Admin GCM", internalRole: "admin"},
+      closureType: "cancelled",
+      closureReason: "Caso aberto em duplicidade",
+    });
+
+    // Missing closureReason
+    expectDomainError(
+      () => assertCaseClosureConsistency("cancelled", {
+        closedAt: now,
+        closedBy: validActor,
+        closureType: "cancelled",
+      }),
+      "missing_closure_reason",
+      "invalid_value",
+    );
+
+    // Whitespace-only closureReason
+    expectDomainError(
+      () => assertCaseClosureConsistency("cancelled", {
+        closedAt: now,
+        closedBy: validActor,
+        closureType: "cancelled",
+        closureReason: "   ",
+      }),
+      "missing_closure_reason",
+      "invalid_value",
+    );
+
+    // Wrong closureType ("discharge")
+    expectDomainError(
+      () => assertCaseClosureConsistency("cancelled", {
+        closedAt: now,
+        closedBy: validActor,
+        closureType: "discharge",
+        closureReason: "Duplicado",
+      }),
+      "inconsistent_closure_metadata",
+      "invalid_value",
+    );
+
+    // Incomplete tuple (missing closedAt)
+    expectDomainError(
+      () => assertCaseClosureConsistency("cancelled", {
+        closedBy: validActor,
+        closureType: "cancelled",
+        closureReason: "Duplicado",
+      }),
+      "incomplete_closure_metadata",
+      "invalid_value",
+    );
+  });
+
+  test("case closure: actor validation in closure tuple fails closed on malformed actors", () => {
+    const now = new Date("2026-08-28T00:00:00Z");
+
+    // Missing UID in discharged closure actor
+    expectDomainError(
+      () => assertCaseClosureConsistency("discharged", {
+        closedAt: now,
+        closedBy: {uid: "", name: "Dr Vet", internalRole: "veterinario"} as never,
+        closureType: "discharge",
+      }),
+      "missing_uid",
+      "invalid_value",
+    );
+
+    // Missing name in cancelled closure actor
+    expectDomainError(
+      () => assertCaseClosureConsistency("cancelled", {
+        closedAt: now,
+        closedBy: {uid: "u1", name: "  ", internalRole: "admin"} as never,
+        closureType: "cancelled",
+        closureReason: "Motivo valido",
+      }),
+      "missing_name",
+      "invalid_value",
+    );
+
+    // Missing role in cancelled closure actor
+    expectDomainError(
+      () => assertCaseClosureConsistency("cancelled", {
+        closedAt: now,
+        closedBy: {uid: "u1", name: "Admin", internalRole: ""} as never,
+        closureType: "cancelled",
+        closureReason: "Motivo valido",
+      }),
+      "missing_internal_role",
+      "invalid_value",
+    );
+  });
+
+  if (failed > 0) {
+    console.error(`\n${failed} test(s) failed, ${passed} passed`);
+    process.exitCode = 1;
+    return;
+  }
+  console.log(`clinical_domain_test: all ${passed} tests passed`);
+}
+
+main();

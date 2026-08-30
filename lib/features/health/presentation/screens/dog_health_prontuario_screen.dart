@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -21,11 +20,17 @@ import 'package:canil_gcm/features/health/data/health_service.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
 import 'package:canil_gcm/features/health/presentation/screens/health_type_selector_screen.dart';
 import 'package:canil_gcm/features/history/presentation/screens/history_screen.dart';
+import 'package:canil_gcm/features/health/data/nutrition/firebase_functions_health_nutrition_mutation_gateway.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_adhoc_meal_form_sheet.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_controller.dart';
+import 'package:canil_gcm/features/health/presentation/nutrition/health_nutrition_mutation_outcome.dart';
+import 'package:canil_gcm/features/health/presentation/weight/health_weight_form_sheet.dart';
+import 'package:canil_gcm/features/health/presentation/weight/prontuario_weight_facts.dart';
+import 'package:canil_gcm/features/health/presentation/weight/prontuario_weight_read_state.dart';
 import 'package:canil_gcm/features/nutrition/data/nutrition_ai_service.dart';
 import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
 import 'package:canil_gcm/features/nutrition/domain/nutrition_prescription.dart';
 import 'package:canil_gcm/features/nutrition/domain/nutrition_supplement.dart';
-import 'package:canil_gcm/features/nutrition/presentation/screens/feeding_registration_screen.dart';
 import 'package:canil_gcm/features/nutrition/presentation/viewmodels/nutrition_viewmodel.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/active_shift_dashboard_screen.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
@@ -46,6 +51,9 @@ class _DogHealthProntuarioScreenState extends State<DogHealthProntuarioScreen> {
   final HealthService _healthService = HealthService();
   final DogProfileService _profileService = DogProfileService();
   final WeightHistoryService _weightHistoryService = WeightHistoryService();
+  late final ProntuarioWeightResolver _resolver = ProntuarioWeightResolver(
+    _weightHistoryService,
+  );
 
   Stream<Dog?>? _dogStream;
   Future<_HealthProntuarioData>? _dataFuture;
@@ -76,13 +84,37 @@ class _DogHealthProntuarioScreenState extends State<DogHealthProntuarioScreen> {
     final results = await Future.wait([
       _healthService.getHealthLogsForDog(dogId),
       _profileService.getDocuments(dogId),
-      _weightHistoryService.getHistory(dogId, limit: 20),
+      _loadWeight(dogId),
     ]);
     return _HealthProntuarioData(
       logs: results[0] as List<HealthLogModel>,
       documents: results[1] as List<DogDocument>,
-      weightRecords: results[2] as List<WeightRecord>,
+      weight: results[2] as _ProntuarioWeight,
     );
+  }
+
+  /// Peso canônico delegado ao resolver testável (WEIGHT-01E-C2B.1A).
+  ///
+  /// A resolução de estado vive em [ProntuarioWeightResolver], que consome
+  /// [WeightHistoryService.getLatest] (coleção completa + policy compartilhada)
+  /// e não conhece `dogs.weight`. A tela apenas apresenta o resultado — não
+  /// existe segundo caminho local de seleção de peso atual.
+  ///
+  /// A série histórica é carregada à parte e é irrelevante para o atual: em
+  /// estado bloqueado ou indisponível ela fica vazia e nada é promovido.
+  Future<_ProntuarioWeight> _loadWeight(String dogId) async {
+    final readState = await _resolver.resolve(dogId);
+    if (!readState.isCurrent) {
+      return _ProntuarioWeight(readState: readState);
+    }
+    List<WeightRecord> records = const [];
+    try {
+      records = await _weightHistoryService.getHistory(dogId);
+    } catch (e) {
+      // Série indisponível não invalida o atual já resolvido canonicamente.
+      debugPrint('[Prontuario] série de peso indisponível: $e');
+    }
+    return _ProntuarioWeight(readState: readState, records: records);
   }
 
   void _refresh() {
@@ -154,7 +186,8 @@ class _DogHealthProntuarioScreenState extends State<DogHealthProntuarioScreen> {
   }
 
   Future<void> _openHealthActionHub(Dog dog) async {
-    final latestWeight = (await _dataFuture)?.latestWeight ?? dog.weight;
+    // Somente peso canônico: `dog.weight` é projeção legada, não evidência.
+    final latestWeight = (await _dataFuture)?.latestWeight;
     if (!mounted) return;
     final saved = await Navigator.of(context, rootNavigator: true).push<bool>(
       MaterialPageRoute(
@@ -193,54 +226,64 @@ class _DogHealthProntuarioScreenState extends State<DogHealthProntuarioScreen> {
     Dog dog, {
     BuildContext? hostContext,
   }) async {
-    final latest = (await _dataFuture)?.latestWeight ?? dog.weight ?? 25.0;
-    if (!mounted) return false;
-    final saved = await showModalBottomSheet<bool>(
+    final saved = await showHealthWeightFormSheet(
       context: hostContext ?? context,
-      isScrollControlled: true,
-      backgroundColor: AppTheme.transparent,
-      builder: (_) => _WeightRegistrationSheet(
-        initialWeight: latest,
-        onSave: (weight, notes) async {
-          final user = FirebaseAuth.instance.currentUser;
-          await _weightHistoryService.addRecord(
-            dog.id,
-            WeightRecord(
-              weightKg: weight,
-              measuredAt: DateTime.now(),
-              measuredBy: user?.uid ?? user?.email ?? 'unknown',
-              context: 'canil',
-              notes: notes,
-            ),
-          );
-        },
-      ),
+      dog: dog,
+      onRefreshAfterSuccess: () async => _refresh(),
     );
     if (!mounted) return saved == true;
-    if (saved == true) _refresh();
     return saved == true;
   }
 
   Future<bool> _openFeedingRegistration(
     Dog dog, {
     BuildContext? hostContext,
+    HealthNutritionMutationController? mutationControllerOverride,
   }) async {
-    final saved =
-        await Navigator.of(
-          hostContext ?? context,
-          rootNavigator: true,
-        ).push<bool>(
-          MaterialPageRoute(
-            builder: (_) =>
-                FeedingRegistrationScreen(dogId: dog.id, dogName: dog.name),
+    final controller =
+        mutationControllerOverride ??
+        HealthNutritionMutationController(
+          gateway: FirebaseFunctionsHealthNutritionMutationGateway(),
+        );
+    final outcome =
+        await showModalBottomSheet<HealthNutritionMutationUiOutcome>(
+          context: hostContext ?? context,
+          isScrollControlled: true,
+          backgroundColor: AppTheme.surfacePanel,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          builder: (_) => HealthAdhocMealFormSheet(
+            dogId: dog.id,
+            dogDisplayName: dog.name,
+            dogPhotoUrl: dog.profileImageUrl,
+            controller: controller,
+            onRefreshRequested: () async {
+              final nutritionVM = Provider.of<NutritionViewModel>(
+                context,
+                listen: false,
+              );
+              await nutritionVM.loadForDog(dog.id, forceReload: true);
+              await nutritionVM.loadFullHistory(dog.id);
+              _refresh();
+            },
           ),
         );
-    if (!mounted) return saved == true;
-    if (saved != true) return false;
-    final nutritionVM = Provider.of<NutritionViewModel>(context, listen: false);
-    await nutritionVM.loadForDog(dog.id, forceReload: true);
-    await nutritionVM.loadFullHistory(dog.id);
-    return true;
+    if (mutationControllerOverride == null) {
+      controller.dispose();
+    }
+    if (!mounted) return outcome is HealthNutritionMutationUiSuccess;
+    if (outcome is HealthNutritionMutationUiSuccess) {
+      final nutritionVM = Provider.of<NutritionViewModel>(
+        context,
+        listen: false,
+      );
+      await nutritionVM.loadForDog(dog.id, forceReload: true);
+      await nutritionVM.loadFullHistory(dog.id);
+      _refresh();
+      return true;
+    }
+    return false;
   }
 
   Future<void> _openUnifiedHistory() async {
@@ -405,7 +448,7 @@ class _HealthProntuarioBody extends StatelessWidget {
                           const SizedBox(height: 12),
                           _DogIdentityCard(
                             dog: dog,
-                            latestWeight: data.latestWeight ?? dog.weight,
+                            latestWeight: data.latestWeight,
                           ),
                           const SizedBox(height: 18),
                           _SectionLabel(title: 'STATUS MÉDICO'),
@@ -428,9 +471,8 @@ class _HealthProntuarioBody extends StatelessWidget {
                             ),
                             const SizedBox(height: 10),
                             _WeightEvolutionCard(
-                              dog: dog,
                               records: data.weightRecords,
-                              legacyLogs: data.weightLogs,
+                              facts: data.weightFacts,
                             ),
                             const SizedBox(height: 18),
                             _SectionLabel(
@@ -563,7 +605,7 @@ class _DogIdentityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayWeight = latestWeight ?? dog.weight;
+    final displayWeight = latestWeight;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -837,6 +879,22 @@ class _QuickStatusRow extends StatelessWidget {
 
   const _QuickStatusRow({required this.dog, required this.data});
 
+  /// Rótulo honesto do peso: distingue ausência, inconclusivo e indisponível.
+  ///
+  /// Nunca exibe `dog.weight`: uma projeção legada não é evidência clínica.
+  static String _weightStatusLabel(_HealthProntuarioData data) {
+    switch (data.weightState) {
+      case ProntuarioWeightState.current:
+        return '${data.latestWeight!.toStringAsFixed(1)} kg';
+      case ProntuarioWeightState.none:
+        return 'Sem registro';
+      case ProntuarioWeightState.inconclusive:
+        return 'Não conclusivo';
+      case ProntuarioWeightState.unavailable:
+        return 'Indisponível';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final vaccines = _statusForVaccines(data.logs);
@@ -848,9 +906,7 @@ class _QuickStatusRow extends StatelessWidget {
           child: _QuickStatusCard(
             icon: Icons.monitor_weight_rounded,
             label: 'Peso',
-            value: data.latestWeight == null
-                ? 'Sem registro'
-                : '${data.latestWeight!.toStringAsFixed(1)} kg',
+            value: _weightStatusLabel(data),
             color: AppTheme.primary,
           ),
         ),
@@ -1054,9 +1110,8 @@ class _HealthResumoTab extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         _WeightEvolutionCard(
-          dog: dog,
           records: data.weightRecords,
-          legacyLogs: data.weightLogs,
+          facts: data.weightFacts,
         ),
         const SizedBox(height: 18),
         _SectionLabel(
@@ -1124,18 +1179,20 @@ class _HealthWeightTab extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         _WeightEvolutionCard(
-          dog: dog,
           records: data.weightRecords,
-          legacyLogs: data.weightLogs,
+          facts: data.weightFacts,
         ),
         const SizedBox(height: 12),
-        _WeightMetricsRow(dog: dog, data: data),
+        _WeightMetricsRow(data: data),
         const SizedBox(height: 18),
         _SectionLabel(title: 'REGISTROS DE PESAGEM'),
         const SizedBox(height: 10),
-        _WeightRecordsList(records: data.weightRecords),
+        _WeightRecordsList(
+          records: data.weightRecords,
+          facts: data.weightFacts,
+        ),
         const SizedBox(height: 12),
-        _WeightTrendInsight(dog: dog, records: data.weightRecords),
+        _WeightTrendInsight(facts: data.weightFacts),
       ],
     );
   }
@@ -2191,24 +2248,20 @@ class _UpcomingVaccineCard extends StatelessWidget {
 }
 
 class _WeightMetricsRow extends StatelessWidget {
-  final Dog dog;
   final _HealthProntuarioData data;
 
-  const _WeightMetricsRow({required this.dog, required this.data});
+  const _WeightMetricsRow({required this.data});
 
   @override
   Widget build(BuildContext context) {
-    final ordered = [...data.weightRecords]
-      ..sort((a, b) => b.measuredAt.compareTo(a.measuredAt));
-    final latest = ordered.isEmpty ? null : ordered.first;
+    // Autoridade única (WEIGHT-01E-C2B.3): peso e data vêm do MESMO registro
+    // canônico. Antes, um sort local por `measuredAt` elegia o "último" e
+    // podia divergir do atual em empate de data.
+    final facts = data.weightFacts;
+    final latest = facts.current;
     final latestDate = latest == null
         ? 'Sem registro'
         : _formatDate(latest.measuredAt);
-    final target = dog.idealWeightMin != null && dog.idealWeightMax != null
-        ? '${((dog.idealWeightMin! + dog.idealWeightMax!) / 2).toStringAsFixed(1)} kg'
-        : 'Não definida';
-    final condition = _weightConditionLabel(dog, data.latestWeight);
-
     return Row(
       children: [
         Expanded(
@@ -2222,19 +2275,21 @@ class _WeightMetricsRow extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: _MetricMiniCard(
-            icon: Icons.track_changes_rounded,
-            label: 'Meta operacional',
-            value: target,
+            icon: Icons.monitor_weight_rounded,
+            label: 'Último peso',
+            value: latest == null
+                ? 'Sem registro'
+                : '${latest.weightKg.toStringAsFixed(1)} kg',
             color: AppTheme.info,
           ),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: _MetricMiniCard(
-            icon: Icons.health_and_safety_rounded,
-            label: 'Condição corporal',
-            value: condition,
-            color: condition == 'Ideal' ? AppTheme.success : AppTheme.warning,
+            icon: Icons.list_alt_rounded,
+            label: 'Registros',
+            value: facts.recordCount.toString(),
+            color: AppTheme.primary,
           ),
         ),
       ],
@@ -2294,27 +2349,23 @@ class _MetricMiniCard extends StatelessWidget {
 }
 
 class _WeightTrendInsight extends StatelessWidget {
-  final Dog dog;
-  final List<WeightRecord> records;
+  final ProntuarioWeightFacts facts;
 
-  const _WeightTrendInsight({required this.dog, required this.records});
+  const _WeightTrendInsight({required this.facts});
 
   @override
   Widget build(BuildContext context) {
-    final ordered = [...records]
-      ..sort((a, b) => b.measuredAt.compareTo(a.measuredAt));
-    final latest = ordered.isEmpty ? null : ordered.first.weightKg;
-    final condition = _weightConditionLabel(dog, latest);
+    // O endpoint atual da tendência é o registro canônico — não o primeiro de
+    // um sort local. O histórico entra apenas como termo anterior do delta.
+    final latest = facts.currentWeightKg;
+    final delta = facts.deltaKg;
     final message = latest == null
-        ? 'Registre pesagens para acompanhar a tendência operacional.'
-        : condition == 'Ideal'
-        ? 'O peso está dentro da faixa ideal cadastrada, com acompanhamento ativo.'
-        : 'Peso fora da faixa ideal cadastrada. Acompanhe a próxima pesagem.';
-    final color = latest == null
-        ? AppTheme.textMuted
-        : condition == 'Ideal'
-        ? AppTheme.success
-        : AppTheme.warning;
+        ? 'Nenhuma pesagem canônica registrada.'
+        : '${facts.recordCount} registro(s) canônico(s); '
+              'último peso: ${latest.toStringAsFixed(1)} kg'
+              '${delta == null ? '' : ' (${delta >= 0 ? '+' : ''}'
+                        '${delta.toStringAsFixed(1)} kg vs anterior)'}.';
+    const color = AppTheme.info;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -2332,7 +2383,7 @@ class _WeightTrendInsight extends StatelessWidget {
               color: color.withAlpha(22),
               borderRadius: BorderRadius.circular(22),
             ),
-            child: Icon(Icons.trending_up_rounded, color: color, size: 22),
+            child: Icon(Icons.monitor_weight_rounded, color: color, size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -2340,9 +2391,7 @@ class _WeightTrendInsight extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  condition == 'Ideal'
-                      ? 'Tendência estável'
-                      : 'Acompanhar tendência',
+                  'Histórico de pesagens',
                   style: GoogleFonts.inter(
                     color: AppTheme.textPrimary,
                     fontSize: 13,
@@ -2635,10 +2684,19 @@ class _SummaryEventRow extends StatelessWidget {
   }
 }
 
+/// Lista de pesagens com variação por linha.
+///
+/// WEIGHT-01E-R: a ordem vem de [compareWeightRecordRecency] — a MESMA
+/// ordenação canônica usada por [ProntuarioWeightFacts] — e não de um
+/// `measuredAt`-only local. O defeito anterior tinha duas consequências:
+/// `List.sort` é instável, então em empate de `measuredAt` a ordem das linhas
+/// (e portanto o `previous` de cada linha) era arbitrária; e o topo da lista
+/// não era necessariamente o atual canônico.
 class _WeightRecordsList extends StatelessWidget {
   final List<WeightRecord> records;
+  final ProntuarioWeightFacts facts;
 
-  const _WeightRecordsList({required this.records});
+  const _WeightRecordsList({required this.records, required this.facts});
 
   @override
   Widget build(BuildContext context) {
@@ -2649,8 +2707,7 @@ class _WeightRecordsList extends StatelessWidget {
       );
     }
 
-    final visible = [...records]
-      ..sort((a, b) => b.measuredAt.compareTo(a.measuredAt));
+    final visible = [...records]..sort(compareWeightRecordRecency);
     final limited = visible.take(6).toList();
     return Container(
       decoration: _panelDecoration(),
@@ -2659,7 +2716,11 @@ class _WeightRecordsList extends StatelessWidget {
           for (var i = 0; i < limited.length; i++)
             _WeightRecordRow(
               record: limited[i],
-              previous: i + 1 < visible.length ? visible[i + 1] : null,
+              // A linha do atual usa o `previous` da decisão canônica; as
+              // demais comparam com o vizinho na mesma ordem canônica.
+              previous: limited[i].id == facts.current?.id
+                  ? facts.previous
+                  : (i + 1 < visible.length ? visible[i + 1] : null),
               isLast: i == limited.length - 1,
             ),
         ],
@@ -2847,16 +2908,18 @@ class _SpecialtyRail extends StatelessWidget {
   }
 }
 
+/// Card de evolução: série cronológica + peso atual CANÔNICO.
+///
+/// WEIGHT-01E-R: o número exibido vem de [ProntuarioWeightFacts.currentWeightKg]
+/// — a decisão da WeightCollectionPolicy — e não do último ponto da série. A
+/// ordenação ASC abaixo existe apenas para desenhar a curva; usar `values.last`
+/// como peso atual fazia este card divergir de `_WeightMetricsRow` na MESMA
+/// tela quando dois registros empatavam em `measuredAt`.
 class _WeightEvolutionCard extends StatelessWidget {
-  final Dog dog;
   final List<WeightRecord> records;
-  final List<HealthLogModel> legacyLogs;
+  final ProntuarioWeightFacts facts;
 
-  const _WeightEvolutionCard({
-    required this.dog,
-    required this.records,
-    this.legacyLogs = const [],
-  });
+  const _WeightEvolutionCard({required this.records, required this.facts});
 
   @override
   Widget build(BuildContext context) {
@@ -2865,19 +2928,7 @@ class _WeightEvolutionCard extends StatelessWidget {
             .map((record) => _WeightPoint(record.measuredAt, record.weightKg))
             .toList()
           ..sort((a, b) => a.date.compareTo(b.date));
-    if (values.isEmpty) {
-      values.addAll(
-        legacyLogs
-            .where((log) => log.weight != null)
-            .map((log) => _WeightPoint(log.date, log.weight!)),
-      );
-      values.sort((a, b) => a.date.compareTo(b.date));
-    }
-    if (values.isEmpty && dog.weight != null) {
-      values.add(_WeightPoint(DateTime.now(), dog.weight!));
-    }
-    final current = values.isNotEmpty ? values.last.value : null;
-    final trend = _weightTrend(values);
+    final current = facts.currentWeightKg;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -2894,21 +2945,6 @@ class _WeightEvolutionCard extends StatelessWidget {
                   style: GoogleFonts.inter(
                     color: AppTheme.textPrimary,
                     fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppTheme.success.withAlpha(25),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  trend,
-                  style: GoogleFonts.inter(
-                    color: AppTheme.success,
-                    fontSize: 10,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -3413,204 +3449,6 @@ class _EventRow extends StatelessWidget {
   }
 }
 
-class _WeightRegistrationSheet extends StatefulWidget {
-  final double initialWeight;
-  final Future<void> Function(double weight, String? notes) onSave;
-
-  const _WeightRegistrationSheet({
-    required this.initialWeight,
-    required this.onSave,
-  });
-
-  @override
-  State<_WeightRegistrationSheet> createState() =>
-      _WeightRegistrationSheetState();
-}
-
-class _WeightRegistrationSheetState extends State<_WeightRegistrationSheet> {
-  final _notesController = TextEditingController();
-  late double _weight;
-  bool _saving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _weight = widget.initialWeight.clamp(5.0, 60.0).toDouble();
-  }
-
-  @override
-  void dispose() {
-    _notesController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    setState(() => _saving = true);
-    try {
-      final notes = _notesController.text.trim();
-      await widget.onSave(_weight, notes.isEmpty ? null : notes);
-      if (!mounted) return;
-      HapticFeedback.mediumImpact();
-      Navigator.of(context).pop(true);
-    } catch (e) {
-      if (!mounted) return;
-      AppFeedback.error(
-        context,
-        e,
-        fallback: 'Não foi possível registrar a pesagem.',
-      );
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bottom = MediaQuery.viewInsetsOf(context).bottom;
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottom),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-        decoration: const BoxDecoration(
-          color: AppTheme.surfaceSheet,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-          border: Border(top: BorderSide(color: AppTheme.primaryDivider)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Registrar pesagem',
-                      style: GoogleFonts.inter(
-                        color: AppTheme.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: _saving ? null : () => Navigator.pop(context),
-                    icon: const Icon(
-                      Icons.close_rounded,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Center(
-                child: Text(
-                  '${_weight.toStringAsFixed(1)} kg',
-                  style: GoogleFonts.inter(
-                    color: AppTheme.primary,
-                    fontSize: 34,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              Slider(
-                value: _weight,
-                min: 5,
-                max: 60,
-                divisions: 550,
-                activeColor: AppTheme.primary,
-                inactiveColor: AppTheme.primary.withAlpha(40),
-                label: '${_weight.toStringAsFixed(1)} kg',
-                onChanged: _saving
-                    ? null
-                    : (value) => setState(() => _weight = value),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '5 kg',
-                    style: GoogleFonts.inter(
-                      color: AppTheme.textTertiary,
-                      fontSize: 11,
-                    ),
-                  ),
-                  Text(
-                    '60 kg',
-                    style: GoogleFonts.inter(
-                      color: AppTheme.textTertiary,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _notesController,
-                minLines: 2,
-                maxLines: 3,
-                enabled: !_saving,
-                style: GoogleFonts.inter(color: AppTheme.textPrimary),
-                decoration: InputDecoration(
-                  labelText: 'Observação opcional',
-                  labelStyle: GoogleFonts.inter(color: AppTheme.textSecondary),
-                  filled: true,
-                  fillColor: AppTheme.surfacePanel,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppTheme.surfaceWhiteBorder),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppTheme.primary),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton.icon(
-                  onPressed: _saving ? null : _save,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    foregroundColor: AppTheme.background,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  icon: _saving
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppTheme.background,
-                          ),
-                        )
-                      : const Icon(Icons.monitor_weight_rounded, size: 18),
-                  label: Text(
-                    _saving ? 'SALVANDO...' : 'SALVAR PESAGEM',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _HealthActionFab extends StatelessWidget {
   final VoidCallback onTap;
 
@@ -4013,19 +3851,57 @@ class _SheetDropdown extends StatelessWidget {
   }
 }
 
+/// Peso do prontuário: estado canônico resolvido + série histórica.
+///
+/// Transporta o [ProntuarioWeightReadState] íntegro — e não um par
+/// estado/registro reconstruído — para que a distinção entre `none`,
+/// `inconclusive` e `unavailable` não se perca no caminho até a UI.
+class _ProntuarioWeight {
+  const _ProntuarioWeight({required this.readState, this.records = const []});
+
+  final ProntuarioWeightReadState readState;
+
+  ProntuarioWeightState get state => readState.state;
+
+  /// Peso atual canônico; `null` fora de [ProntuarioWeightState.current].
+  WeightRecord? get current => readState.current;
+
+  /// Histórico válido para série/lista; vazio quando inconclusivo ou indisponível.
+  final List<WeightRecord> records;
+}
+
 class _HealthProntuarioData {
   final List<HealthLogModel> logs;
   final List<DogDocument> documents;
-  final List<WeightRecord> weightRecords;
+  final _ProntuarioWeight weight;
 
   const _HealthProntuarioData({
     required this.logs,
     required this.documents,
-    required this.weightRecords,
+    required this.weight,
   });
 
-  factory _HealthProntuarioData.empty() =>
-      const _HealthProntuarioData(logs: [], documents: [], weightRecords: []);
+  factory _HealthProntuarioData.empty() => const _HealthProntuarioData(
+    logs: [],
+    documents: [],
+    // Sem dado carregado ainda: indisponível, nunca "sem registro".
+    weight: _ProntuarioWeight(
+      readState: ProntuarioWeightReadState.unavailable(),
+    ),
+  );
+
+  List<WeightRecord> get weightRecords => weight.records;
+
+  /// Fatos de peso apresentáveis: atual canônico + anterior histórico.
+  ///
+  /// Autoridade única do atual; o histórico nunca o redefine.
+  ProntuarioWeightFacts get weightFacts => ProntuarioWeightFacts.from(
+    readState: weight.readState,
+    history: weight.records,
+  );
+
+  /// Estado da leitura de peso, para representação honesta na UI.
+  ProntuarioWeightState get weightState => weight.state;
 
   List<HealthLogModel> get vaccines =>
       logs.where((log) => log.type == 'vaccination').toList();
@@ -4039,18 +3915,12 @@ class _HealthProntuarioData {
   List<HealthLogModel> get weightLogs =>
       logs.where((log) => log.weight != null).toList();
 
-  double? get latestWeight {
-    if (weightRecords.isNotEmpty) {
-      final sorted = [...weightRecords]
-        ..sort((a, b) => b.measuredAt.compareTo(a.measuredAt));
-      return sorted.first.weightKg;
-    }
-    if (weightLogs.isNotEmpty) {
-      final sorted = [...weightLogs]..sort((a, b) => b.date.compareTo(a.date));
-      return sorted.first.weight;
-    }
-    return null;
-  }
+  /// Peso atual canônico, ou `null` quando não há evidência factual.
+  ///
+  /// Não seleciona localmente e não recorre a fontes não canônicas: a decisão
+  /// vem da policy compartilhada. `health_logs` (via [weightLogs]) permanece
+  /// disponível para contagem/histórico legado, mas NÃO é fonte de peso atual.
+  double? get latestWeight => weight.current?.weightKg;
 
   int get openAlertsCount {
     return logs.where((log) {
@@ -4279,14 +4149,14 @@ class _SummaryEventData {
   }
 
   factory _SummaryEventData.fromWeightRecord(WeightRecord record) {
-    final context = record.context.trim().isEmpty ? 'canil' : record.context;
+    final context = record.contextLabel;
     final measuredBy = record.measuredBy.trim();
     return _SummaryEventData(
       date: record.measuredAt,
       title: 'Pesagem',
       subtitle: [
         '${record.weightKg.toStringAsFixed(1)} kg',
-        context,
+        ?context,
         if (measuredBy.isNotEmpty) measuredBy,
       ].join(' · '),
       icon: Icons.monitor_weight_rounded,
@@ -4463,37 +4333,6 @@ _MedicalStatusData _statusForAntiparasitic(List<HealthLogModel> logs) {
 }
 
 // ignore: unused_element
-_MedicalStatusData _statusForWeight(Dog dog, double? latestWeight) {
-  final weight = latestWeight ?? dog.weight;
-  if (weight == null) {
-    return const _MedicalStatusData(
-      label: 'PESO',
-      value: 'Sem registro',
-      subtitle: 'Registre uma pesagem',
-      icon: Icons.monitor_weight_rounded,
-      level: _StatusLevel.neutral,
-    );
-  }
-
-  final inRange =
-      dog.idealWeightMin != null &&
-      dog.idealWeightMax != null &&
-      weight >= dog.idealWeightMin! &&
-      weight <= dog.idealWeightMax!;
-  final hasRange = dog.idealWeightMin != null && dog.idealWeightMax != null;
-
-  return _MedicalStatusData(
-    label: 'PESO',
-    value: '${weight.toStringAsFixed(1)} kg',
-    subtitle: hasRange
-        ? 'Faixa ideal: ${dog.idealWeightMin!.toStringAsFixed(1)}-${dog.idealWeightMax!.toStringAsFixed(1)} kg'
-        : 'Última pesagem registrada',
-    icon: Icons.monitor_weight_rounded,
-    level: !hasRange || inRange ? _StatusLevel.ok : _StatusLevel.warn,
-  );
-}
-
-// ignore: unused_element
 _MedicalStatusData _statusForExams(List<HealthLogModel> logs) {
   final exams = logs.where((log) => log.type == 'exam').toList();
   if (exams.isEmpty) {
@@ -4583,31 +4422,6 @@ String _supplementSubtitle(NutritionSupplement supplement) {
       ? 'em uso'
       : 'até ${_formatDate(supplement.endedAt!)}';
   return '${supplement.dose} · desde ${_formatDate(supplement.startedAt)} · $end';
-}
-
-// ignore: unused_element
-double? _latestWeight(List<HealthLogModel> logs) {
-  final weighted = logs.where((log) => log.weight != null).toList()
-    ..sort((a, b) => b.date.compareTo(a.date));
-  return weighted.isEmpty ? null : weighted.first.weight;
-}
-
-String _weightTrend(List<_WeightPoint> values) {
-  if (values.length < 2) return '→ sem curva';
-  final diff = values.last.value - values.first.value;
-  if (diff.abs() < 0.4) return '→ estável';
-  if (diff > 0) return '↑ +${diff.toStringAsFixed(1)} kg';
-  return '↓ ${diff.toStringAsFixed(1)} kg';
-}
-
-String _weightConditionLabel(Dog dog, double? weight) {
-  if (weight == null) return 'Sem dado';
-  final min = dog.idealWeightMin;
-  final max = dog.idealWeightMax;
-  if (min == null || max == null) return 'Monitorado';
-  if (weight < min) return 'Abaixo';
-  if (weight > max) return 'Acima';
-  return 'Ideal';
 }
 
 Color _colorForLevel(_StatusLevel level) {

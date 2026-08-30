@@ -764,13 +764,20 @@ class ShiftService {
 
     return _db.runTransaction((transaction) async {
       // ── 1) Marcar membro como saiu ──
-      // dog_id: null limpo junto na saída (rule exige dog_id no affectedKeys)
+      // dog_id limpo junto na saída (rule exige dog_id no affectedKeys).
+      //
+      // HEALTH-V1-OP-AUTH: a remoção usa `FieldValue.delete()`, NUNCA `null`.
+      // `clientPreservesOperationalDog()` compara valores via
+      // `data.get('dog_id', '')`, e esse default só vale para chave AUSENTE —
+      // uma chave presente com `null` retorna `null`, que não é igual nem a ''
+      // nem ao valor anterior, e a saída da guarnição seria negada. Deletar o
+      // campo é o mesmo contrato já usado no doc pai (service_dog_id abaixo).
       transaction.set(
         _vehicleCrews.doc(previousCrewId).collection('members').doc(handlerId),
         {
           'status': 'ended',
           'left_at': leftAt,
-          'dog_id': null,
+          'dog_id': FieldValue.delete(),
           'updated_at': FieldValue.serverTimestamp(),
         },
         SetOptions(merge: true),

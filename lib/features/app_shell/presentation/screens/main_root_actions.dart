@@ -2,7 +2,9 @@ part of 'main_root_screen.dart';
 
 extension _MainRootActions on _MainRootScreenState {
   // ─── Tokens espelhados do Header Universal ─────────────────────────
-  static const _navBg = AppTheme.primaryOverlay; // rgba(77,208,225,0.04)
+  // Navy sólido (surfaceNavigation) — primaryOverlay (~4% alpha) deixava
+  // o conteúdo legível atrás da barra com extendBody: true.
+  static const _navBg = AppTheme.surfaceNavigation;
   static const _navBorder = AppTheme.primaryDivider; // rgba(77,208,225,0.12)
   static const _iconInactive = AppTheme.textMuted;
   static const _iconActive = AppTheme.primary;
@@ -16,13 +18,16 @@ extension _MainRootActions on _MainRootScreenState {
   static const _fabIconColor = AppTheme.background;
   static const _fabRingColor = AppTheme.background;
   static const _fabSize = 54.0;
-  static const _fabElevation = 22.0; // how much FAB rises above bar
+  static const _fabElevation = MainRootNavMetrics.fabElevation;
 
   Widget _buildBottomNavigation(BuildContext context, String? activeDogId) {
     return SizedBox(
       // Total height = bar content + safe area padding handled by SafeArea
       // The Stack allows the FAB to overflow upward
-      height: 76 + MediaQuery.of(context).padding.bottom,
+      // Ver MainRootNavMetrics (fonte única com Health scroll clearance).
+      height:
+          MainRootNavMetrics.barContentHeight +
+          MediaQuery.of(context).padding.bottom,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -180,7 +185,10 @@ extension _MainRootActions on _MainRootScreenState {
   ) async {
     HapticFeedback.mediumImpact();
     if (dogId == null) {
-      AppFeedback.warning(context, 'Inicie um turno para registrar ocorrência.');
+      AppFeedback.warning(
+        context,
+        'Inicie um turno para registrar ocorrência.',
+      );
       return;
     }
 

@@ -526,14 +526,18 @@ class HistoryDetailScaffold extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const TextSpan(text: ' · GCM '),
-                      TextSpan(
-                        text: detail.handlerName,
-                        style: const TextStyle(
-                          color: _textPrimary,
-                          fontWeight: FontWeight.bold,
+                      // Autoria ausente (ex.: pesagem legada sem recorder):
+                      // omite o segmento de condutor sem deixar 'GCM' órfão.
+                      if (detail.handlerName.trim().isNotEmpty) ...[
+                        const TextSpan(text: ' · GCM '),
+                        TextSpan(
+                          text: detail.handlerName,
+                          style: const TextStyle(
+                            color: _textPrimary,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
+                      ],
                       const TextSpan(text: ' · Canil K9 Limeira'),
                     ],
                   ),
@@ -2847,43 +2851,53 @@ class HistorySaudeBody extends StatelessWidget {
           const SizedBox(height: 16),
         ],
 
-        // Veterinário responsável
-        const _SectionLabel('RESPONSÁVEL TÉCNICO'),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: _textPrimary.withAlpha(5),
-            border: Border.all(color: _textPrimary.withAlpha(12)),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.assignment_ind_outlined, color: _cyan, size: 18),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      vetName,
-                      style: GoogleFonts.inter(
-                        color: _textPrimary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      crmv,
-                      style: GoogleFonts.inter(color: _textMuted, fontSize: 11),
-                    ),
-                  ],
+        // Veterinário responsável — omitido quando não há responsável técnico
+        // factual (ex.: pesagem legada sem autoria não fabrica um nome).
+        if (vetName.trim().isNotEmpty) ...[
+          const _SectionLabel('RESPONSÁVEL TÉCNICO'),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _textPrimary.withAlpha(5),
+              border: Border.all(color: _textPrimary.withAlpha(12)),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.assignment_ind_outlined,
+                  color: _cyan,
+                  size: 18,
                 ),
-              ),
-            ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        vetName,
+                        style: GoogleFonts.inter(
+                          color: _textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        crmv,
+                        style: GoogleFonts.inter(
+                          color: _textMuted,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
+          const SizedBox(height: 16),
+        ],
 
         // Documentos anexos
         const _SectionLabel('DOCUMENTOS ANEXOS'),
@@ -2963,19 +2977,25 @@ class HistoryNutricaoBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final original = detail.source.originalModel;
-    Feeding? feeding;
-    if (original is Feeding) {
-      feeding = original;
-    }
-
-    final served = feeding?.amountGrams ?? 350;
-    final prescribed = feeding?.prescriptionAtTime ?? 350;
-    final conforms = feeding?.isConform ?? true;
-    final divergenceVal = (served - prescribed).abs();
-    final divergenceText =
-        '${divergenceVal}g (${conforms ? 'Sem divergência' : 'Divergência'})';
-    final racaoName =
-        detail.source.details['Ração'] ?? 'Ração Premium K9 Adulto';
+    final feeding = original is Feeding ? original : null;
+    final served = feeding?.amountGrams;
+    final prescribed = feeding != null && feeding.prescriptionAtTime > 0
+        ? feeding.prescriptionAtTime
+        : null;
+    final conforms = served != null && prescribed != null
+        ? feeding!.isConform
+        : null;
+    final divergenceText = served != null && prescribed != null
+        ? '${(served - prescribed).abs()}g'
+        : null;
+    final rawRacao = detail.source.details['Ração'];
+    final racaoName = rawRacao is String && rawRacao.trim().isNotEmpty
+        ? rawRacao.trim()
+        : 'Não informado';
+    final rawPhotoUrl = feeding?.photoBalanceUrl?.trim();
+    final photoUrl = rawPhotoUrl != null && rawPhotoUrl.isNotEmpty
+        ? rawPhotoUrl
+        : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3008,10 +3028,10 @@ class HistoryNutricaoBody extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${served}g',
+                        served == null ? 'Não informado' : '${served}g',
                         style: GoogleFonts.inter(
                           color: _textPrimary,
-                          fontSize: 20,
+                          fontSize: served == null ? 13 : 20,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -3030,10 +3050,10 @@ class HistoryNutricaoBody extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${prescribed}g',
+                        prescribed == null ? 'Não informado' : '${prescribed}g',
                         style: GoogleFonts.inter(
                           color: _textSecondary,
-                          fontSize: 16,
+                          fontSize: prescribed == null ? 13 : 16,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -3081,18 +3101,32 @@ class HistoryNutricaoBody extends StatelessWidget {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: conforms
+                      color: conforms == null
+                          ? _textMuted.withAlpha(20)
+                          : conforms
                           ? _green.withAlpha(20)
                           : _amber.withAlpha(20),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: conforms ? _green : _amber),
+                      border: Border.all(
+                        color: conforms == null
+                            ? _textMuted
+                            : conforms
+                            ? _green
+                            : _amber,
+                      ),
                     ),
                     child: Text(
-                      conforms
+                      conforms == null
+                          ? 'NÃO INFORMADO'
+                          : conforms
                           ? 'EM CONFORMIDADE'
                           : 'DIVERGENTE ($divergenceText)',
                       style: GoogleFonts.inter(
-                        color: conforms ? _green : _amber,
+                        color: conforms == null
+                            ? _textMuted
+                            : conforms
+                            ? _green
+                            : _amber,
                         fontSize: 9,
                         fontWeight: FontWeight.bold,
                       ),
@@ -3105,81 +3139,28 @@ class HistoryNutricaoBody extends StatelessWidget {
         ),
         const SizedBox(height: 16),
 
-        // Vínculo ao Laudo Nutricional Vigente
-        const _SectionLabel('VÍNCULO CLÍNICO'),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: _textPrimary.withAlpha(5),
-            border: Border.all(color: _textPrimary.withAlpha(12)),
+        if (photoUrl != null) ...[
+          const _SectionLabel('FOTO DE VERIFICAÇÃO'),
+          const SizedBox(height: 8),
+          ClipRRect(
             borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.assignment_turned_in_outlined,
-                color: _cyan,
-                size: 18,
+            child: CachedNetworkImage(
+              imageUrl: photoUrl,
+              height: 120,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              placeholder: (_, _) => const SizedBox(
+                height: 120,
+                child: Center(child: CircularProgressIndicator()),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Laudo Nutricional Vigente',
-                      style: GoogleFonts.inter(
-                        color: _textPrimary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      'Prescrição Dra. Patrícia Lima · CRMV 8812 · Ativo',
-                      style: GoogleFonts.inter(
-                        color: _textSecondary,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
+              errorWidget: (_, _, _) => const SizedBox(
+                height: 120,
+                child: Center(child: Text('Imagem indisponível')),
               ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Foto do pote/registro
-        const _SectionLabel('FOTO DE VERIFICAÇÃO'),
-        const SizedBox(height: 8),
-        Container(
-          height: 120,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _textPrimary.withAlpha(15)),
-            color: AppTheme.surfacePanelSoft,
-          ),
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.restaurant_rounded,
-                  color: _textMuted,
-                  size: 24,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Foto da refeição registrada',
-                  style: GoogleFonts.inter(color: _textSecondary, fontSize: 11),
-                ),
-              ],
             ),
           ),
-        ),
-        const SizedBox(height: 16),
+          const SizedBox(height: 16),
+        ],
 
         // Acompanhamento do dia
         if (detail.notes.isNotEmpty) ...[

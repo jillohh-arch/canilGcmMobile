@@ -81,7 +81,63 @@
         { "fieldPath": "ativo", "order": "ASCENDING" },
         { "fieldPath": "ordem", "order": "ASCENDING" }
       ]
+    },
+
+    {
+      "collectionGroup": "health_schedule",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "lifecycle_status", "order": "ASCENDING" },
+        { "fieldPath": "scheduled_for", "order": "ASCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "health_schedule",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "dog_id", "order": "ASCENDING" },
+        { "fieldPath": "lifecycle_status", "order": "ASCENDING" },
+        { "fieldPath": "scheduled_for", "order": "ASCENDING" }
+      ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    {
+      "collectionGroup": "meal_logs",
+      "fieldPath": "recorded_at",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "supplement_logs",
+      "fieldPath": "recorded_at",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    }
+  ]
 }
