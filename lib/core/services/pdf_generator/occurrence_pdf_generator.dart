@@ -3194,6 +3194,18 @@ class OccurrencePdfGenerator {
     );
   }
 
+  /// FF-OCC-09: expõe o texto do estado de integridade para regressão, no mesmo
+  /// padrão que FF-OCC-08 usa em [formatDrugDescriptionForTest]. O objetivo é
+  /// travar permanentemente a redação não acusatória de `unverified`.
+  @visibleForTesting
+  static String integrityStateTextForTest({
+    required bool hasHash,
+    required IntegrityVerdict? verdict,
+  }) => OccurrencePdfGenerator()._integrityStateText(
+    hasHash: hasHash,
+    verdict: verdict,
+  );
+
   String _integrityStateText({
     required bool hasHash,
     required IntegrityVerdict? verdict,
@@ -3205,14 +3217,24 @@ class OccurrencePdfGenerator {
       return 'SELO ARMAZENADO\nVerificacao local indisponivel neste PDF. Confirme pelo QR Code.';
     }
     return switch (verdict.status) {
+      // FF-OCC-09.H1.C1: quem confirma a integridade documental e o verificador
+      // oficial, nao o recalculo local. A homologacao fisica da ocorrencia
+      // 212bdc56 provou o caso: hash local divergente e documento valido.
+      // Afirmar "conferido localmente" seria falso.
       IntegrityStatus.intact =>
-        'INTEGRO\nHash recalculado localmente e conferido com o selo armazenado.',
+        'INTEGRO\nIntegridade documental confirmada pelo verificador oficial.',
       IntegrityStatus.broken =>
         'SELO QUEBRADO\nHash recalculado nao confere com o selo armazenado.',
       IntegrityStatus.legacy =>
         'SELO LEGADO\nVersao de hash nao recalculavel pelo verificador atual.',
       IntegrityStatus.unsealed =>
         'PENDENTE\nOcorrencia sem selo de integridade armazenado.',
+      // FF-OCC-09: sem veredito do verificador oficial nao se afirma nada
+      // sobre adulteracao. Texto autossuficiente: FF-OCC-11 provou que a
+      // rota do QR responde 404 hoje, logo nao a recomendamos como fallback.
+      IntegrityStatus.unverified =>
+        'VERIFICACAO NAO DISPONIVEL\nNao foi possivel consultar o verificador '
+            'oficial neste momento. Tente novamente com conexao.',
     };
   }
 

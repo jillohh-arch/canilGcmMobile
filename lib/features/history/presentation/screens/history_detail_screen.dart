@@ -41,6 +41,16 @@ const Color _green = AppTheme.success;
 const Color _amber = AppTheme.warning;
 const Color _red = AppTheme.error;
 
+/// FF-OCC-09.C3.1: costura de testabilidade do card de integridade.
+///
+/// Representa somente a operação que o card precisa — obter o veredito — e não
+/// a dependência concreta de Firestore/HTTP. Em produção fica `null` e o
+/// caminho real (`IntegrityVerificationService().verifyById`) é usado sem
+/// alteração. Nos testes de widget, substitui a borda para permitir render
+/// hermético, sem trocar nenhuma regra de apresentação.
+typedef IntegrityVerifier =
+    Future<IntegrityVerdict> Function({required bool verifyMediaBytes});
+
 class RegistroDetalhePage extends StatelessWidget {
   final HistoryEntry entry;
   const RegistroDetalhePage({super.key, required this.entry});
@@ -198,6 +208,9 @@ class HistoryDetailScaffold extends StatelessWidget {
   final VoidCallback onShareTap;
   final VoidCallback onMenuTap;
 
+  /// Somente para testes de widget. `null` em produção.
+  final IntegrityVerifier? integrityVerifier;
+
   const HistoryDetailScaffold({
     super.key,
     required this.detail,
@@ -205,6 +218,7 @@ class HistoryDetailScaffold extends StatelessWidget {
     required this.onPdfTap,
     required this.onShareTap,
     required this.onMenuTap,
+    this.integrityVerifier,
   });
 
   @override
@@ -589,6 +603,7 @@ class HistoryDetailScaffold extends StatelessWidget {
       return _VerifiedOccurrenceIntegrityCard(
         detail: detail,
         occurrenceHash: occurrenceHash!,
+        integrityVerifier: integrityVerifier,
         onAuditTrail: () => _showAuditTrail(context),
         onCreateAmendment: () => _openCreateAmendment(context),
       );
@@ -999,11 +1014,15 @@ class _VerifiedOccurrenceIntegrityCard extends StatefulWidget {
   final VoidCallback onAuditTrail;
   final VoidCallback onCreateAmendment;
 
+  /// Somente para testes de widget. `null` em produção.
+  final IntegrityVerifier? integrityVerifier;
+
   const _VerifiedOccurrenceIntegrityCard({
     required this.detail,
     required this.occurrenceHash,
     required this.onAuditTrail,
     required this.onCreateAmendment,
+    this.integrityVerifier,
   });
 
   @override
@@ -1032,6 +1051,10 @@ class _VerifiedOccurrenceIntegrityCardState
   }
 
   Future<IntegrityVerdict> _verify({required bool verifyMediaBytes}) {
+    final override = widget.integrityVerifier;
+    if (override != null) {
+      return override(verifyMediaBytes: verifyMediaBytes);
+    }
     return IntegrityVerificationService().verifyById(
       widget.detail.id,
       verifyMediaBytes: verifyMediaBytes,
@@ -1052,25 +1075,36 @@ class _VerifiedOccurrenceIntegrityCardState
       builder: (context, snapshot) {
         final verdict = snapshot.data;
         final verifying = snapshot.connectionState == ConnectionState.waiting;
+        // FF-OCC-09.C2: somente um veredito intact comprovado pode aparecer
+        // como verificado. Ausencia de veredito, erro, verificacao
+        // indisponivel e documento nao selado sao estados de incerteza — nao
+        // podem herdar o verde/escudo de sucesso.
+        final status = verdict?.status;
+        final isSuccess = status == IntegrityStatus.intact;
+        final isBroken = status == IntegrityStatus.broken;
+        final isLegacy = status == IntegrityStatus.legacy;
         final color = verifying
             ? _cyan
-            : verdict?.status == IntegrityStatus.broken
+            : isBroken
             ? _red
-            : verdict?.status == IntegrityStatus.legacy
-            ? _amber
-            : _green;
+            : isSuccess
+            ? _green
+            : _amber;
         final icon = verifying
             ? Icons.hourglass_top_rounded
-            : verdict?.status == IntegrityStatus.broken
+            : isBroken
             ? Icons.gpp_bad_outlined
-            : verdict?.status == IntegrityStatus.legacy
+            : isSuccess
+            ? Icons.verified_user_outlined
+            : isLegacy
             ? Icons.history_edu_outlined
-            : Icons.verified_user_outlined;
+            : Icons.help_outline_rounded;
         final title = verifying
             ? (_deepMediaVerification
                   ? 'VERIFICANDO MIDIAS NO STORAGE'
                   : 'VERIFICANDO SELO SHA-256')
-            : '${(verdict?.label ?? 'Documento integro').toUpperCase()} - HASH V${verdict?.hashVersion ?? '?'}';
+            : '${(verdict?.label ?? 'Verificacao nao disponivel').toUpperCase()}'
+                  ' - HASH V${verdict?.hashVersion ?? '?'}';
 
         return _buildCard(
           color: color,

@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import 'package:canil_gcm/core/domain/occurrence_participation.dart';
 import 'package:canil_gcm/core/services/occurrence_finalization_service.dart';
@@ -10,7 +13,12 @@ import 'package:canil_gcm/features/occurrences/data/signature_repository.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
 
-enum IntegrityStatus { intact, broken, legacy, unsealed }
+/// Estado documental do selo.
+///
+/// FF-OCC-09: `broken` só pode vir de um veredito autoritativo do servidor.
+/// Divergência do recálculo local, indisponibilidade do verificador e mídia
+/// divergente NÃO são autoridade para acusar adulteração do documento.
+enum IntegrityStatus { intact, broken, legacy, unsealed, unverified }
 
 typedef MediaHashReader = Future<String?> Function(String url, {int maxBytes});
 
@@ -39,6 +47,7 @@ class IntegrityVerdict {
     IntegrityStatus.broken => 'Selo quebrado - possivel adulteracao',
     IntegrityStatus.legacy => 'Selo legado nao recalculavel',
     IntegrityStatus.unsealed => 'Nao selado',
+    IntegrityStatus.unverified => 'Verificacao nao disponivel',
   };
 
   IntegrityVerdict copyWith({
@@ -67,17 +76,30 @@ class IntegrityVerificationService {
     SignatureRepository? signatureRepository,
     FirebaseFirestore? firestore,
     MediaHashReader? mediaHashReader,
+    http.Client? httpClient,
   }) : _occurrenceRepository = occurrenceRepository,
        _eventRepository = eventRepository,
        _signatureRepository = signatureRepository,
        _firestore = firestore,
-       _mediaHashReader = mediaHashReader;
+       _mediaHashReader = mediaHashReader,
+       _httpClient = httpClient;
+
+  /// Base do verificador oficial. O documento é selado e verificado no
+  /// servidor; o Mobile apenas apresenta o veredito.
+  static const _verifierBaseUrl = String.fromEnvironment(
+    'K9_INTEGRITY_VERIFIER_BASE_URL',
+    defaultValue:
+        'https://southamerica-east1-canil-gcm.cloudfunctions.net/verifyOccurrence/v',
+  );
+
+  static const _verifierTimeout = Duration(seconds: 8);
 
   final OccurrenceRepository? _occurrenceRepository;
   final OccurrenceEventRepository? _eventRepository;
   final SignatureRepository? _signatureRepository;
   final FirebaseFirestore? _firestore;
   final MediaHashReader? _mediaHashReader;
+  final http.Client? _httpClient;
 
   FirebaseFirestore get _db => _firestore ?? FirebaseFirestore.instance;
   OccurrenceRepository get _occurrences =>
@@ -104,14 +126,40 @@ class IntegrityVerificationService {
     );
     final participations = await _loadParticipations(occurrenceId);
     final correctionRequests = await _loadCorrectionRequests(occurrenceId);
-    final verdict = verify(
-      occurrence.copyWith(
-        signatures: signatures,
-        participations: participations,
-        correctionRequests: correctionRequests,
-      ),
-      events: events,
-    );
+
+    // O recálculo local permanece apenas como diagnóstico: Dart e a Function
+    // canonicalizam de forma independente, então uma divergência aqui não prova
+    // adulteração. Quem decide o estado documental é o verificador oficial.
+    //
+    // FF-OCC-09.C2: o diagnóstico é isolado. Se ele falhar (dado malformado,
+    // por exemplo), a consulta autoritativa ainda acontece — diagnóstico não
+    // pode ser pré-requisito da verdade.
+    IntegrityVerdict local;
+    try {
+      local = verify(
+        occurrence.copyWith(
+          signatures: signatures,
+          participations: participations,
+          correctionRequests: correctionRequests,
+        ),
+        events: events,
+      );
+    } catch (error) {
+      debugPrint(
+        '[IntegrityVerification] Recalculo local (diagnostico) falhou para '
+        '$occurrenceId: $error',
+      );
+      // Placeholder sem autoridade documental: preserva o selo armazenado e a
+      // versão para exibição, sem recomputedHash e sem afirmar intact/broken.
+      local = IntegrityVerdict(
+        status: IntegrityStatus.unverified,
+        storedHash: occurrence.integrityHash,
+        hashVersion: occurrence.hashVersion,
+      );
+    }
+
+    final verdict = await _authoritativeVerdict(occurrenceId, local);
+
     if (!verifyMediaBytes ||
         verdict.status != IntegrityStatus.intact ||
         (verdict.hashVersion ?? 1) < 2) {
@@ -124,13 +172,115 @@ class IntegrityVerificationService {
         '[IntegrityVerification] Midia divergente para $occurrenceId: '
         '${mediaResult.issues.join(' | ')}',
       );
-      return verdict.copyWith(
-        status: IntegrityStatus.broken,
-        checkedMediaCount: mediaResult.checkedCount,
-        mediaIssues: mediaResult.issues,
-      );
     }
-    return verdict.copyWith(checkedMediaCount: mediaResult.checkedCount);
+    // FF-OCC-09: mídia divergente NÃO sobrescreve o estado documental. O selo
+    // do documento continua valendo o que o servidor disse; a divergência de
+    // mídia é reportada pelo canal próprio (mediaIssues).
+    return verdict.copyWith(
+      checkedMediaCount: mediaResult.checkedCount,
+      mediaIssues: mediaResult.issues,
+    );
+  }
+
+  /// Consulta o verificador oficial e traduz o veredito autoritativo.
+  ///
+  /// Qualquer indisponibilidade (rede, timeout, HTTP não-2xx, JSON malformado,
+  /// status desconhecido ou payload incoerente) resulta em
+  /// [IntegrityStatus.unverified] — nunca em [IntegrityStatus.broken].
+  Future<IntegrityVerdict> _authoritativeVerdict(
+    String occurrenceId,
+    IntegrityVerdict local,
+  ) async {
+    final diagnostic = local.copyWith(status: IntegrityStatus.unverified);
+    final client = _httpClient ?? http.Client();
+    try {
+      final uri = Uri.parse(
+        '${_verifierBaseUrl.replaceFirst(RegExp(r'/+$'), '')}'
+        '/${Uri.encodeComponent(occurrenceId)}?format=json',
+      );
+      final response = await client
+          .get(uri, headers: const {'Accept': 'application/json'})
+          .timeout(_verifierTimeout);
+
+      if (response.statusCode != 200) {
+        debugPrint(
+          '[IntegrityVerification] Verificador respondeu '
+          'HTTP ${response.statusCode} para $occurrenceId',
+        );
+        return diagnostic;
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) return diagnostic;
+      return _mapServerPayload(occurrenceId, decoded, diagnostic);
+    } catch (error) {
+      debugPrint(
+        '[IntegrityVerification] Verificador indisponivel para '
+        '$occurrenceId: $error',
+      );
+      return diagnostic;
+    } finally {
+      // Fecha somente o cliente que este serviço criou.
+      if (_httpClient == null) client.close();
+    }
+  }
+
+  IntegrityVerdict _mapServerPayload(
+    String occurrenceId,
+    Map<String, dynamic> payload,
+    IntegrityVerdict diagnostic,
+  ) {
+    if (payload['occurrence_id']?.toString() != occurrenceId) {
+      return diagnostic;
+    }
+
+    final serverStatus = payload['status']?.toString();
+    final storedHash = payload['stored_hash']?.toString();
+    final rawVersion = payload['hash_version'];
+    final version = rawVersion is num
+        ? rawVersion.round()
+        : int.tryParse(rawVersion?.toString() ?? '');
+    final documentIntact = payload['document_intact'] ?? payload['intact'];
+
+    IntegrityVerdict withStatus(IntegrityStatus status) => diagnostic.copyWith(
+      status: status,
+      storedHash: storedHash?.isNotEmpty == true ? storedHash : null,
+      hashVersion: version,
+    );
+
+    switch (serverStatus) {
+      case 'intact':
+        // Coerência exigida: um documento íntegro não pode declarar o
+        // contrário no campo booleano.
+        if (documentIntact == false) return diagnostic;
+        return withStatus(IntegrityStatus.intact);
+      case 'media_broken':
+        // Documento íntegro com mídia divergente: o estado documental
+        // permanece íntegro e a mídia é reportada em mediaIssues.
+        if (documentIntact == false) return withStatus(IntegrityStatus.broken);
+        return withStatus(
+          IntegrityStatus.intact,
+        ).copyWith(mediaIssues: _serverMediaIssues(payload));
+      case 'broken':
+        if (documentIntact == true) return diagnostic;
+        return withStatus(IntegrityStatus.broken);
+      case 'unsealed':
+        return withStatus(IntegrityStatus.unsealed);
+      case 'unsupported_version':
+        return withStatus(IntegrityStatus.legacy);
+      default:
+        // not_found, error e qualquer status desconhecido.
+        return diagnostic;
+    }
+  }
+
+  static List<String> _serverMediaIssues(Map<String, dynamic> payload) {
+    final raw = payload['media_issues'];
+    if (raw is! List) return const [];
+    return raw
+        .map((issue) => issue?.toString() ?? '')
+        .where((issue) => issue.isNotEmpty)
+        .toList();
   }
 
   static IntegrityVerdict verify(
