@@ -26,6 +26,7 @@ import {
   HumanLifecycleTransaction,
   reactivateHuman,
 } from "./admin_human_lifecycle";
+import {isAuthUserNotFound} from "./auth_error_classification";
 import {
   AccessScope,
   AccessScopeResolution,
@@ -3146,24 +3147,30 @@ function humanLifecycleDeps(request: CallableRequest<unknown>) {
       const snap = await activeShiftRef(ra).get();
       return {exists: snap.exists, data: snap.data() ?? null};
     },
-    // `null` quando a conta nao existe: o modulo trata como DANGLING (o doc
-    // afirma um uid morto) e falha fechado antes de qualquer mutacao.
+    // `null` SOMENTE quando a conta nao existe: o modulo trata como DANGLING (o
+    // doc afirma um uid morto) e falha fechado antes de qualquer mutacao.
+    // Qualquer outro erro propaga: um `catch` nu transformaria falta de
+    // permissao num DANGLING falso (S2.A.D1).
     getAuthAccount: async (uid: string) => {
       try {
         const record = await admin.auth().getUser(uid);
         return {uid: record.uid, disabled: record.disabled === true};
-      } catch {
-        return null;
+      } catch (error) {
+        if (isAuthUserNotFound(error)) return null;
+        throw error;
       }
     },
     // Fallback CANONICO, identico ao de adminAssignAccessProfile/
     // adminUpsertHuman/setK9InstructorRole. `null` => Personnel sem conta.
+    // Só a inexistencia real vira `null`: engolir um PERMISSION_DENIED aqui
+    // devolveria `not_provisioned` com a conta ainda habilitada (S2.A.D1).
     findAuthAccountByEmail: async (email: string) => {
       try {
         const record = await admin.auth().getUserByEmail(email);
         return {uid: record.uid, disabled: record.disabled === true};
-      } catch {
-        return null;
+      } catch (error) {
+        if (isAuthUserNotFound(error)) return null;
+        throw error;
       }
     },
     // Mesma expressao provada no repo. `institutional_email` NUNCA participa.

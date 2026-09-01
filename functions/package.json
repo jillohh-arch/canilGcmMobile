@@ -7,7 +7,7 @@
   "main": "lib/index.js",
   "scripts": {
     "build": "tsc",
-    "test:effective-admin": "tsc -p tsconfig.test.json && node --test lib/test-build/test/admin_patch_k9_identity.test.js lib/test-build/test/admin_create_human.test.js lib/test-build/test/admin_patch_human_personnel.test.js lib/test-build/test/admin_human_lifecycle.test.js",
+    "test:effective-admin": "tsc -p tsconfig.test.json && node --test lib/test-build/test/admin_patch_k9_identity.test.js lib/test-build/test/admin_create_human.test.js lib/test-build/test/admin_patch_human_personnel.test.js lib/test-build/test/admin_human_lifecycle.test.js lib/test-build/test/auth_error_classification.test.js",
     "test:access-scope": "npm run build && node lib/access_scope_test.js",
     "test:access-profile-writer": "npm run build && node lib/access_profile_writer_test.js",
     "test:health-schedule": "npm run build && node lib/health_schedule_logic_test.js && node lib/health_schedule_callables_test.js",
