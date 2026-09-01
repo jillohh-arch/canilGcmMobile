@@ -136,6 +136,20 @@ interface HarnessOptions {
    */
   authByEmail?: {uid: string; disabled: boolean};
   /**
+   * Falha OPERACIONAL da consulta de identidade [D6.R1].
+   *
+   * Distinto de `authAccountMissing`/`authByEmail: undefined`, que representam
+   * ausencia LEGITIMA. Aqui a dependencia LANCA — permissao ausente, API
+   * desabilitada, transporte — e o dominio precisa traduzir para
+   * AUTH_OPERATION_FAILED em vez de deixar o erro cru escapar como `internal`
+   * generico sem `details.reason`.
+   *
+   * `on` escolhe qual das duas portas de resolucao falha:
+   *   "uid"   -> getAuthAccount        (documento COM alias)
+   *   "email" -> findAuthAccountByEmail (fallback canonico)
+   */
+  authLookupFailure?: {on: "uid" | "email"; error: Error};
+  /**
    * Escrita de um writer CONCORRENTE, aplicada ao documento imediatamente antes
    * da transacao de compensacao ler. Substitui as antigas opcoes de "versao":
    * o CAS de B1.R2 inspeciona ESTADO de lifecycle, nao timestamp, entao o teste
@@ -276,6 +290,10 @@ function harness(options: HarnessOptions = {}): {
     },
     getAuthAccount: async (uid) => {
       recorded.authDisabledReads.push(uid);
+      // Falha OPERACIONAL da porta por uid [D6.R1]: distinta de ausencia.
+      if (options.authLookupFailure?.on === "uid") {
+        throw options.authLookupFailure.error;
+      }
       // `authAccountMissing` simula DANGLING: o doc afirma o uid, o Auth nao tem.
       if (options.authAccountMissing) return null;
       // Default FIEL ao estado convergido: documento inativo => conta
@@ -288,6 +306,10 @@ function harness(options: HarnessOptions = {}): {
     },
     findAuthAccountByEmail: async (email) => {
       recorded.emailLookups.push(email);
+      // Falha OPERACIONAL do fallback canonico [D6.R1]: distinta de ausencia.
+      if (options.authLookupFailure?.on === "email") {
+        throw options.authLookupFailure.error;
+      }
       if (options.authByEmail === undefined) return null;
       return options.authByEmail;
     },
@@ -2280,4 +2302,194 @@ test("G1: isCurrentlyActive reconhece todos os sinais de arquivamento", async ()
   assert.equal(isCurrentlyActive({status: "inactive"}), false);
   // Valores nulos explicitos nao sao marcadores.
   assert.equal(isCurrentlyActive({deleted_at: null, archived_at: null}), true);
+});
+
+// ---------------------------------------------------------------------------
+// R1-T. FALHA OPERACIONAL DA CONSULTA DE AUTH  [D6.R1]
+//
+// Lacuna encontrada ao preparar o D6: o wiring corrigido (69defda) para de
+// transformar PERMISSION_DENIED em "conta inexistente", mas o erro cru subia
+// pelo handler `onCall` como `internal` GENERICO, sem `details.reason`. O mapper
+// do Web discrimina por reason, nao por code, entao a falha ficava sem rotulo.
+//
+// A resolucao de identidade acontece ANTES de qualquer escrita e fora de todo
+// `try` transacional, logo estes testes tambem fixam zero-mutacao estrutural.
+//
+// Distincao central: ausencia LEGITIMA continua sendo absent/dangling; falha
+// OPERACIONAL passa a ser AUTH_OPERATION_FAILED.
+// ---------------------------------------------------------------------------
+
+/** Forma real observada em staging quando o runtime SA nao tem role de Auth. */
+function permissionDenied(): Error {
+  return Object.assign(
+    new Error("Permission denied on resource project k9-ops-staging."),
+    {code: "auth/insufficient-permission", status: "PERMISSION_DENIED"},
+  );
+}
+
+test("R1-T1: DESATIVAR, fallback por e-mail falha => AUTH_OPERATION_FAILED, zero mutacao", async () => {
+  const user = activeUser();
+  delete user.auth_uid;
+  const {deps, recorded} = harness({
+    user,
+    authLookupFailure: {on: "email", error: permissionDenied()},
+  });
+  const error = await expectFailure(() =>
+    deactivateHuman(deps, deactivatePayload()),
+  );
+  assert.equal(error.code, "internal");
+  assert.equal(reasonOf(error), LIFECYCLE_ERROR.authOperationFailed);
+  // O caller NAO pode concluir "sem conta a suspender".
+  assert.notEqual(reasonOf(error), LIFECYCLE_ERROR.notFound);
+  // Zero efeito: nem patch, nem Auth, nem auditoria.
+  assert.deepEqual(recorded.effects, []);
+  assert.deepEqual(patches(recorded), []);
+  assert.deepEqual(authCalls(recorded), []);
+  assert.deepEqual(recorded.auditEntries, []);
+});
+
+test("R1-T2: DESATIVAR, consulta por uid falha => AUTH_OPERATION_FAILED, nao DANGLING", async () => {
+  const {deps, recorded} = harness({
+    authLookupFailure: {on: "uid", error: permissionDenied()},
+  });
+  const error = await expectFailure(() =>
+    deactivateHuman(deps, deactivatePayload()),
+  );
+  assert.equal(error.code, "internal");
+  assert.equal(reasonOf(error), LIFECYCLE_ERROR.authOperationFailed);
+  // Falha de permissao NAO e "o vinculo morreu": isso acusaria corrupcao falsa.
+  assert.notEqual(reasonOf(error), LIFECYCLE_ERROR.authIdentityNotFound);
+  assert.deepEqual(recorded.effects, []);
+  assert.deepEqual(recorded.auditEntries, []);
+});
+
+test("R1-T3: REATIVAR, fallback por e-mail falha => AUTH_OPERATION_FAILED, zero mutacao", async () => {
+  const user = inactiveUser();
+  delete user.auth_uid;
+  const {deps, recorded} = harness({
+    user,
+    authLookupFailure: {on: "email", error: permissionDenied()},
+  });
+  const error = await expectFailure(() =>
+    reactivateHuman(deps, reactivatePayload()),
+  );
+  assert.equal(error.code, "internal");
+  assert.equal(reasonOf(error), LIFECYCLE_ERROR.authOperationFailed);
+  assert.deepEqual(recorded.effects, []);
+  assert.deepEqual(patches(recorded), []);
+  assert.deepEqual(authCalls(recorded), []);
+  assert.deepEqual(recorded.auditEntries, []);
+});
+
+test("R1-T4: REATIVAR, consulta por uid falha => AUTH_OPERATION_FAILED, nao DANGLING", async () => {
+  const {deps, recorded} = harness({
+    user: inactiveUser(),
+    authLookupFailure: {on: "uid", error: permissionDenied()},
+  });
+  const error = await expectFailure(() =>
+    reactivateHuman(deps, reactivatePayload()),
+  );
+  assert.equal(error.code, "internal");
+  assert.equal(reasonOf(error), LIFECYCLE_ERROR.authOperationFailed);
+  assert.notEqual(reasonOf(error), LIFECYCLE_ERROR.authIdentityNotFound);
+  assert.deepEqual(recorded.effects, []);
+  assert.deepEqual(recorded.auditEntries, []);
+});
+
+test("R1-T5: a falha e reportada ANTES de checar OCC — token velho nao mascara o erro", async () => {
+  // Se a ordem fosse invertida, um token stale devolveria STALE_WRITE e
+  // esconderia a falha operacional de Auth do operador.
+  const {deps, recorded} = harness({
+    authLookupFailure: {on: "uid", error: permissionDenied()},
+  });
+  const error = await expectFailure(() =>
+    deactivateHuman(deps, deactivatePayload({expectedUpdatedAt: 1})),
+  );
+  assert.equal(reasonOf(error), LIFECYCLE_ERROR.authOperationFailed);
+  assert.notEqual(reasonOf(error), LIFECYCLE_ERROR.staleWrite);
+  assert.deepEqual(recorded.effects, []);
+});
+
+test("R1-T6: erro operacional de OUTRA natureza tambem falha fechado", async () => {
+  // Nao e especifico de permissao: API desabilitada, transporte, etc.
+  const {deps, recorded} = harness({
+    authLookupFailure: {
+      on: "uid",
+      error: Object.assign(new Error("socket hang up"), {code: "ECONNRESET"}),
+    },
+  });
+  const error = await expectFailure(() =>
+    deactivateHuman(deps, deactivatePayload()),
+  );
+  assert.equal(reasonOf(error), LIFECYCLE_ERROR.authOperationFailed);
+  assert.deepEqual(recorded.effects, []);
+});
+
+test("R1-T7: a mensagem declara que NADA foi aplicado", async () => {
+  const {deps} = harness({
+    authLookupFailure: {on: "email", error: permissionDenied()},
+    user: (() => {
+      const u = activeUser();
+      delete u.auth_uid;
+      return u;
+    })(),
+  });
+  const error = await expectFailure(() =>
+    deactivateHuman(deps, deactivatePayload()),
+  );
+  // O operador precisa saber que pode corrigir e repetir com seguranca.
+  assert.match(error.message, /Nenhuma alteracao foi aplicada/i);
+});
+
+test("R1-T8: AUSENCIA legitima continua ABSENT — o novo mapeamento nao a captura", async () => {
+  // Contraprova: sem alias e sem conta, o fluxo segue e conclui normalmente.
+  const user = activeUser();
+  delete user.auth_uid;
+  const {deps, recorded} = harness({user});
+  const result = await deactivateHuman(deps, deactivatePayload());
+  assert.equal(result.authState, "not_provisioned");
+  assert.equal(result.active, false);
+  assert.deepEqual(authCalls(recorded), []);
+});
+
+test("R1-T9: HttpsError vindo da resolucao e REPASSADO, nao remapeado", async () => {
+  // Braco DEFENSIVO do wrapper. Hoje o wiring real lanca erros operacionais do
+  // Firebase Admin, nunca HttpsError, entao esta condicao nao e alcancada em
+  // producao. Ela existe para que um wiring futuro que valide argumentos e
+  // chame `fail()` nao tenha sua taxonomia canonica reclassificada como
+  // AUTH_OPERATION_FAILED — o que apagaria justamente a distincao que o D6.R1
+  // acabou de introduzir.
+  const injected = new HttpsError(
+    "failed-precondition",
+    "Vinculo de Auth inconsistente.",
+    {reason: LIFECYCLE_ERROR.authIdentityNotFound, sentinel: "R1-T9"},
+  );
+  const user = activeUser();
+  delete user.auth_uid;
+  const {deps, recorded} = harness({
+    user,
+    authLookupFailure: {on: "email", error: injected},
+  });
+
+  const error = await expectFailure(() =>
+    deactivateHuman(deps, deactivatePayload()),
+  );
+
+  // Identidade literal: o objeto sai exatamente como entrou.
+  assert.equal(error, injected, "esperado rethrow do MESMO objeto");
+  // E, independentemente da identidade, a taxonomia original sobrevive.
+  assert.equal(error.code, "failed-precondition");
+  assert.equal(reasonOf(error), LIFECYCLE_ERROR.authIdentityNotFound);
+  assert.notEqual(reasonOf(error), LIFECYCLE_ERROR.authOperationFailed);
+  assert.equal(error.message, "Vinculo de Auth inconsistente.");
+  // Detalhes estaveis nao sao substituidos pelo envelope do wrapper.
+  assert.equal((error.details as {sentinel?: unknown}).sentinel, "R1-T9");
+  // A mensagem do wrapper de operacao NAO pode ter sido aplicada.
+  assert.doesNotMatch(error.message, /Nao foi possivel consultar a conta/i);
+
+  // Zero mutacao: a resolucao precede toda escrita.
+  assert.deepEqual(recorded.effects, []);
+  assert.deepEqual(patches(recorded), []);
+  assert.deepEqual(authCalls(recorded), []);
+  assert.deepEqual(recorded.auditEntries, []);
 });

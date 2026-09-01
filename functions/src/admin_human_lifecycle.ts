@@ -476,6 +476,40 @@ async function resolveAuthPresence(
   return {kind: "present", account};
 }
 
+/**
+ * `resolveAuthPresence` com a taxonomia PUBLICA aplicada [D6.R1].
+ *
+ * A resolucao de identidade acontece antes de qualquer escrita e FORA de todo
+ * `try` das transacoes. Um erro cru da dependencia subiria pelo handler
+ * `onCall` e chegaria ao cliente como `internal` generico, SEM
+ * `details.reason` — invisivel para o mapper do Web, que discrimina por reason
+ * e nao por code.
+ *
+ * Depois do wiring fail-closed, `auth/user-not-found` e a UNICA condicao que
+ * chega aqui como ausencia de conta; qualquer outra falha e OPERACIONAL
+ * (permissao, API desabilitada, transporte) e precisa dizer isso ao caller.
+ *
+ * `mutationApplied` fica implicitamente falso: nada foi escrito neste ponto.
+ */
+async function resolveAuthPresenceOrFail(
+  deps: HumanLifecycleDeps,
+  user: JsonMap,
+  ra: string,
+): Promise<AuthPresence> {
+  try {
+    return await resolveAuthPresence(deps, user, ra);
+  } catch (error) {
+    // Um HttpsError daqui ja carrega a taxonomia: repassar sem reembrulhar.
+    if (error instanceof HttpsError) throw error;
+    fail(
+      "internal",
+      LIFECYCLE_ERROR.authOperationFailed,
+      "Nao foi possivel consultar a conta de autenticacao. " +
+        `Nenhuma alteracao foi aplicada. Erro: ${errorText(error)}`,
+    );
+  }
+}
+
 /** CASE 2: o documento afirma um vinculo de Auth que deixou de existir. */
 function failDangling(uid: string): never {
   fail(
@@ -645,7 +679,7 @@ export async function deactivateHuman(
   }
   const preUser = preSnapshot.data;
 
-  const presence = await resolveAuthPresence(deps, preUser, ra);
+  const presence = await resolveAuthPresenceOrFail(deps, preUser, ra);
   if (presence.kind === "dangling") failDangling(presence.uid);
 
   const personnelActive = isCurrentlyActive(preUser);
@@ -858,7 +892,7 @@ export async function reactivateHuman(
   }
   const preUser = preSnapshot.data;
 
-  const presence = await resolveAuthPresence(deps, preUser, ra);
+  const presence = await resolveAuthPresenceOrFail(deps, preUser, ra);
   if (presence.kind === "dangling") failDangling(presence.uid);
 
   const personnelActive = isCurrentlyActive(preUser);
