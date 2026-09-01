@@ -26,6 +26,7 @@ import 'package:canil_gcm/features/health/presentation/screens/health_v1_entry_s
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_dog_context_view.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_source.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_start_eligibility.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/active_occurrence_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/start_occurrence_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';

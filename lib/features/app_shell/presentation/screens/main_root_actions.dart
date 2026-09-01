@@ -201,20 +201,31 @@ extension _MainRootActions on _MainRootScreenState {
         occurrenceVM.openOccurrence ?? await occurrenceVM.findOpen(dogId);
     if (!context.mounted) return;
 
-    if (openOccurrence != null) {
-      final shouldContinue = await _showOpenOccurrenceDialog(context);
-      if (!context.mounted || shouldContinue != true) return;
-      rootNavigator.push(
-        MaterialPageRoute(
-          builder: (_) =>
-              ActiveOccurrenceScreen(occurrenceId: openOccurrence.id),
-        ),
-      );
-      return;
-    }
-
-    rootNavigator.push(
-      MaterialPageRoute(builder: (_) => const StartOccurrenceScreen()),
+    final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
+    await routeRootOccurrenceEntrypoint(
+      hasOpenOccurrence: openOccurrence != null,
+      eligibility: evaluateOccurrenceStartEligibility(
+        isLoading: shiftVM.isLoading,
+        shiftError: shiftVM.error,
+        hasActiveShift: shiftVM.hasActiveShift,
+        vehicleCrewId: shiftVM.vehicleCrewId,
+      ),
+      onRecoverOpenOccurrence: () async {
+        final shouldContinue = await _showOpenOccurrenceDialog(context);
+        if (!context.mounted || shouldContinue != true) return;
+        rootNavigator.push(
+          MaterialPageRoute(
+            builder: (_) =>
+                ActiveOccurrenceScreen(occurrenceId: openOccurrence!.id),
+          ),
+        );
+      },
+      onStartNewOccurrence: () {
+        rootNavigator.push(
+          MaterialPageRoute(builder: (_) => const StartOccurrenceScreen()),
+        );
+      },
+      onBlocked: (message) => AppFeedback.warning(context, message),
     );
   }
 
@@ -237,4 +248,38 @@ extension _MainRootActions on _MainRootScreenState {
       ),
     );
   }
+}
+
+/// FF-OCC-03 — orquestração do entrypoint raiz de ocorrência.
+///
+/// Existe para que a decisão real "recuperar / bloquear / abrir" seja
+/// exercitável em teste sem montar `MainRootScreen`, que constrói todas as abas
+/// e arrasta serviços sem seam de injeção. A produção (`_openOccurrenceFromRoot`)
+/// delega a esta função — não há cópia da lógica.
+///
+/// Pura em termos de dependência: sem Provider, sem Firebase, sem construção de
+/// serviço, sem mutação de estado de turno. Só ordena callbacks.
+///
+/// Ordenação deliberada (M8): a retomada de uma ocorrência JÁ criada vem ANTES
+/// da guarda de criação. A guarnição foi validada quando aquela ocorrência foi
+/// aberta; bloquear o retorno porque a viatura mudou depois deixaria o operador
+/// sem acesso a uma ocorrência em andamento. "Não pode abrir nova" e "não pode
+/// voltar para a aberta" são regras diferentes.
+@visibleForTesting
+Future<void> routeRootOccurrenceEntrypoint({
+  required bool hasOpenOccurrence,
+  required OccurrenceStartEligibility eligibility,
+  required Future<void> Function() onRecoverOpenOccurrence,
+  required VoidCallback onStartNewOccurrence,
+  required void Function(String message) onBlocked,
+}) async {
+  if (hasOpenOccurrence) {
+    await onRecoverOpenOccurrence();
+    return;
+  }
+  if (!eligibility.canStart) {
+    onBlocked(occurrenceStartBlockMessage(eligibility)!);
+    return;
+  }
+  onStartNewOccurrence();
 }

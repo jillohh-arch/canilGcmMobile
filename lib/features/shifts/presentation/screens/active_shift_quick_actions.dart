@@ -156,9 +156,23 @@ class _QuickActionsSection extends StatelessWidget {
 
   void _openOccurrence(BuildContext context) {
     HapticFeedback.mediumImpact();
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const StartOccurrenceScreen()));
+    // FF-OCC-03: mesma decisão compartilhada de E1 — nenhum predicado
+    // duplicado. Somente `ready` navega; a validação final segue autoritativa.
+    final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
+    routeQuickActionOccurrenceEntrypoint(
+      eligibility: evaluateOccurrenceStartEligibility(
+        isLoading: shiftVM.isLoading,
+        shiftError: shiftVM.error,
+        hasActiveShift: shiftVM.hasActiveShift,
+        vehicleCrewId: shiftVM.vehicleCrewId,
+      ),
+      onStartNewOccurrence: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const StartOccurrenceScreen()),
+        );
+      },
+      onBlocked: (message) => AppFeedback.warning(context, message),
+    );
   }
 
   DateTime? _latestDate(Iterable<DateTime> dates) {
@@ -301,4 +315,28 @@ class _CommandCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// FF-OCC-03 — orquestração do entrypoint de ocorrência da central de ações.
+///
+/// Mesmo motivo do hook equivalente em `main_root_actions.dart`: permitir que a
+/// decisão real "bloquear / abrir" seja exercitada em teste sem montar
+/// `ActiveShiftDashboardScreen`, que exige oito providers e serviços sem seam.
+/// A produção (`_openOccurrence`) delega a esta função.
+///
+/// Este entrypoint não tem recuperação de ocorrência aberta — essa
+/// responsabilidade é do entrypoint raiz. Aqui só existe abrir ou bloquear.
+///
+/// Sem Provider, sem Firebase, sem mutação de estado de turno.
+@visibleForTesting
+void routeQuickActionOccurrenceEntrypoint({
+  required OccurrenceStartEligibility eligibility,
+  required VoidCallback onStartNewOccurrence,
+  required void Function(String message) onBlocked,
+}) {
+  if (!eligibility.canStart) {
+    onBlocked(occurrenceStartBlockMessage(eligibility)!);
+    return;
+  }
+  onStartNewOccurrence();
 }

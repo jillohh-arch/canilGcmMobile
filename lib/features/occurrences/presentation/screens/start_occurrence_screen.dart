@@ -13,6 +13,7 @@ import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.d
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_nature.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_start_eligibility.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurrence_binomio.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurrence_cta.dart';
@@ -251,10 +252,7 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
     );
 
     if (candidate.isAfter(DateTime.now())) {
-      AppFeedback.warning(
-        context,
-        'Horário não pode ser no futuro',
-      );
+      AppFeedback.warning(context, 'Horário não pode ser no futuro');
       return;
     }
 
@@ -567,6 +565,45 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
   @override
   Widget build(BuildContext context) {
     final shiftVM = context.watch<ShiftViewModel>();
+
+    // FF-OCC-03 M6: guarda defensiva central, avaliada ANTES de ler os demais
+    // ViewModels. Os entrypoints já barram a navegação, mas um caller
+    // futuro/direto não pode encontrar um formulário utilizável sem guarnição.
+    // Reativa via `context.watch`: se a viatura for liberada com a tela aberta,
+    // o formulário é substituído. Sem efeito colateral no build — nada de pop,
+    // SnackBar ou mutação aqui.
+    final eligibility = evaluateOccurrenceStartEligibility(
+      isLoading: shiftVM.isLoading,
+      shiftError: shiftVM.error,
+      hasActiveShift: shiftVM.hasActiveShift,
+      vehicleCrewId: shiftVM.vehicleCrewId,
+    );
+    if (!eligibility.canStart) {
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) async {
+          if (didPop) return;
+          await _requestExit();
+        },
+        child: Scaffold(
+          backgroundColor: AppTheme.background,
+          body: SafeArea(
+            child: Column(
+              children: [
+                StartOccurrenceHeader(
+                  onBack: _requestExit,
+                  onClose: _requestExit,
+                ),
+                Expanded(
+                  child: _StartOccurrenceBlockedCard(eligibility: eligibility),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     final dogVM = context.watch<DogViewModel>();
     final authVM = context.watch<AuthViewModel>();
     final userVM = context.watch<UserViewModel>();
@@ -694,6 +731,56 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// FF-OCC-03: apresentação bloqueante quando a abertura não está elegível.
+///
+/// Estática e sem efeito colateral — pode ser reconstruída livremente pelo
+/// `context.watch` da tela. `loading` recebe tratamento visual neutro; os
+/// demais estados usam âmbar de aviso. Nunca acusa ausência de viatura durante
+/// o carregamento.
+class _StartOccurrenceBlockedCard extends StatelessWidget {
+  final OccurrenceStartEligibility eligibility;
+
+  const _StartOccurrenceBlockedCard({required this.eligibility});
+
+  @override
+  Widget build(BuildContext context) {
+    final isLoading = eligibility == OccurrenceStartEligibility.loading;
+    final color = isLoading ? AppTheme.primary : AppTheme.warning;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (isLoading)
+              SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  valueColor: AlwaysStoppedAnimation<Color>(color),
+                ),
+              )
+            else
+              Icon(Icons.info_outline_rounded, color: color, size: 34),
+            const SizedBox(height: 18),
+            Text(
+              occurrenceStartBlockMessage(eligibility) ?? '',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                height: 1.45,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+          ],
         ),
       ),
     );

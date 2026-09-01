@@ -19,6 +19,7 @@ import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/health/presentation/screens/dog_health_prontuario_screen.dart';
 import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmodel.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_start_eligibility.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/start_occurrence_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 import 'package:canil_gcm/features/shifts/data/dashboard_service.dart';
