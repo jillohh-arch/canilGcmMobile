@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/features/health/presentation/clinical/clinical_consultation_screen.dart';
 import 'health_event_form_screen.dart';
 
 class HealthTypeSelectorScreen extends StatefulWidget {
@@ -208,6 +209,21 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
       final saved = await widget.onRegisterRestriction?.call(context) ?? false;
       if (!mounted) return;
       if (saved && widget.popOnSave) Navigator.pop(context, true);
+      return;
+    }
+
+    // Consulta Veterinária tem tela dedicada: grava no caminho clínico
+    // canônico (ClinicalCase/ClinicalEvent) em vez do HealthLog legado.
+    // Os demais tipos seguem no formulário genérico abaixo, inalterados.
+    if (selectedId == 'consultation') {
+      final saved = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ClinicalConsultationScreen(dogId: widget.dogId),
+        ),
+      );
+      if (!mounted) return;
+      if (saved == true && widget.popOnSave) Navigator.pop(context, true);
       return;
     }
 
