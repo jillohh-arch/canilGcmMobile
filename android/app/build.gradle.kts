@@ -33,6 +33,32 @@ android {
         multiDexEnabled = true
     }
 
+    // Alvos Firebase explícitos por flavor.
+    //
+    // `production` mantém o applicationId histórico e resolve
+    // `android/app/google-services.json` (canil-gcm). `staging` acrescenta o
+    // sufixo `.staging`, o que faz o plugin Google Services resolver
+    // `android/app/src/staging/google-services.json` (k9-ops-staging).
+    //
+    // applicationIds distintos permitem que os dois APKs coexistam no mesmo
+    // aparelho — homologação nunca sobrescreve produção.
+    flavorDimensions += "environment"
+
+    productFlavors {
+        create("production") {
+            dimension = "environment"
+            // Sem suffix: applicationId permanece com.example.canil_gcm.
+        }
+        create("staging") {
+            dimension = "environment"
+            applicationIdSuffix = ".staging"
+            versionNameSuffix = "-stg"
+            // O rótulo visível vem do source-set `src/staging/res`, que
+            // sobrepõe `src/main/res` — não de `resValue`, para não duplicar
+            // recurso com o `strings.xml` de main.
+        }
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
