@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/health/presentation/clinical/clinical_consultation_screen.dart';
+import 'package:canil_gcm/features/health/presentation/clinical/exam_process_flow_screen.dart';
 import 'health_event_form_screen.dart';
 
 class HealthTypeSelectorScreen extends StatefulWidget {
@@ -220,6 +221,20 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
         context,
         MaterialPageRoute(
           builder: (_) => ClinicalConsultationScreen(dogId: widget.dogId),
+        ),
+      );
+      if (!mounted) return;
+      if (saved == true && widget.popOnSave) Navigator.pop(context, true);
+      return;
+    }
+
+    // Exames Clínicos possuem fluxo canônico próprio e ciclo de vida completo
+    // (F20.EXAM-V1: Solicitação -> Coleta -> Resultado -> Interpretação -> Impacto)
+    if (selectedId == 'exam') {
+      final saved = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ExamProcessFlowScreen(dogId: widget.dogId),
         ),
       );
       if (!mounted) return;

@@ -2307,6 +2307,15 @@ service cloud.firestore {
           && canAccessDogRecord(dogId);
         allow create, update, delete: if false;
       }
+
+      // F20.EXAM-V1 — Agregado ExamProcess (subcoleção de caso).
+      // Leitura fail-closed: hasClinicalReadAuthority() + canAccessDogRecord(dogId).
+      // Escrita de cliente estritamente proibida (backend Admin SDK via callables).
+      match /clinical_cases/{caseId}/exams/{examId} {
+        allow read: if hasClinicalReadAuthority()
+          && canAccessDogRecord(dogId);
+        allow create, update, delete: if false;
+      }
     }
 
     // Health v1 — HW-4A.2C.5: Agenda Preventiva GLOBAL (collection group).

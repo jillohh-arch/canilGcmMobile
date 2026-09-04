@@ -66,6 +66,16 @@ import {
   type ClinicalCaseCallableDeps,
 } from "./clinical_case_callables";
 import {
+  type ExamCaller,
+  type ExamProcessCallableDeps,
+  runHealthRequestExam,
+  runHealthRecordExamCollection,
+  runHealthRecordExamResult,
+  runHealthRecordExamInterpretation,
+  runHealthAssessExamImpact,
+  runHealthCancelExam,
+} from "./exam_process_callables";
+import {
   RestrictionCaller,
   runHealthRestrictionCancel,
   runHealthRestrictionEnd,
@@ -8434,6 +8444,87 @@ export const healthCancelClinicalEvent = onCall({region}, async (request) => {
  */
 export const healthAmendClinicalEvent = onCall({region}, async (request) => {
   return runHealthAmendClinicalEvent(request, clinicalCaseDeps);
+});
+
+function toExamCaller(caller: CallerIdentity): ExamCaller {
+  return {
+    uid: caller.uid,
+    email: caller.email,
+    ra: caller.ra,
+    name: caller.name,
+  };
+}
+
+const examProcessDeps: ExamProcessCallableDeps = {
+  db,
+  requireRequestExam: async (auth) => {
+    return toExamCaller(await requireClinicalCapability(auth, "record_clinical"));
+  },
+  requireRecordClinical: async (auth) => {
+    return toExamCaller(await requireClinicalCapability(auth, "record_clinical"));
+  },
+  requireInterpretExam: async (auth) => {
+    return toExamCaller(await requireClinicalCapability(auth, "finalize_clinical"));
+  },
+  requireManageClinicalCase: async (auth) => {
+    return toExamCaller(await requireClinicalCapability(auth, "manage_clinical_case"));
+  },
+  requireDogAccess: async (auth, caller, dogId, dog) => {
+    await requireDogRecordAccess(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+      dogId,
+      dog,
+    );
+  },
+  isAdministrativeAuthority: async (auth, caller) => {
+    return isAdministrativeHealthAuthority(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+    );
+  },
+};
+
+/**
+ * F20.EXAM-V1: Solicita um exame clínico para um caso existente.
+ */
+export const healthRequestExam = onCall({region}, async (request) => {
+  return runHealthRequestExam(request, examProcessDeps);
+});
+
+/**
+ * F20.EXAM-V1: Registra coleta física de material do exame.
+ */
+export const healthRecordExamCollection = onCall({region}, async (request) => {
+  return runHealthRecordExamCollection(request, examProcessDeps);
+});
+
+/**
+ * F20.EXAM-V1: Registra laudo / resultado técnico recebido do laboratório.
+ */
+export const healthRecordExamResult = onCall({region}, async (request) => {
+  return runHealthRecordExamResult(request, examProcessDeps);
+});
+
+/**
+ * F20.EXAM-V1: Registra interpretação clínica emitida por veterinário responsável.
+ */
+export const healthRecordExamInterpretation = onCall({region}, async (request) => {
+  return runHealthRecordExamInterpretation(request, examProcessDeps);
+});
+
+/**
+ * F20.EXAM-V1: Registra avaliação de impacto operacional do exame.
+ */
+export const healthAssessExamImpact = onCall({region}, async (request) => {
+  return runHealthAssessExamImpact(request, examProcessDeps);
+});
+
+/**
+ * F20.EXAM-V1: Cancela exame com justificativa obrigatória.
+ */
+export const healthCancelExam = onCall({region}, async (request) => {
+  return runHealthCancelExam(request, examProcessDeps);
 });
 
 function toRestrictionCaller(caller: CallerIdentity): RestrictionCaller {

@@ -144,5 +144,26 @@ void main() {
         throwsA(isA<HealthDomainException>()),
       );
     });
+
+    test('serialização e deserialização preservam todos os campos (round-trip)', () {
+      final exam = build(
+        requestedAt: now,
+        collectedAt: now.add(const Duration(hours: 1)),
+        resultedAt: now.add(const Duration(hours: 4)),
+      );
+      final map = exam.toMap();
+      final restored = ExamProcess.fromMap(map);
+
+      expect(restored.id, exam.id);
+      expect(restored.caseId, exam.caseId);
+      expect(restored.dogId, exam.dogId);
+      expect(restored.title, exam.title);
+      expect(restored.examType, exam.examType);
+      expect(restored.stage, exam.stage);
+      expect(restored.urgency, exam.urgency);
+      expect(restored.requestedAt, exam.requestedAt);
+      expect(restored.collectedAt, exam.collectedAt);
+      expect(restored.resultedAt, exam.resultedAt);
+    });
   });
 }
