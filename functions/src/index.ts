@@ -22,6 +22,12 @@ import {
   patchHumanPersonnel,
 } from "./admin_patch_human_personnel";
 import {
+  deactivateHuman,
+  HumanLifecycleTransaction,
+  reactivateHuman,
+} from "./admin_human_lifecycle";
+import {isAuthUserNotFound} from "./auth_error_classification";
+import {
   AccessScope,
   AccessScopeResolution,
   decideAccessScope,
@@ -3096,6 +3102,101 @@ export const adminPatchHumanPersonnel = onCall({region}, async (request) => {
     },
     request.data,
   );
+});
+
+/**
+ * Wiring compartilhado das duas callables de Human Lifecycle V1.
+ *
+ * As chamadas de Auth ficam FORA do callback de runTransaction: transacoes
+ * podem sofrer retry e repetiriam o efeito colateral externo. A ordem e a
+ * compensacao vivem em admin_human_lifecycle.ts.
+ */
+function humanLifecycleDeps(request: CallableRequest<unknown>) {
+  const userRef = (ra: string) => db.collection("users").doc(ra);
+  const activeShiftRef = (ra: string) =>
+    db.collection("active_shifts").doc(ra);
+  return {
+    authorize: () =>
+      requireAccessPermission(request.auth, "humans", "archive"),
+    runTransaction: <T>(
+      handler: (tx: HumanLifecycleTransaction) => Promise<T>,
+    ) =>
+      db.runTransaction(async (transaction) => {
+        const tx: HumanLifecycleTransaction = {
+          getUser: async (ra) => {
+            const snap = await transaction.get(userRef(ra));
+            return {exists: snap.exists, data: snap.data() ?? null};
+          },
+          // Uma transacao do Firestore le documentos de colecoes diferentes; o
+          // guard de turno precisa ser revalidado no mesmo instante logico.
+          getActiveShift: async (ra) => {
+            const snap = await transaction.get(activeShiftRef(ra));
+            return {exists: snap.exists, data: snap.data() ?? null};
+          },
+          patchUser: (ra, patch) => {
+            transaction.set(userRef(ra), patch, {merge: true});
+          },
+        };
+        return handler(tx);
+      }),
+    getUser: async (ra: string) => {
+      const snap = await userRef(ra).get();
+      return {exists: snap.exists, data: snap.data() ?? null};
+    },
+    getActiveShift: async (ra: string) => {
+      const snap = await activeShiftRef(ra).get();
+      return {exists: snap.exists, data: snap.data() ?? null};
+    },
+    // `null` SOMENTE quando a conta nao existe: o modulo trata como DANGLING (o
+    // doc afirma um uid morto) e falha fechado antes de qualquer mutacao.
+    // Qualquer outro erro propaga: um `catch` nu transformaria falta de
+    // permissao num DANGLING falso (S2.A.D1).
+    getAuthAccount: async (uid: string) => {
+      try {
+        const record = await admin.auth().getUser(uid);
+        return {uid: record.uid, disabled: record.disabled === true};
+      } catch (error) {
+        if (isAuthUserNotFound(error)) return null;
+        throw error;
+      }
+    },
+    // Fallback CANONICO, identico ao de adminAssignAccessProfile/
+    // adminUpsertHuman/setK9InstructorRole. `null` => Personnel sem conta.
+    // Só a inexistencia real vira `null`: engolir um PERMISSION_DENIED aqui
+    // devolveria `not_provisioned` com a conta ainda habilitada (S2.A.D1).
+    findAuthAccountByEmail: async (email: string) => {
+      try {
+        const record = await admin.auth().getUserByEmail(email);
+        return {uid: record.uid, disabled: record.disabled === true};
+      } catch (error) {
+        if (isAuthUserNotFound(error)) return null;
+        throw error;
+      }
+    },
+    // Mesma expressao provada no repo. `institutional_email` NUNCA participa.
+    canonicalAuthEmail: (user: JsonMap, ra: string) =>
+      stringValue(user.email) ?? emailForRa(ra),
+    setAuthDisabled: async (uid: string, disabled: boolean) => {
+      await admin.auth().updateUser(uid, {disabled});
+    },
+    serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+    auditEntry: (
+      action: string,
+      caller: CallerIdentity,
+      reason?: string,
+    ) => auditEntry(action, caller, reason),
+    arrayUnion: (value: unknown) =>
+      admin.firestore.FieldValue.arrayUnion(value),
+    deleteField: () => admin.firestore.FieldValue.delete(),
+  };
+}
+
+export const adminDeactivateHuman = onCall({region}, async (request) => {
+  return deactivateHuman(humanLifecycleDeps(request), request.data);
+});
+
+export const adminReactivateHuman = onCall({region}, async (request) => {
+  return reactivateHuman(humanLifecycleDeps(request), request.data);
 });
 
 export const adminArchiveHuman = onCall({region}, async (request) => {
