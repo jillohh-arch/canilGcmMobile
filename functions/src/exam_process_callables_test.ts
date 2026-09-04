@@ -283,9 +283,26 @@ async function runTests() {
     const eventId = colRes["eventId"] as string;
     const evtSnap = db._store.get(`dogs/dog-1/clinical_cases/case-1/clinical_events/${eventId}`);
     assert.ok(evtSnap);
-    assert.strictEqual(evtSnap["event_type"], "exam_collection");
+    assert.strictEqual(evtSnap!["entity_kind"], "clinical_event");
+    assert.strictEqual(evtSnap!["dog_id"], "dog-1");
+    assert.strictEqual(evtSnap!["case_id"], "case-1");
+    assert.strictEqual(evtSnap!["exam_id"], examId);
+    assert.strictEqual(evtSnap!["event_type"], "exam_collection");
+    assert.strictEqual(evtSnap!["payload_type"], "exam_collection_v1");
+    assert.strictEqual(evtSnap!["payload_version"], 1);
+    assert.strictEqual(evtSnap!["schema_version"], 1);
+    assert.strictEqual(evtSnap!["revision"], 1);
+    assert.strictEqual(evtSnap!["status"], "final");
+    assert.strictEqual((evtSnap!["recorded_by"] as any)["uid"], testCaller.uid);
+    assert.strictEqual((evtSnap!["recorded_by"] as any)["name"], testCaller.name);
+    assert.ok(evtSnap!["occurred_at"]);
+    assert.ok(evtSnap!["recorded_at"]);
+    assert.ok(evtSnap!["updated_at"]);
+    assert.strictEqual((evtSnap!["content"] as any)["exam_id"], examId);
+    assert.strictEqual((evtSnap!["content"] as any)["if_collection_site"], "Veia cefálica");
+    assert.strictEqual((evtSnap!["content"] as any)["if_collection_notes"], "Coleta tranquila");
 
-    console.log("✓ Record Collection: happy path passed");
+    console.log("✓ Record Collection: happy path & immutable ClinicalEvent passed");
   }
 
   // ── 3. RECORD RESULT ──
