@@ -161,6 +161,19 @@ function parseRequiredString(data: JsonMap, field: string): string {
 // 1. REQUEST EXAM
 // ─────────────────────────────────────────────────────────────────────────────
 
+export const VALID_EXAM_TYPES = new Set([
+  "blood_work",
+  "imaging",
+  "biopsy",
+  "culture",
+  "parasitology",
+  "urinalysis",
+  "cardiology",
+  "dermatology",
+  "ophthalmology",
+  "other",
+]);
+
 export async function runHealthRequestExam(
   request: CallableRequest,
   deps: ExamProcessCallableDeps,
@@ -172,6 +185,12 @@ export async function runHealthRequestExam(
   const caseId = parseRequiredString(data, "caseId");
   const title = parseRequiredString(data, "title");
   const examType = parseRequiredString(data, "examType");
+  if (!VALID_EXAM_TYPES.has(examType)) {
+    throw new HttpsError(
+      "invalid-argument",
+      `Tipo de exame desconhecido ou malformado: ${examType}`,
+    );
+  }
   const urgency = stringValue(data["urgency"]) ?? "routine";
   const labName = stringValue(data["labName"] ?? data["lab_name"]) ?? null;
   const requestReason = stringValue(data["requestReason"] ?? data["request_reason"]) ?? null;
@@ -304,19 +323,18 @@ export async function runHealthRequestExam(
     // HealthScheduleItem
     const scheduleDoc: JsonMap = {
       dog_id: dogId,
-      title: `Exame: ${title}`,
       schedule_type: "exam",
+      title: `Exame: ${title}`,
       scheduled_for: nowTs,
       timezone: "America/Sao_Paulo",
-      status: "scheduled",
-      source: {
-        type: "exam_process",
-        exam_id: examId,
-        case_id: caseId,
-      },
+      lifecycle_status: "open",
+      source_type: "exam_process",
+      source_id: examId,
+      case_id: caseId,
       created_at: nowTs,
-      created_by: recordedBy,
+      recorded_by: recordedBy,
       schema_version: 1,
+      revision: 1,
     };
 
     tx.set(eRef, examDoc);
@@ -601,14 +619,19 @@ export async function runHealthRecordExamResult(
       eventDoc["attachment_refs"] = [resultDocumentId];
     }
 
-    // Schedule: marca concluído se existir
+    // Schedule: marca concluído se existir e estiver open
     const schedSnap = await tx.get(schedRef);
     if (schedSnap.exists) {
-      tx.update(schedRef, {
-        status: "completed",
-        completed_at: nowTs,
-        completed_by: recordedBy,
-      });
+      const schedData = (schedSnap.data() ?? {}) as JsonMap;
+      if (schedData["lifecycle_status"] === "open") {
+        const schedRev = typeof schedData["revision"] === "number" ? schedData["revision"] : 1;
+        tx.update(schedRef, {
+          lifecycle_status: "completed",
+          completed_at: nowTs,
+          completed_by: recordedBy,
+          revision: schedRev + 1,
+        });
+      }
     }
 
     tx.update(eRef, examUpdate);
@@ -657,7 +680,11 @@ export async function runHealthRecordExamInterpretation(
   const examId = parseRequiredString(data, "examId");
   const interpretationText = parseRequiredString(data, "interpretationText");
   const professionalRaw = data["professional"] as JsonMap | undefined;
-  if (!professionalRaw || !stringValue(professionalRaw["name"]) || !stringValue(professionalRaw["registration_number"])) {
+  const profName = professionalRaw ? stringValue(professionalRaw["name"]) : null;
+  const profRegNumber = professionalRaw
+    ? stringValue(professionalRaw["registration_number"] ?? professionalRaw["registrationNumber"])
+    : null;
+  if (!professionalRaw || !profName || !profRegNumber) {
     throw new HttpsError(
       "invalid-argument",
       "Interpretação de exame exige ProfessionalIdentity completa (veterinário responsável).",
@@ -1015,16 +1042,18 @@ export async function runHealthCancelExam(
       revision: examRev + 1,
     };
 
-    // Cancela agendamento preventivo se estiver aberto
+    // Cancela agendamento preventivo se estiver open
     const schedSnap = await tx.get(schedRef);
     if (schedSnap.exists) {
       const schedData = schedSnap.data() as JsonMap;
-      if (schedData["status"] === "scheduled") {
+      if (schedData["lifecycle_status"] === "open") {
+        const schedRev = typeof schedData["revision"] === "number" ? schedData["revision"] : 1;
         tx.update(schedRef, {
-          status: "cancelled",
+          lifecycle_status: "cancelled",
           cancelled_at: nowTs,
           cancelled_by: recordedBy,
           cancel_reason: cancelReason,
+          revision: schedRev + 1,
         });
       }
     }
