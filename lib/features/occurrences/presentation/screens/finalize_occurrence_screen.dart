@@ -19,6 +19,7 @@ import 'package:canil_gcm/features/occurrences/data/occurrence_repository.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
+import 'package:canil_gcm/features/occurrences/domain/upload_progress_aggregator.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_confirmation_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_team_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
@@ -43,6 +44,50 @@ class FinalizeOccurrenceScreen extends StatefulWidget {
     this.locationAddress,
   });
 
+  @visibleForTesting
+  static String formatUploadStatus({
+    required int currentFileIndex,
+    required int totalFiles,
+    required double? fraction,
+    bool hasActiveProgress = false,
+  }) {
+    final fileNumber = currentFileIndex + 1;
+    final prefix = totalFiles == 1 ? 'Enviando foto' : 'Enviando fotos';
+    final hasCompletedBaseline = currentFileIndex > 0;
+    if (fraction != null && (hasCompletedBaseline || hasActiveProgress)) {
+      final pct = (fraction * 100).floor().clamp(0, 100);
+      return '$prefix $fileNumber/$totalFiles · $pct%';
+    }
+    return totalFiles == 1 ? '$prefix...' : '$prefix $fileNumber/$totalFiles...';
+  }
+
+  @visibleForTesting
+  static List<File> resolveEffectiveFilesAfterCollisionGuard(
+    List<({File original, File candidate, bool wasCompressed})> candidates,
+  ) {
+    final compressedPathCounts = <String, int>{};
+    for (final c in candidates) {
+      if (c.wasCompressed) {
+        compressedPathCounts[c.candidate.path] =
+            (compressedPathCounts[c.candidate.path] ?? 0) + 1;
+      }
+    }
+
+    final taintedPaths = <String>{};
+    for (final entry in compressedPathCounts.entries) {
+      if (entry.value >= 2) {
+        taintedPaths.add(entry.key);
+      }
+    }
+
+    return candidates.map((c) {
+      if (c.wasCompressed && taintedPaths.contains(c.candidate.path)) {
+        return c.original;
+      }
+      return c.candidate;
+    }).toList();
+  }
+
   @override
   State<FinalizeOccurrenceScreen> createState() =>
       _FinalizeOccurrenceScreenState();
@@ -57,6 +102,10 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
   int _currentStep = 0;
   bool _isListening = false;
   bool _isFinalizing = false;
+  String? _finalizeStatus;
+  double? _finalizeFraction;
+  int _currentFinalizeUploadIndex = 0;
+  bool _hasActiveFinalizeProgress = false;
   bool _isGeneratingAiDraft = false;
   bool _draftLoaded = false;
   Timer? _draftDebounce;
@@ -548,7 +597,13 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       return;
     }
 
-    setState(() => _isFinalizing = true);
+    setState(() {
+      _isFinalizing = true;
+      _finalizeFraction = null;
+      _finalizeStatus = _finalizationPhotos.isNotEmpty
+          ? 'Preparando fotos...'
+          : 'Selando ocorrência...';
+    });
     HapticFeedback.heavyImpact();
 
     try {
@@ -566,10 +621,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                 OccurrenceTeamScreen(occurrenceId: widget.occurrenceId),
           ),
         );
-        AppFeedback.info(
-          context,
-          'Ocorrência já está aguardando assinaturas.',
-        );
+        AppFeedback.info(context, 'Ocorrência já está aguardando assinaturas.');
         return;
       }
 
@@ -577,6 +629,15 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
       final photoUploadResults = await _uploadFinalizationPhotos();
       final photoUrls = photoUploadResults.map((r) => r.url).toList();
       final photoHashes = photoUploadResults.map((r) => r.sha256Hash).toList();
+
+      if (mounted) {
+        setState(() {
+          _currentFinalizeUploadIndex = 0;
+          _hasActiveFinalizeProgress = false;
+          _finalizeFraction = null;
+          _finalizeStatus = 'Selando ocorrência...';
+        });
+      }
 
       if (_hasCoSigners) {
         final closeResult = await vm
@@ -633,10 +694,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                   OccurrenceTeamScreen(occurrenceId: widget.occurrenceId),
             ),
           );
-          AppFeedback.success(
-            context,
-            'Ocorrência fechada para assinaturas.',
-          );
+          AppFeedback.success(context, 'Ocorrência fechada para assinaturas.');
         }
         return;
       }
@@ -714,7 +772,15 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
         AppFeedback.error(context, 'Erro ao finalizar: $e');
       }
     } finally {
-      if (mounted) setState(() => _isFinalizing = false);
+      if (mounted) {
+        setState(() {
+          _isFinalizing = false;
+          _finalizeStatus = null;
+          _finalizeFraction = null;
+          _currentFinalizeUploadIndex = 0;
+          _hasActiveFinalizeProgress = false;
+        });
+      }
     }
   }
 
@@ -1120,60 +1186,109 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
           top: BorderSide(color: AppTheme.textPrimary.withAlpha(10)),
         ),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          if (_currentStep > 0)
-            Expanded(
-              child: OutlinedButton(
-                onPressed: _goBack,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.textPrimary,
-                  side: BorderSide(color: AppTheme.textPrimary.withAlpha(40)),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: Text(
-                  '‹ VOLTAR',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+          if (_isFinalizing && _finalizeFraction != null) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: SizedBox(
+                height: 3,
+                width: double.infinity,
+                child: LinearProgressIndicator(
+                  value: (_currentFinalizeUploadIndex == 0 &&
+                          !_hasActiveFinalizeProgress)
+                      ? null
+                      : _finalizeFraction,
+                  backgroundColor: AppTheme.textPrimary.withAlpha(20),
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    AppTheme.primary,
                   ),
                 ),
               ),
             ),
-          if (_currentStep > 0) const SizedBox(width: 12),
-          Expanded(
-            flex: 2,
-            child: ElevatedButton(
-              onPressed: _canAdvance ? (isLast ? _finalize : _goNext) : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isLast ? AppTheme.success : AppTheme.primary,
-                disabledBackgroundColor: AppTheme.textPrimary.withAlpha(30),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: _isFinalizing
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppTheme.textPrimary,
+            const SizedBox(height: 8),
+          ],
+          Row(
+            children: [
+              if (_currentStep > 0)
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _isFinalizing ? null : _goBack,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.textPrimary,
+                      side: BorderSide(
+                        color: AppTheme.textPrimary.withAlpha(40),
                       ),
-                    )
-                  : Text(
-                      isLast ? '✓ CONCLUIR' : 'PRÓXIMO ›',
-                      style: GoogleFonts.inter(
-                        color: AppTheme.textPrimary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-            ),
+                    child: Text(
+                      '‹ VOLTAR',
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              if (_currentStep > 0) const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton(
+                  onPressed: _canAdvance
+                      ? (isLast ? _finalize : _goNext)
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isLast
+                        ? AppTheme.success
+                        : AppTheme.primary,
+                    disabledBackgroundColor: AppTheme.textPrimary.withAlpha(30),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: _isFinalizing
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                _finalizeStatus ?? 'Selando ocorrência...',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.inter(
+                                  color: AppTheme.textPrimary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : Text(
+                          isLast ? '✓ CONCLUIR' : 'PRÓXIMO ›',
+                          style: GoogleFonts.inter(
+                            color: AppTheme.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1727,17 +1842,92 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
   Future<List<UploadResult>> _uploadFinalizationPhotos() async {
     if (_finalizationPhotos.isEmpty) return [];
 
+    if (mounted) {
+      setState(() {
+        _finalizeStatus = 'Preparando fotos...';
+        _finalizeFraction = null;
+      });
+    }
+
+    // Fase 1: Preparação sequencial com tracking de candidatos
+    final candidates =
+        <({File original, File candidate, bool wasCompressed})>[];
+    for (final original in _finalizationPhotos) {
+      final compressed = await _mediaService.compressImage(original);
+      candidates.add((
+        original: original,
+        candidate: compressed ?? original,
+        wasCompressed: compressed != null,
+      ));
+    }
+
+    // Fase 2: Aplicação da regra de guarda contra colisão de paths temporários
+    final effectiveFiles =
+        FinalizeOccurrenceScreen.resolveEffectiveFilesAfterCollisionGuard(
+          candidates,
+        );
+
+    // Fase 3: Medição dos tamanhos efetivos finais para o denominador
+    final fileSizes = <int>[];
+    for (final file in effectiveFiles) {
+      try {
+        fileSizes.add(await file.length());
+      } catch (_) {
+        fileSizes.add(0);
+      }
+    }
+
+    final aggregator = UploadProgressAggregator(fileSizes);
     final results = <UploadResult>[];
     final folder = 'occurrences/${widget.occurrenceId}/finalization';
 
-    for (final file in _finalizationPhotos) {
-      final compressed = await _mediaService.compressImage(file);
+    // Fase 4: Upload sequencial com progresso agregado real em bytes
+    for (var i = 0; i < effectiveFiles.length; i++) {
+      final file = effectiveFiles[i];
+      final startSnap = aggregator.startFile(i);
+      if (mounted) {
+        setState(() {
+          _currentFinalizeUploadIndex = i;
+          _hasActiveFinalizeProgress = false;
+          _finalizeFraction = startSnap.fraction;
+          _finalizeStatus = FinalizeOccurrenceScreen.formatUploadStatus(
+            currentFileIndex: i,
+            totalFiles: effectiveFiles.length,
+            fraction: startSnap.fraction,
+            hasActiveProgress: false,
+          );
+        });
+      }
+
       final result = await _storageService.uploadImageWithHash(
-        compressed ?? file,
+        file,
         folder,
+        onProgress: (transferred, total) {
+          if (!mounted) return;
+          final snapshot = aggregator.updateFileProgress(i, transferred);
+          setState(() {
+            _currentFinalizeUploadIndex = i;
+            _hasActiveFinalizeProgress = snapshot.hasActiveFileProgress;
+            _finalizeFraction = snapshot.fraction;
+            _finalizeStatus = FinalizeOccurrenceScreen.formatUploadStatus(
+              currentFileIndex: i,
+              totalFiles: effectiveFiles.length,
+              fraction: snapshot.fraction,
+              hasActiveProgress: snapshot.hasActiveFileProgress,
+            );
+          });
+        },
       );
-      if (result != null) results.add(result);
+
+      if (result != null) {
+        aggregator.completeFile(i);
+        _hasActiveFinalizeProgress = false;
+        results.add(result);
+      } else {
+        break;
+      }
     }
+
     return results;
   }
 

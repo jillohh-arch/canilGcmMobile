@@ -27,12 +27,17 @@ class StorageService {
 
   /// Faz upload de uma imagem e retorna URL + SHA-256 do binário.
   /// Usado para fotos que precisam de verificação de integridade.
-  Future<UploadResult?> uploadImageWithHash(File file, String folder) async {
+  Future<UploadResult?> uploadImageWithHash(
+    File file,
+    String folder, {
+    void Function(int bytesTransferred, int totalBytes)? onProgress,
+  }) async {
     return uploadFileWithHash(
       file,
       folder,
       mimeType: 'image/jpeg',
       extension: 'jpg',
+      onProgress: onProgress,
     );
   }
 
@@ -99,6 +104,7 @@ class StorageService {
     String folder, {
     String? mimeType,
     String? extension,
+    void Function(int bytesTransferred, int totalBytes)? onProgress,
   }) async {
     try {
       final String ext = extension ?? _extensionFromPath(file.path);
@@ -118,7 +124,13 @@ class StorageService {
         SettableMetadata(contentType: resolvedMime),
       );
 
-      final TaskSnapshot snapshot = await _awaitUpload(uploadTask);
+      final TaskSnapshot snapshot = onProgress == null
+          ? await _awaitUpload(uploadTask)
+          : await runTransferWithProgress<TaskSnapshot>(
+              completionFactory: () => _awaitUpload(uploadTask),
+              progressEvents: uploadProgressEvents(uploadTask),
+              onProgress: onProgress,
+            );
 
       if (snapshot.state == TaskState.success) {
         final String downloadUrl = await snapshot.ref.getDownloadURL().timeout(
@@ -264,6 +276,55 @@ class StorageService {
       }
     } catch (e) {
       debugPrint('[StorageService] Erro genérico ao deletar: $e');
+    }
+  }
+}
+
+// ─── FF-OCC-02: Progress Bridge Helpers ─────────────────────────────
+
+@visibleForTesting
+Stream<(int, int)> uploadProgressEvents(UploadTask task) {
+  return task.snapshotEvents.map(
+    (snapshot) => (snapshot.bytesTransferred, snapshot.totalBytes),
+  );
+}
+
+@visibleForTesting
+Future<T> runTransferWithProgress<T>({
+  required Future<T> Function() completionFactory,
+  required Stream<(int, int)> progressEvents,
+  required void Function(int transferred, int total)? onProgress,
+}) async {
+  if (onProgress == null) {
+    return completionFactory();
+  }
+
+  StreamSubscription<(int, int)>? subscription;
+  try {
+    subscription = progressEvents.listen(
+      (event) {
+        try {
+          onProgress(event.$1, event.$2);
+        } catch (e, st) {
+          debugPrint('[StorageService] Erro no callback onProgress: $e\n$st');
+        }
+      },
+      onError: (Object error, StackTrace st) {
+        debugPrint('[StorageService] Erro no stream de progresso: $error\n$st');
+      },
+      cancelOnError: false,
+    );
+
+    return await completionFactory();
+  } finally {
+    if (subscription != null) {
+      try {
+        await subscription.cancel();
+      } catch (e, st) {
+        debugPrint(
+          '[StorageService] Erro ao cancelar subscription de progresso: $e\n$st',
+        );
+      }
     }
   }
 }
