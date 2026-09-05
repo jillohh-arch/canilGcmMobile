@@ -57,11 +57,20 @@ final class FirebaseFunctionsExamProcessGateway implements ExamProcessGateway {
 
   @override
   Future<List<ClinicalCaseOption>> loadUsableCases(String dogId) async {
-    final snapshot = await _db
-        .collection('dogs')
-        .doc(dogId)
-        .collection('clinical_cases')
-        .get();
+    QuerySnapshot<Map<String, dynamic>> snapshot;
+    try {
+      snapshot = await _db
+          .collection('dogs')
+          .doc(dogId)
+          .collection('clinical_cases')
+          .get(const GetOptions(source: Source.server));
+    } catch (_) {
+      snapshot = await _db
+          .collection('dogs')
+          .doc(dogId)
+          .collection('clinical_cases')
+          .get();
+    }
 
     final options = <ClinicalCaseOption>[];
     for (final doc in snapshot.docs) {
@@ -102,13 +111,24 @@ final class FirebaseFunctionsExamProcessGateway implements ExamProcessGateway {
     required String dogId,
     required String caseId,
   }) async {
-    final snapshot = await _db
-        .collection('dogs')
-        .doc(dogId)
-        .collection('clinical_cases')
-        .doc(caseId)
-        .collection('exams')
-        .get();
+    QuerySnapshot<Map<String, dynamic>> snapshot;
+    try {
+      snapshot = await _db
+          .collection('dogs')
+          .doc(dogId)
+          .collection('clinical_cases')
+          .doc(caseId)
+          .collection('exams')
+          .get(const GetOptions(source: Source.server));
+    } catch (_) {
+      snapshot = await _db
+          .collection('dogs')
+          .doc(dogId)
+          .collection('clinical_cases')
+          .doc(caseId)
+          .collection('exams')
+          .get();
+    }
 
     final exams = <ExamProcess>[];
     for (final doc in snapshot.docs) {
@@ -289,14 +309,26 @@ final class FirebaseFunctionsExamProcessGateway implements ExamProcessGateway {
     String caseId,
     String examId,
   ) async {
-    final doc = await _db
-        .collection('dogs')
-        .doc(dogId)
-        .collection('clinical_cases')
-        .doc(caseId)
-        .collection('exams')
-        .doc(examId)
-        .get();
+    DocumentSnapshot<Map<String, dynamic>> doc;
+    try {
+      doc = await _db
+          .collection('dogs')
+          .doc(dogId)
+          .collection('clinical_cases')
+          .doc(caseId)
+          .collection('exams')
+          .doc(examId)
+          .get(const GetOptions(source: Source.server));
+    } catch (_) {
+      doc = await _db
+          .collection('dogs')
+          .doc(dogId)
+          .collection('clinical_cases')
+          .doc(caseId)
+          .collection('exams')
+          .doc(examId)
+          .get();
+    }
     if (!doc.exists || doc.data() == null) {
       throw Exception('Exame $examId não encontrado após mutação.');
     }

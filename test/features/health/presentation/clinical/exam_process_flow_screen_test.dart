@@ -8,6 +8,7 @@ import 'package:canil_gcm/features/health/domain/exam_process_gateway.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums_ext.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_models.dart';
+import 'package:canil_gcm/features/health/domain/health_v1_value_objects.dart';
 import 'package:canil_gcm/features/health/presentation/clinical/exam_process_flow_screen.dart';
 
 class MockExamProcessGateway implements ExamProcessGateway {
@@ -276,6 +277,84 @@ void main() {
       expect(find.text('Hemograma Completo'), findsOneWidget);
       expect(find.text('Coletado'), findsWidgets);
       expect(find.text('Registrar Resultado'), findsOneWidget);
+      expect(find.text('Cancelar'), findsOneWidget);
+    });
+
+    testWidgets(
+        'solicitar novo exame com exame historico existente exibe ambos na tela',
+        (tester) async {
+      mockGateway.casesToReturn = [
+        const ClinicalCaseOption(
+          caseId: 'case-alpha',
+          title: 'STG EXAM-V1 HOMOLOG 2026-09-04',
+          statusWireName: 'under_investigation',
+          revision: 2,
+        ),
+      ];
+
+      final historicalExam = ExamProcess(
+        id: 'exam-hist-1',
+        caseId: 'case-alpha',
+        dogId: 'dog-1',
+        examType: ExamType.bloodWork,
+        stage: ExamStage.impactAssessed,
+        title: 'Hemograma - Homologação EXAM-V1',
+        createdAt: DateTime(2026, 9, 4, 10, 0),
+        recordedBy: RecordedBy(
+          uid: 'u1',
+          name: 'Veterinário',
+          internalRole: 'veterinario',
+        ),
+        schemaVersion: 1,
+        requestedAt: DateTime(2026, 9, 4, 10, 0),
+        collectedAt: DateTime(2026, 9, 4, 10, 30),
+        resultedAt: DateTime(2026, 9, 4, 11, 0),
+        interpretedAt: DateTime(2026, 9, 4, 11, 30),
+        impactAssessedAt: DateTime(2026, 9, 4, 12, 0),
+        operationalImpact: OperationalImpact(
+          level: OperationalImpactLevel.none,
+          description: 'Cão totalmente apto para serviço',
+        ),
+      );
+
+      // Simula que o gateway (cache) inicialmente só retorna o histórico
+      mockGateway.examsToReturn = [historicalExam];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ExamProcessFlowScreen(
+            dogId: 'dog-1',
+            gateway: mockGateway,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Verifica que o histórico está visível
+      expect(find.text('Hemograma - Homologação EXAM-V1'), findsOneWidget);
+      expect(find.text('Ciclo do exame totalmente concluído'), findsOneWidget);
+
+      // Clica em Novo Exame
+      await tester.tap(find.byType(FloatingActionButton));
+      await tester.pumpAndSettle();
+
+      // Preenche o formulário
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Título do Exame *'),
+        'Hemograma teste de homologação',
+      );
+      await tester.pumpAndSettle();
+
+      // Submete a solicitação
+      await tester.tap(find.text('Confirmar Solicitação'));
+      await tester.pumpAndSettle();
+
+      // Verifica que AMBOS os exames estão visíveis na tela
+      expect(find.text('Hemograma teste de homologação'), findsOneWidget);
+      expect(find.text('Hemograma - Homologação EXAM-V1'), findsOneWidget);
+
+      // O novo exame deve ter os botões de ação da etapa solicitada
+      expect(find.text('Registrar Coleta'), findsOneWidget);
       expect(find.text('Cancelar'), findsOneWidget);
     });
   });

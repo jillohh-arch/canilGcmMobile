@@ -165,5 +165,42 @@ void main() {
       expect(restored.collectedAt, exam.collectedAt);
       expect(restored.resultedAt, exam.resultedAt);
     });
+
+    test('parse do payload factual do exame fisico', () {
+      final payload = <String, dynamic>{
+        'exam_id': 'exam_ade5a7b2a922c5e8',
+        'case_id': 'cc_94bf654056e135b5e077c71ed66c',
+        'dog_id': 'stg-dog-nutrition-unlinked-001',
+        'exam_type': 'blood_work',
+        'current_stage': 'requested',
+        'title': 'Hemograma teste de homologação',
+        'urgency': 'routine',
+        'created_at': '2026-09-05T00:58:49.028Z',
+        'requested_at': '2026-09-05T00:58:49.028Z',
+        'recorded_by': {
+          'uid': 'stg-homolog-990002',
+          'name': 'Homologacao Nutrition Manager 990002',
+          'internal_role': 'condutor',
+        },
+        'requested_by': {
+          'uid': 'stg-homolog-990002',
+          'name': 'Homologacao Nutrition Manager 990002',
+          'internal_role': 'condutor',
+        },
+        'schema_version': 1,
+        'revision': 1,
+        'lab_name': 'lab previsto homologação',
+        'request_reason': 'sem justificativa',
+      };
+
+      final parsed = ExamProcess.fromMap(payload);
+      expect(parsed.id, 'exam_ade5a7b2a922c5e8');
+      expect(parsed.title, 'Hemograma teste de homologação');
+      expect(parsed.stage, ExamStage.requested);
+      expect(parsed.examType, ExamType.bloodWork);
+      expect(parsed.urgency, ExamUrgency.routine);
+      expect(parsed.labName, 'lab previsto homologação');
+      expect(parsed.requestReason, 'sem justificativa');
+    });
   });
 }

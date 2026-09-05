@@ -105,7 +105,13 @@ class _ExamProcessFlowScreenState extends State<ExamProcessFlowScreen> {
       );
       if (!mounted) return;
       setState(() {
-        _exams = exams;
+        final existingIds = exams.map((e) => e.id).toSet();
+        final locallyKnown = _exams.where(
+          (e) => !existingIds.contains(e.id) && e.caseId == caseId,
+        );
+        final combined = [...exams, ...locallyKnown];
+        combined.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        _exams = combined;
         _loadingExams = false;
       });
     } catch (e) {
@@ -358,6 +364,14 @@ class _ExamProcessFlowScreenState extends State<ExamProcessFlowScreen> {
 
       if (res is ExamProcessSuccess) {
         AppFeedback.success(context, 'Exame solicitado com sucesso!');
+        setState(() {
+          final updated = [
+            res.exam,
+            ..._exams.where((e) => e.id != res.exam.id),
+          ];
+          updated.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          _exams = updated;
+        });
         await _loadExams(_selectedCaseId!);
       } else if (res is ExamProcessFailure) {
         AppFeedback.error(context, res.message);
@@ -475,6 +489,9 @@ class _ExamProcessFlowScreenState extends State<ExamProcessFlowScreen> {
 
       if (res is ExamProcessSuccess) {
         AppFeedback.success(context, 'Coleta registrada com sucesso!');
+        setState(() {
+          _exams = _exams.map((e) => e.id == res.exam.id ? res.exam : e).toList();
+        });
         await _loadExams(exam.caseId);
       } else if (res is ExamProcessFailure) {
         AppFeedback.error(context, res.message);
@@ -594,6 +611,9 @@ class _ExamProcessFlowScreenState extends State<ExamProcessFlowScreen> {
 
       if (res is ExamProcessSuccess) {
         AppFeedback.success(context, 'Resultado técnico registrado!');
+        setState(() {
+          _exams = _exams.map((e) => e.id == res.exam.id ? res.exam : e).toList();
+        });
         await _loadExams(exam.caseId);
       } else if (res is ExamProcessFailure) {
         AppFeedback.error(context, res.message);
@@ -747,6 +767,9 @@ class _ExamProcessFlowScreenState extends State<ExamProcessFlowScreen> {
 
       if (res is ExamProcessSuccess) {
         AppFeedback.success(context, 'Interpretação veterinária homologada!');
+        setState(() {
+          _exams = _exams.map((e) => e.id == res.exam.id ? res.exam : e).toList();
+        });
         await _loadExams(exam.caseId);
       } else if (res is ExamProcessFailure) {
         AppFeedback.error(context, res.message);
@@ -927,6 +950,9 @@ class _ExamProcessFlowScreenState extends State<ExamProcessFlowScreen> {
 
       if (res is ExamProcessSuccess) {
         AppFeedback.success(context, 'Impacto operacional registrado! Ciclo concluído.');
+        setState(() {
+          _exams = _exams.map((e) => e.id == res.exam.id ? res.exam : e).toList();
+        });
         await _loadExams(exam.caseId);
       } else if (res is ExamProcessFailure) {
         AppFeedback.error(context, res.message);
@@ -1009,6 +1035,9 @@ class _ExamProcessFlowScreenState extends State<ExamProcessFlowScreen> {
 
       if (res is ExamProcessSuccess) {
         AppFeedback.success(context, 'Exame cancelado.');
+        setState(() {
+          _exams = _exams.map((e) => e.id == res.exam.id ? res.exam : e).toList();
+        });
         await _loadExams(exam.caseId);
       } else if (res is ExamProcessFailure) {
         AppFeedback.error(context, res.message);
@@ -1114,6 +1143,7 @@ class _ExamProcessFlowScreenState extends State<ExamProcessFlowScreen> {
           DropdownButtonFormField<String>(
             key: ValueKey(_selectedCaseId),
             initialValue: _selectedCaseId,
+            isExpanded: true,
             dropdownColor: AppTheme.surfacePanel,
             style: GoogleFonts.inter(
               color: AppTheme.textPrimary,
@@ -1572,47 +1602,60 @@ class _ExamProcessFlowScreenState extends State<ExamProcessFlowScreen> {
     }
 
     if (_exams.isEmpty) {
-      return Center(
-        child: Padding(
+      return RefreshIndicator(
+        onRefresh: () async {
+          if (_selectedCaseId != null) {
+            await _loadExams(_selectedCaseId!);
+          }
+        },
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.biotech_outlined,
-                size: 48,
-                color: AppTheme.textSecondary.withAlpha(120),
+          children: [
+            const SizedBox(height: 48),
+            Icon(
+              Icons.biotech_outlined,
+              size: 48,
+              color: AppTheme.textSecondary.withAlpha(120),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Nenhum exame solicitado para este caso',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textPrimary,
               ),
-              const SizedBox(height: 12),
-              Text(
-                'Nenhum exame solicitado para este caso',
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.textPrimary,
-                ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Toque no botão abaixo para solicitar um novo exame complementar.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: AppTheme.textSecondary,
               ),
-              const SizedBox(height: 6),
-              Text(
-                'Toque no botão abaixo para solicitar um novo exame complementar.',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: AppTheme.textSecondary,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _exams.length,
-      itemBuilder: (context, index) {
-        return _buildExamCard(_exams[index]);
+    return RefreshIndicator(
+      onRefresh: () async {
+        if (_selectedCaseId != null) {
+          await _loadExams(_selectedCaseId!);
+        }
       },
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        itemCount: _exams.length,
+        itemBuilder: (context, index) {
+          return _buildExamCard(_exams[index]);
+        },
+      ),
     );
   }
 

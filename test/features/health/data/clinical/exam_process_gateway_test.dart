@@ -73,6 +73,35 @@ class FakeFirestore implements FirebaseFirestore {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+class FakeQueryDocumentSnapshot implements QueryDocumentSnapshot<Map<String, dynamic>> {
+  FakeQueryDocumentSnapshot(this._data, this._id);
+  final Map<String, dynamic> _data;
+  final String _id;
+
+  @override
+  String get id => _id;
+
+  @override
+  bool get exists => true;
+
+  @override
+  Map<String, dynamic> data() => _data;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class FakeQuerySnapshot implements QuerySnapshot<Map<String, dynamic>> {
+  FakeQuerySnapshot(this._docs);
+  final List<QueryDocumentSnapshot<Map<String, dynamic>>> _docs;
+
+  @override
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> get docs => _docs;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 class _FakeNestedCollection implements CollectionReference<Map<String, dynamic>> {
   _FakeNestedCollection(this._db, this._path);
   final FakeFirestore _db;
@@ -82,6 +111,21 @@ class _FakeNestedCollection implements CollectionReference<Map<String, dynamic>>
   DocumentReference<Map<String, dynamic>> doc([String? path]) {
     final fullPath = '$_path/${path ?? "auto"}';
     return _FakeNestedDoc(_db, fullPath, path ?? 'auto');
+  }
+
+  @override
+  Future<QuerySnapshot<Map<String, dynamic>>> get([GetOptions? options]) async {
+    final prefix = '$_path/';
+    final docs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+    for (final entry in _db.store.entries) {
+      if (entry.key.startsWith(prefix)) {
+        final remainder = entry.key.substring(prefix.length);
+        if (!remainder.contains('/')) {
+          docs.add(FakeQueryDocumentSnapshot(entry.value, remainder));
+        }
+      }
+    }
+    return FakeQuerySnapshot(docs);
   }
 
   @override
@@ -205,6 +249,61 @@ void main() {
       final failure = result as ExamProcessFailure;
       expect(failure.code, 'permission-denied');
       expect(failure.message, 'Sem permissao');
+    });
+
+    test('loadCaseExams busca da collection com fallback e ordena por createdAt desc', () async {
+      fakeDb.store['dogs/dog-1/clinical_cases/case-1/exams/exam-1'] = {
+        'exam_id': 'exam-1',
+        'case_id': 'case-1',
+        'dog_id': 'dog-1',
+        'title': 'Exame 1',
+        'exam_type': 'blood_work',
+        'current_stage': 'requested',
+        'created_at': '2026-09-01T10:00:00Z',
+        'requested_at': '2026-09-01T10:00:00Z',
+        'recorded_by': {'uid': 'u1', 'name': 'U1', 'internal_role': 'condutor'},
+        'schema_version': 1,
+      };
+      fakeDb.store['dogs/dog-1/clinical_cases/case-1/exams/exam-2'] = {
+        'exam_id': 'exam-2',
+        'case_id': 'case-1',
+        'dog_id': 'dog-1',
+        'title': 'Exame 2 Recente',
+        'exam_type': 'blood_work',
+        'current_stage': 'requested',
+        'created_at': '2026-09-04T12:00:00Z',
+        'requested_at': '2026-09-04T12:00:00Z',
+        'recorded_by': {'uid': 'u1', 'name': 'U1', 'internal_role': 'condutor'},
+        'schema_version': 1,
+      };
+
+      final gateway = FirebaseFunctionsExamProcessGateway(firestore: fakeDb);
+      final exams = await gateway.loadCaseExams(dogId: 'dog-1', caseId: 'case-1');
+
+      expect(exams.length, 2);
+      expect(exams.first.id, 'exam-2');
+      expect(exams.first.title, 'Exame 2 Recente');
+      expect(exams.last.id, 'exam-1');
+    });
+
+    test('loadUsableCases filtra status nao usaveis e ordena por openedAt desc', () async {
+      fakeDb.store['dogs/dog-1/clinical_cases/case-open'] = {
+        'title': 'Caso Aberto',
+        'clinical_status': 'under_investigation',
+        'revision': 2,
+      };
+      fakeDb.store['dogs/dog-1/clinical_cases/case-closed'] = {
+        'title': 'Caso Encerrado',
+        'clinical_status': 'resolved',
+        'revision': 5,
+      };
+
+      final gateway = FirebaseFunctionsExamProcessGateway(firestore: fakeDb);
+      final cases = await gateway.loadUsableCases('dog-1');
+
+      expect(cases.length, 1);
+      expect(cases.first.caseId, 'case-open');
+      expect(cases.first.statusWireName, 'under_investigation');
     });
   });
 }
