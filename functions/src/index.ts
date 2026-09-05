@@ -32,6 +32,7 @@ import {
   createAdminAccessHomologationSnapshotDeps,
 } from "./admin_access_homologation_snapshot";
 import {isAuthUserNotFound} from "./auth_error_classification";
+import {composeEffectiveAccessClaims} from "./access_claims_composition";
 import {
   AccessScope,
   AccessScopeResolution,
@@ -321,26 +322,6 @@ export function isAdminUserRecord(user: JsonMap): boolean {
   return isAdminAccessLevel(accessLevel) || user.admin === true;
 }
 
-const MANAGED_ACCESS_ROLES = new Set([
-  "admin",
-  "administrador",
-  "admin_master",
-  "almoxarifado",
-  "condutor",
-  "estoque",
-  "gestor",
-  "handler",
-  "inspetor",
-  "instrutor",
-  "instrutor_k9",
-  "inventory_manager",
-  "mobile_user",
-  "subinspetor",
-  "subinspetor_inspetor",
-  "supervisor",
-  "supervisor_operacional",
-]);
-
 function normalizedRoleKeys(...sources: unknown[]): string[] {
   return Array.from(
     new Set(
@@ -358,90 +339,14 @@ function accessClaimsForProfile(
   profileId: string | null,
   roleKeys: string[],
   accessScope: "global" | "own_records" = "global",
+  isInstructor: boolean = false,
 ): JsonMap {
-  const profileKey = normalizedKey(profileId);
-  const profileRoles = new Set([
-    ...roleKeys.map((role) => normalizedKey(role)).filter((role) => role.length > 0),
-    ...(profileKey ? [profileKey] : []),
-  ]);
-  const isAdminProfile = profileRoles.has("admin") ||
-    profileRoles.has("administrador") ||
-    profileRoles.has("admin_master");
-  const isInstructorProfile = profileRoles.has("instrutor_k9") ||
-    profileRoles.has("instrutor") ||
-    profileRoles.has("adestrador");
-  const isInventoryProfile = profileRoles.has("inventory_manager") ||
-    profileRoles.has("almoxarifado") ||
-    profileRoles.has("estoque");
-  const isManagerProfile = profileRoles.has("gestor") ||
-    profileRoles.has("subinspetor") ||
-    profileRoles.has("inspetor") ||
-    profileRoles.has("subinspetor_inspetor");
-  const isHandlerProfile = profileRoles.has("condutor") ||
-    profileRoles.has("handler") ||
-    profileRoles.has("mobile_user") ||
-    profileRoles.has("operacional") ||
-    profileRoles.has("operador") ||
-    profileRoles.has("operador_k9") ||
-    profileRoles.has("guarda_k9");
-  const mobileAccess = isAdminProfile || isInstructorProfile || isHandlerProfile;
-  const webAccess = true;
-  const preservedRoles = Array.isArray(existingClaims.roles) ?
-    existingClaims.roles
-      .map((role) => normalizedKey(role))
-      .filter((role) => role.length > 0 && !MANAGED_ACCESS_ROLES.has(role)) :
-    [];
-  const roles = new Set([...preservedRoles, ...profileRoles]);
-
-  if (isAdminProfile) roles.add("admin");
-  if (isInstructorProfile) {
-    roles.add("instrutor_k9");
-    roles.add("condutor");
-  }
-  if (isInventoryProfile) roles.add("inventory_manager");
-  if (isManagerProfile) roles.add("gestor");
-  if (isHandlerProfile) roles.add("condutor");
-
-  const primaryRole = isAdminProfile
-    ? "admin"
-    : isInstructorProfile
-      ? "instrutor_k9"
-      : isInventoryProfile
-        ? "inventory_manager"
-        : isManagerProfile
-          ? "gestor"
-          : "condutor";
-  const appAccess = mobileAccess ? ["web", "mobile"] : ["web"];
-  const claims: JsonMap = {
-    ...existingClaims,
+  return composeEffectiveAccessClaims(
+    existingClaims,
     ra,
-    access_profile_id: profileKey || null,
-    access_scope: accessScope,
-    admin: isAdminProfile,
-    app_access: appAccess,
-    mobile_access: mobileAccess,
-    role: primaryRole,
-    roles: Array.from(roles).sort(),
-    web_access: webAccess,
-  };
-
-  if (isInstructorProfile) {
-    claims.instrutor_k9 = true;
-    claims.training_role = "instrutor_k9";
-    claims.training_instructor = true;
-  } else {
-    delete claims.instrutor_k9;
-    delete claims.training_role;
-    delete claims.training_instructor;
-  }
-
-  if (isInventoryProfile) {
-    claims.inventory_manager = true;
-  } else {
-    delete claims.inventory_manager;
-  }
-
-  return claims;
+    { profileId, roleKeys, accessScope },
+    isInstructor,
+  );
 }
 
 function humanClaims(
@@ -452,16 +357,12 @@ function humanClaims(
   isK9Instructor: boolean,
   accessScope: "global" | "own_records" = "global",
 ): JsonMap {
-  const roleKeys = normalizedRoleKeys(
-    [accessLevel, accessProfileId],
-    isK9Instructor ? ["instrutor_k9"] : [],
-  );
-  return accessClaimsForProfile(
+  const roleKeys = normalizedRoleKeys([accessLevel, accessProfileId]);
+  return composeEffectiveAccessClaims(
     existingClaims,
     ra,
-    accessProfileId,
-    roleKeys,
-    accessScope,
+    { profileId: accessProfileId, roleKeys, accessScope },
+    isK9Instructor,
   );
 }
 
@@ -2016,7 +1917,6 @@ export const adminAssignAccessProfile = onCall({region}, async (request) => {
     roleSet.has("operador") ||
     roleSet.has("operador_k9") ||
     roleSet.has("guarda_k9");
-  const appAccess = mobileAccess ? ["web", "mobile"] : ["web"];
   const userData = userSnap.data() ?? {};
 
   // FRONT10.ACCESS-CREDENTIALS.B — politica congelada: atribuir ou TROCAR o
@@ -2066,6 +1966,15 @@ export const adminAssignAccessProfile = onCall({region}, async (request) => {
     ? ({...(authUser.customClaims ?? {})} as JsonMap)
     : null;
   let claimsMutated = false;
+  // FRONT10.ACCESS-CREDENTIALS.D: A atribuicao de perfil de acesso NAO PODE
+  // sobrescrever nem apagar a qualificacao funcional de Instrutor K9 existente.
+  // Lemos o estado direto canonico de instrutor do cadastro e compomos tanto as
+  // claims quanto o payload do Firestore.
+  const isK9Instructor = userData.is_k9_instructor === true;
+  const effectiveRoles = Array.from(
+    new Set([...roleKeys, ...(isK9Instructor ? ["instrutor_k9"] : [])]),
+  ).sort();
+
   if (authUser) {
     await admin.auth().setCustomUserClaims(
       authUser.uid,
@@ -2075,10 +1984,21 @@ export const adminAssignAccessProfile = onCall({region}, async (request) => {
         profileId,
         roleKeys,
         accessScope,
+        isK9Instructor,
       ),
     );
     claimsMutated = true;
   }
+
+  const primaryRole = isAdminProfile
+    ? "admin"
+    : isManagerProfile
+      ? "gestor"
+      : isInventoryProfile
+        ? "inventory_manager"
+        : isInstructorProfile
+          ? "instrutor_k9"
+          : "condutor";
 
   const assignmentPayload: JsonMap = {
     ...(authUser ? {auth_uid: authUser.uid, email: authEmail} : {}),
@@ -2089,38 +2009,23 @@ export const adminAssignAccessProfile = onCall({region}, async (request) => {
     access_scope: accessScope,
     accessScope,
     admin: isAdminProfile,
-    app_access: appAccess,
-    claim_role: isAdminProfile
-      ? "admin"
-      : isInstructorProfile
-        ? "instrutor_k9"
-        : isInventoryProfile
-          ? "inventory_manager"
-          : isManagerProfile
-            ? "gestor"
-            : "condutor",
+    app_access: (mobileAccess || isK9Instructor) ? ["web", "mobile"] : ["web"],
+    claim_role: primaryRole,
     inventory_manager: isInventoryProfile,
-    is_k9_instructor: isInstructorProfile,
-    mobile_access: mobileAccess,
+    is_k9_instructor: isK9Instructor,
+    mobile_access: mobileAccess || isK9Instructor,
     permissions_version: seedVersion,
-    role: isAdminProfile
-      ? "admin"
-      : isInstructorProfile
-        ? "instrutor_k9"
-        : isInventoryProfile
-          ? "inventory_manager"
-          : isManagerProfile
-            ? "gestor"
-            : "condutor",
-    roles: roleKeys,
-    training_instructor: isInstructorProfile,
-    training_role: isInstructorProfile ? "instrutor_k9" : null,
+    role: primaryRole,
+    roles: effectiveRoles,
+    training_instructor: isK9Instructor ? true : null,
+    training_role: isK9Instructor ? "instrutor_k9" : null,
     web_access: true,
     claim_refresh_required: authUser != null,
     claim_updated_at: authUser
       ? admin.firestore.FieldValue.serverTimestamp()
       : null,
     updated_at: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     updated_by: caller.ra,
     audit_trail: admin.firestore.FieldValue.arrayUnion({
       ...auditEntry("assign_access_profile", caller),
@@ -4483,36 +4388,57 @@ export const setK9InstructorRole = onCall({region}, async (request) => {
     );
   }
 
-  const existingClaims = userRecord.customClaims ?? {};
-  const roles = new Set<string>(Array.isArray(existingClaims.roles) ? existingClaims.roles.map(String) : []);
-  if (enabled) {
-    roles.add("instrutor_k9");
-  } else {
-    roles.delete("instrutor_k9");
-  }
-  const nextClaims: JsonMap = {
-    ...existingClaims,
-    roles: Array.from(roles),
-  };
-  if (enabled) {
-    nextClaims.role = "instrutor_k9";
-    nextClaims.instrutor_k9 = true;
-    nextClaims.training_role = "instrutor_k9";
-    nextClaims.training_instructor = true;
-  } else {
-    delete nextClaims.instrutor_k9;
-    delete nextClaims.training_role;
-    delete nextClaims.training_instructor;
-    if (nextClaims.role === "instrutor_k9") delete nextClaims.role;
+  // FRONT10.ACCESS-CREDENTIALS.D: A qualificacao funcional de Instrutor K9 e
+  // ortogonal ao Perfil de Acesso base. Preservamos o perfil de acesso e escopo
+  // atuais, compomos as claims de forma deterministica, mantemos o papel singular
+  // base do perfil e implementamos compensacao completa se a gravacao no Firestore falhar.
+  const currentProfileId = stringValue(userData.access_profile_id) ?? stringValue(userData.accessProfileId) ?? null;
+  const currentScope = parseAccessScope(userData.access_scope ?? userData.accessScope) ?? "global";
+  let profileRoleKeys: string[] = [];
+  if (currentProfileId) {
+    const profileSnap = await db.collection("access_profiles").doc(currentProfileId).get();
+    if (profileSnap.exists) {
+      const pData = profileSnap.data() ?? {};
+      profileRoleKeys = normalizedRoleKeys(pData.role_keys, [currentProfileId]);
+    } else {
+      profileRoleKeys = normalizedRoleKeys(userData.roles, [currentProfileId]);
+    }
   }
 
+  const previousClaims: JsonMap = { ...(userRecord.customClaims ?? {}) };
+  const nextClaims = composeEffectiveAccessClaims(
+    previousClaims,
+    ra,
+    {
+      profileId: currentProfileId,
+      roleKeys: profileRoleKeys,
+      accessScope: currentScope,
+    },
+    enabled,
+  );
+
   await admin.auth().setCustomUserClaims(userRecord.uid, nextClaims);
-  await userRef.set({
+
+  const effectiveRoles = Array.from(new Set([
+    ...profileRoleKeys,
+    ...(enabled ? ["instrutor_k9"] : []),
+  ])).sort();
+
+  // Preserva a role singular base do perfil existente, a menos que nao haja perfil
+  const baseClaimRole = stringValue(userData.claim_role) ?? stringValue(userData.role);
+  const effectiveClaimRole = (baseClaimRole && baseClaimRole !== "instrutor_k9")
+    ? baseClaimRole
+    : (nextClaims.role as string);
+
+  const instructorFirestorePayload: JsonMap = {
     auth_uid: userRecord.uid,
     email,
     is_k9_instructor: enabled,
     training_role: enabled ? "instrutor_k9" : null,
-    claim_role: enabled ? "instrutor_k9" : null,
+    training_instructor: enabled ? true : null,
+    claim_role: effectiveClaimRole,
+    role: effectiveClaimRole,
+    roles: effectiveRoles,
     claim_refresh_required: true,
     claim_updated_at: admin.firestore.FieldValue.serverTimestamp(),
     updated_at: admin.firestore.FieldValue.serverTimestamp(),
@@ -4521,7 +4447,29 @@ export const setK9InstructorRole = onCall({region}, async (request) => {
       enabled ? "k9_instructor_role_granted" : "k9_instructor_role_revoked",
       caller,
     )),
-  }, {merge: true});
+  };
+
+  try {
+    await userRef.set(instructorFirestorePayload, {merge: true});
+  } catch (firestoreError) {
+    try {
+      await admin.auth().setCustomUserClaims(userRecord.uid, previousClaims);
+    } catch (compensationError) {
+      logger.error("set_k9_instructor_role_compensation_failed", {
+        error: String(compensationError),
+        ra,
+        uid: userRecord.uid,
+      });
+      throw new HttpsError(
+        "internal",
+        "As claims do instrutor foram alteradas, a gravacao do cadastro falhou e a " +
+          "reversao nao foi garantida. Confira o acesso deste integrante antes " +
+          "de nova tentativa.",
+        {reason: "COMPENSATION_FAILED"},
+      );
+    }
+    throw firestoreError;
+  }
 
   return {
     ra,

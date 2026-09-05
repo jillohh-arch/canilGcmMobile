@@ -105,8 +105,12 @@ async function simulateAssignAccessProfile(
     claimsMutated = true;
   }
 
+  const isK9Instructor = userData.is_k9_instructor === true;
   const assignmentPayload: JsonMap = {
     access_profile_id: profileId,
+    is_k9_instructor: isK9Instructor,
+    training_role: isK9Instructor ? "instrutor_k9" : null,
+    training_instructor: isK9Instructor ? true : null,
     updated_at: "SERVER_TIMESTAMP",
     updatedAt: "SERVER_TIMESTAMP",
   };
@@ -257,4 +261,56 @@ test("Phase A.5: Falha na compensacao retorna COMPENSATION_FAILED", async () => 
   assert.ok(caughtError instanceof HttpsError);
   assert.equal((caughtError as HttpsError).code, "internal");
   assert.equal(((caughtError as HttpsError).details as JsonMap)?.reason, "COMPENSATION_FAILED");
+});
+
+// ── Testes da Phase D: Cross-Writer Preservation ─────────────────────────────
+
+test("Phase D.19 (Cenario 7): Atribuicao de perfil PRESERVA is_k9_instructor=true", async () => {
+  const { recorded, result } = await simulateAssignAccessProfile("9001", "gestor", {
+    userData: {
+      active: true,
+      status: "Ativo",
+      email: "9001@gcm.com.br",
+      is_k9_instructor: true,
+      training_role: "instrutor_k9",
+    },
+  });
+
+  assert.equal(result?.profileId, "gestor");
+  const write = recorded.firestoreWrites[0].payload;
+  // Invariante critico: is_k9_instructor continua TRUE
+  assert.equal(write.is_k9_instructor, true);
+  assert.equal(write.training_role, "instrutor_k9");
+  assert.equal(write.training_instructor, true);
+});
+
+test("Phase D.20 (Cenario 7b): Atribuicao de perfil PRESERVA is_k9_instructor=false", async () => {
+  const { recorded } = await simulateAssignAccessProfile("9001", "operador_k9", {
+    userData: {
+      active: true,
+      status: "Ativo",
+      email: "9001@gcm.com.br",
+      is_k9_instructor: false,
+    },
+  });
+
+  const write = recorded.firestoreWrites[0].payload;
+  assert.equal(write.is_k9_instructor, false);
+  assert.equal(write.training_role, null);
+  assert.equal(write.training_instructor, null);
+});
+
+test("Phase D.21 (Secao 21): Atribuicao de perfil legado com role_keys de instrutor NAO altera flag direta se false", async () => {
+  const { recorded } = await simulateAssignAccessProfile("9001", "instrutor_k9", {
+    userData: {
+      active: true,
+      status: "Ativo",
+      email: "9001@gcm.com.br",
+      is_k9_instructor: false, // flag funcional direta desativada
+    },
+  });
+
+  const write = recorded.firestoreWrites[0].payload;
+  // A flag funcional direta NAO e mutada pela atribuicao de perfil
+  assert.equal(write.is_k9_instructor, false);
 });
