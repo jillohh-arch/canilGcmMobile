@@ -43,7 +43,7 @@
 -dontwarn io.flutter.**
 
 # --- Modelos de dados (evita que sejam removidos pela reflexão) ---
--keep class com.example.canil_gcm.** { *; }
+-keep class com.ragonha.k9ops.** { *; }
 
 # Preserva anotações de serialização
 -keepattributes *Annotation*
