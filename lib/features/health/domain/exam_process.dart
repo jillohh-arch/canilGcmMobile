@@ -80,11 +80,12 @@ final class ExamProcess {
       );
     }
     // Invariantes por estágio (Domain Model §2.3 §"Campos por estágio").
-    _requireStageMetadata(
-      stage: stage,
-      required: requestedAt,
-      field: 'requested_at',
-    );
+    if (requestedAt == null) {
+      throw HealthDomainException(
+        'missing_stage_field',
+        'Estágio ${stage.wireName} exige requested_at',
+      );
+    }
     _requireStageMetadata(
       stage: stage,
       required: collectedAt,
@@ -129,6 +130,7 @@ final class ExamProcess {
     required String field,
     ExamStage? stageRequired,
   }) {
+    if (stage == ExamStage.cancelled) return;
     final minStage = stageRequired ?? ExamStage.requested;
     if (stage.index >= minStage.index && required == null) {
       throw HealthDomainException(

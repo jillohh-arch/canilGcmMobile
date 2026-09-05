@@ -1493,124 +1493,215 @@ class _ExamProcessFlowScreenState extends State<ExamProcessFlowScreen> {
       );
     }
 
-    return switch (exam.stage) {
-      ExamStage.requested => Row(
-          children: [
-            Expanded(
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.warning,
-                  foregroundColor: AppTheme.background,
-                ),
-                icon: const Icon(Icons.colorize_rounded, size: 18),
-                label: const Text('Registrar Coleta'),
-                onPressed: () => _openRecordCollectionDialog(exam),
-              ),
-            ),
-            const SizedBox(width: 8),
-            OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppTheme.error,
-                side: const BorderSide(color: AppTheme.error),
-              ),
-              child: const Text('Cancelar'),
-              onPressed: () => _openCancelDialog(exam),
-            ),
-          ],
-        ),
-      ExamStage.collected => Row(
-          children: [
-            Expanded(
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.attention,
-                  foregroundColor: AppTheme.background,
-                ),
-                icon: const Icon(Icons.assignment_turned_in_rounded, size: 18),
-                label: const Text('Registrar Resultado'),
-                onPressed: () => _openRecordResultDialog(exam),
-              ),
-            ),
-            const SizedBox(width: 8),
-            OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppTheme.error,
-                side: const BorderSide(color: AppTheme.error),
-              ),
-              child: const Text('Cancelar'),
-              onPressed: () => _openCancelDialog(exam),
-            ),
-          ],
-        ),
-      ExamStage.resulted => SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.healthAccent,
-              foregroundColor: AppTheme.background,
-            ),
-            icon: const Icon(Icons.rate_review_rounded, size: 18),
-            label: const Text('Registrar Interpretação Veterinária'),
-            onPressed: () => _openRecordInterpretationDialog(exam),
-          ),
-        ),
-      ExamStage.interpreted => SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.success,
-              foregroundColor: AppTheme.background,
-            ),
-            icon: const Icon(Icons.verified_rounded, size: 18),
-            label: const Text('Avaliar Impacto Operacional'),
-            onPressed: () => _openAssessImpactDialog(exam),
-          ),
-        ),
-      ExamStage.impactAssessed => Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-          decoration: BoxDecoration(
-            color: AppTheme.success.withAlpha(20),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: switch (exam.stage) {
+        ExamStage.requested => Row(
             children: [
-              const Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 18),
-              const SizedBox(width: 6),
-              Text(
-                'Ciclo do exame totalmente concluído',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.success,
+              Expanded(
+                child: ElevatedButton.icon(
+                  key: const ValueKey('cta_record_collection'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.warning,
+                    foregroundColor: AppTheme.background,
+                    minimumSize: const Size(0, 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  icon: const Icon(Icons.colorize_rounded, size: 18),
+                  label: Text(
+                    'Registrar Coleta',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  onPressed: () => _openRecordCollectionDialog(exam),
                 ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton(
+                key: const ValueKey('cta_cancel_requested'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.error,
+                  side: const BorderSide(color: AppTheme.error),
+                  minimumSize: const Size(0, 44),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Text(
+                  'Cancelar',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                onPressed: () => _openCancelDialog(exam),
               ),
             ],
           ),
-        ),
-      ExamStage.cancelled => Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-          decoration: BoxDecoration(
-            color: AppTheme.error.withAlpha(20),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+        ExamStage.collected => Row(
             children: [
-              const Icon(Icons.cancel_rounded, color: AppTheme.error, size: 18),
-              const SizedBox(width: 6),
-              Text(
-                'Exame cancelado e encerrado',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.error,
+              Expanded(
+                child: ElevatedButton.icon(
+                  key: const ValueKey('cta_record_result'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.attention,
+                    foregroundColor: AppTheme.background,
+                    minimumSize: const Size(0, 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  icon: const Icon(Icons.assignment_turned_in_rounded, size: 18),
+                  label: Text(
+                    'Registrar Resultado Técnico',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  onPressed: () => _openRecordResultDialog(exam),
                 ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton(
+                key: const ValueKey('cta_cancel_collected'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.error,
+                  side: const BorderSide(color: AppTheme.error),
+                  minimumSize: const Size(0, 44),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Text(
+                  'Cancelar',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                onPressed: () => _openCancelDialog(exam),
               ),
             ],
           ),
-        ),
-    };
+        ExamStage.resulted => SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              key: const ValueKey('cta_record_interpretation'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.healthAccent,
+                foregroundColor: AppTheme.background,
+                minimumSize: const Size(0, 44),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              icon: const Icon(Icons.rate_review_rounded, size: 18),
+              label: Text(
+                'Registrar Interpretação Veterinária',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              onPressed: () => _openRecordInterpretationDialog(exam),
+            ),
+          ),
+        ExamStage.interpreted => SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              key: const ValueKey('cta_assess_impact'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.success,
+                foregroundColor: AppTheme.background,
+                minimumSize: const Size(0, 44),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              icon: const Icon(Icons.verified_rounded, size: 18),
+              label: Text(
+                'Avaliar Impacto Operacional',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              onPressed: () => _openAssessImpactDialog(exam),
+            ),
+          ),
+        ExamStage.impactAssessed => Container(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            decoration: BoxDecoration(
+              color: AppTheme.success.withAlpha(20),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 18),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    'Ciclo do exame totalmente concluído',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.success,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ExamStage.cancelled => Container(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            decoration: BoxDecoration(
+              color: AppTheme.error.withAlpha(20),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.cancel_rounded, color: AppTheme.error, size: 18),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    'Exame cancelado e encerrado',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.error,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      },
+    );
   }
 
   Widget _buildExamsList() {
@@ -1702,7 +1793,7 @@ class _ExamProcessFlowScreenState extends State<ExamProcessFlowScreen> {
       },
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
         itemCount: _exams.length,
         itemBuilder: (context, index) {
           return _buildExamCard(_exams[index]);

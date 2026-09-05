@@ -241,7 +241,7 @@ void main() {
       expect(find.byType(FloatingActionButton), findsOneWidget);
     });
 
-    testWidgets('exibe botão Registrar Resultado para exame coletado',
+    testWidgets('exibe botão Registrar Resultado Técnico para exame coletado',
         (tester) async {
       mockGateway.casesToReturn = [
         const ClinicalCaseOption(
@@ -284,8 +284,157 @@ void main() {
 
       expect(find.text('Hemograma Completo'), findsOneWidget);
       expect(find.text('Coletado'), findsWidgets);
-      expect(find.text('Registrar Resultado'), findsOneWidget);
+      expect(find.text('Registrar Resultado Técnico'), findsOneWidget);
       expect(find.text('Cancelar'), findsOneWidget);
+    });
+
+    testWidgets(
+        'exibe CTA Registrar Interpretação Veterinária para exame com laudo técnico',
+        (tester) async {
+      mockGateway.casesToReturn = [
+        const ClinicalCaseOption(
+          caseId: 'case-alpha',
+          title: 'Caso Claudicação',
+          statusWireName: 'under_investigation',
+          revision: 2,
+        ),
+      ];
+
+      mockGateway.examsToReturn = [
+        ExamProcess(
+          id: 'exam-3',
+          caseId: 'case-alpha',
+          dogId: 'dog-1',
+          examType: ExamType.bloodWork,
+          stage: ExamStage.resulted,
+          title: 'Hemograma Completo',
+          createdAt: DateTime(2026, 9, 2),
+          recordedBy: RecordedBy(
+            uid: 'u1',
+            name: 'Veterinário',
+            internalRole: 'veterinario',
+          ),
+          schemaVersion: 1,
+          requestedAt: DateTime(2026, 9, 2),
+          collectedAt: DateTime(2026, 9, 2, 14, 30),
+          resultedAt: DateTime(2026, 9, 2, 16, 0),
+          resultSummary: 'Plaquetopenia leve',
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ExamProcessFlowScreen(
+            dogId: 'dog-1',
+            gateway: mockGateway,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Registrar Interpretação Veterinária'), findsOneWidget);
+    });
+
+    testWidgets(
+        'exibe CTA Avaliar Impacto Operacional para exame interpretado',
+        (tester) async {
+      mockGateway.casesToReturn = [
+        const ClinicalCaseOption(
+          caseId: 'case-alpha',
+          title: 'Caso Claudicação',
+          statusWireName: 'under_investigation',
+          revision: 2,
+        ),
+      ];
+
+      mockGateway.examsToReturn = [
+        ExamProcess(
+          id: 'exam-4',
+          caseId: 'case-alpha',
+          dogId: 'dog-1',
+          examType: ExamType.bloodWork,
+          stage: ExamStage.interpreted,
+          title: 'Hemograma Completo',
+          createdAt: DateTime(2026, 9, 2),
+          recordedBy: RecordedBy(
+            uid: 'u1',
+            name: 'Veterinário',
+            internalRole: 'veterinario',
+          ),
+          schemaVersion: 1,
+          requestedAt: DateTime(2026, 9, 2),
+          collectedAt: DateTime(2026, 9, 2, 14, 30),
+          resultedAt: DateTime(2026, 9, 2, 16, 0),
+          resultSummary: 'Plaquetopenia leve',
+          interpretedAt: DateTime(2026, 9, 2, 17, 0),
+          interpretationText: 'Repetir em 7 dias',
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ExamProcessFlowScreen(
+            dogId: 'dog-1',
+            gateway: mockGateway,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Avaliar Impacto Operacional'), findsOneWidget);
+    });
+
+    testWidgets(
+        'exibe selo de cancelamento sem CTAs de mutação para exame cancelado',
+        (tester) async {
+      mockGateway.casesToReturn = [
+        const ClinicalCaseOption(
+          caseId: 'case-alpha',
+          title: 'Caso Claudicação',
+          statusWireName: 'under_investigation',
+          revision: 2,
+        ),
+      ];
+
+      mockGateway.examsToReturn = [
+        ExamProcess(
+          id: 'exam-canc',
+          caseId: 'case-alpha',
+          dogId: 'dog-1',
+          examType: ExamType.bloodWork,
+          stage: ExamStage.cancelled,
+          title: 'Hemograma Completo',
+          createdAt: DateTime(2026, 9, 2),
+          recordedBy: RecordedBy(
+            uid: 'u1',
+            name: 'Veterinário',
+            internalRole: 'veterinario',
+          ),
+          schemaVersion: 1,
+          requestedAt: DateTime(2026, 9, 2),
+          cancelledAt: DateTime(2026, 9, 2, 15, 0),
+          cancelledBy: RecordedBy(
+            uid: 'u1',
+            name: 'Veterinário',
+            internalRole: 'veterinario',
+          ),
+          cancelReason: 'Solicitado por engano',
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ExamProcessFlowScreen(
+            dogId: 'dog-1',
+            gateway: mockGateway,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Exame cancelado e encerrado'), findsOneWidget);
+      expect(find.text('Registrar Coleta'), findsNothing);
+      expect(find.text('Registrar Resultado Técnico'), findsNothing);
     });
 
     testWidgets(
@@ -364,6 +513,102 @@ void main() {
       // O novo exame deve ter os botões de ação da etapa solicitada
       expect(find.text('Registrar Coleta'), findsOneWidget);
       expect(find.text('Cancelar'), findsOneWidget);
+    });
+
+    testWidgets(
+        'viewport Pixel 10 Pro XL (412x915): card requested exibe Registrar Coleta visível e sem overlap do FAB',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(412, 915));
+      addTearDown(() async => await tester.binding.setSurfaceSize(null));
+
+      mockGateway.casesToReturn = [
+        const ClinicalCaseOption(
+          caseId: 'cc_94bf654056e135b5e077c71ed66c',
+          title: 'STG EXAM-V1 HOMOLOG 2026-09-04',
+          statusWireName: 'under_investigation',
+          revision: 2,
+        ),
+      ];
+
+      final requestedExam = ExamProcess(
+        id: 'exam_ade5a7b2a922c5e8',
+        caseId: 'cc_94bf654056e135b5e077c71ed66c',
+        dogId: 'stg-dog-nutrition-unlinked-001',
+        examType: ExamType.bloodWork,
+        stage: ExamStage.requested,
+        title: 'Hemograma teste de homologação',
+        urgency: ExamUrgency.routine,
+        requestReason: 'sem justificativa',
+        labName: 'lab previsto homologação',
+        createdAt: DateTime(2026, 9, 4, 22, 30),
+        requestedAt: DateTime(2026, 9, 4, 22, 30),
+        recordedBy: RecordedBy(
+          uid: 'u1',
+          name: 'Veterinário',
+          internalRole: 'veterinario',
+        ),
+        schemaVersion: 1,
+      );
+
+      final historicalExam = ExamProcess(
+        id: 'exam_248862333f8057af',
+        caseId: 'cc_94bf654056e135b5e077c71ed66c',
+        dogId: 'stg-dog-nutrition-unlinked-001',
+        examType: ExamType.bloodWork,
+        stage: ExamStage.impactAssessed,
+        title: 'Hemograma - Homologação EXAM-V1',
+        createdAt: DateTime(2026, 9, 4, 10, 0),
+        recordedBy: RecordedBy(
+          uid: 'u1',
+          name: 'Veterinário',
+          internalRole: 'veterinario',
+        ),
+        schemaVersion: 1,
+        requestedAt: DateTime(2026, 9, 4, 10, 0),
+        collectedAt: DateTime(2026, 9, 4, 10, 30),
+        resultedAt: DateTime(2026, 9, 4, 11, 0),
+        interpretedAt: DateTime(2026, 9, 4, 11, 30),
+        impactAssessedAt: DateTime(2026, 9, 4, 12, 0),
+        operationalImpact: OperationalImpact(
+          level: OperationalImpactLevel.none,
+          description: 'Cão totalmente apto para serviço',
+        ),
+      );
+
+      mockGateway.examsToReturn = [requestedExam, historicalExam];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ExamProcessFlowScreen(
+            dogId: 'stg-dog-nutrition-unlinked-001',
+            gateway: mockGateway,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Ambos os exames estão presentes
+      expect(find.text('Hemograma teste de homologação'), findsOneWidget);
+      expect(find.text('Hemograma - Homologação EXAM-V1'), findsOneWidget);
+
+      // Botão Registrar Coleta está presente e visível
+      final ctaFinder = find.byKey(const ValueKey('cta_record_collection'));
+      expect(ctaFinder, findsOneWidget);
+
+      final ctaRect = tester.getRect(ctaFinder);
+      expect(ctaRect.top, greaterThan(0.0));
+      expect(ctaRect.bottom, lessThan(915.0));
+      expect(ctaRect.left, greaterThanOrEqualTo(0.0));
+      expect(ctaRect.right, lessThanOrEqualTo(412.0));
+
+      // FAB existe na tela
+      final fabFinder = find.byType(FloatingActionButton);
+      expect(fabFinder, findsOneWidget);
+      final fabRect = tester.getRect(fabFinder);
+
+      // Verifica que o CTA "Registrar Coleta" não intersecta o retângulo do FAB
+      final overlaps = ctaRect.overlaps(fabRect);
+      expect(overlaps, isFalse);
     });
   });
 }
