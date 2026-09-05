@@ -4913,6 +4913,124 @@ async function testLifecycleCaseOnlyInvariants(): Promise<void> {
   );
 }
 
+/**
+ * CLINICAL-BE.MERGE-I1 §22.11 — the main-only administrative callables must
+ * survive the Clinical convergence merge.
+ *
+ * A two-tip diff between the two Front 20 heads rendered these five as
+ * "deletions", because they were added on main after the merge base and never
+ * existed on the canonical branch. Reading that diff literally — or resolving the
+ * merge from the canonical side — would silently drop five callables, one of which
+ * (adminPatchHumanPersonnel) is deployed in production. Source-level proof,
+ * because a behavioural test in this suite would never exercise them.
+ */
+async function testAdminCallablesSurviveMerge() {
+  const index = readSource("index.ts");
+  const expected = [
+    "adminCreateHuman",
+    "adminDeactivateHuman",
+    "adminReactivateHuman",
+    "adminPatchHumanPersonnel",
+    "adminPatchK9Identity",
+  ];
+  for (const name of expected) {
+    assert.ok(
+      new RegExp(`^export const ${name} = onCall`, "m").test(index),
+      `callable administrativo ${name} deve permanecer exportado após o merge`,
+    );
+  }
+  // Os módulos que os implementam também devem existir.
+  for (const mod of [
+    "admin_create_human.ts",
+    "admin_human_lifecycle.ts",
+    "admin_patch_human_personnel.ts",
+    "admin_patch_k9_identity.ts",
+    "auth_error_classification.ts",
+  ]) {
+    assert.ok(readSource(mod).length > 0, `módulo ${mod} deve sobreviver ao merge`);
+  }
+
+  // E o conjunto clínico + exame precisa coexistir com eles.
+  for (const name of [
+    "healthOpenClinicalCase", "healthAppendClinicalEvent", "healthFinalizeClinicalEvent",
+    "healthCancelClinicalEvent", "healthAmendClinicalEvent", "healthTransitionClinicalCase",
+    "healthDischargeClinicalCase", "healthCancelClinicalCase", "healthReopenClinicalCase",
+    "healthRequestExam", "healthRecordExamCollection", "healthRecordExamResult",
+    "healthRecordExamInterpretation", "healthAssessExamImpact", "healthCancelExam",
+  ]) {
+    assert.ok(
+      new RegExp(`^export const ${name} = onCall`, "m").test(index),
+      `callable ${name} deve estar exportado no head único`,
+    );
+  }
+}
+
+/**
+ * CLINICAL-BE.MERGE-I1 §22.12 — the Front 30 Web reader contract.
+ *
+ * `/health/clinical` parses `dogs/{dogId}/clinical_cases/{caseId}` and marks a
+ * case `partial` unless all EIGHT required fields are present and well formed,
+ * with the actor as `{uid, name, internal_role}`. Front 30 is frozen and must not
+ * be changed, so this asserts the WRITER keeps its side of that contract: a case
+ * opened here must parse as `complete` on the Web.
+ */
+async function testFront30RequiredCaseShape() {
+  const db = dbWithDog();
+  const res = (await runHealthOpenClinicalCase(
+    mockRequest(validOpen),
+    depsFor({db}),
+  )) as JsonMap;
+
+  const caseDoc = db._store.get(
+    `dogs/dog-1/clinical_cases/${res.case_id as string}`,
+  ) as JsonMap;
+  assert.ok(caseDoc, "caso persistido");
+
+  // 1..8 — obrigatórios para o parser da Front 30.
+  const required = [
+    "clinical_status",
+    "title",
+    "opened_at",
+    "opened_by",
+    "recorded_by",
+    "opening_event_id",
+    "opening_type",
+    "schema_version",
+  ];
+  for (const field of required) {
+    assert.ok(
+      caseDoc[field] !== undefined && caseDoc[field] !== null && caseDoc[field] !== "",
+      `campo requerido pela Front 30 ausente: ${field}`,
+    );
+  }
+
+  // Vocabulários que a Front 30 reconhece (fora deles ela degrada para partial).
+  assert.ok(
+    ["open", "under_investigation", "under_treatment", "monitoring", "discharged", "cancelled"]
+      .includes(caseDoc.clinical_status as string),
+    "clinical_status precisa estar no vocabulário da Front 30",
+  );
+  assert.ok(
+    ["incident", "consultation", "preventive", "administrative"]
+      .includes(caseDoc.opening_type as string),
+    "opening_type precisa estar no vocabulário da Front 30",
+  );
+  assert.strictEqual(typeof caseDoc.schema_version, "number", "schema_version numérico");
+
+  // Envelope de ator: uid/name/internal_role, os três preenchidos — qualquer
+  // subcampo ausente vira `incomplete_actor` na Front 30.
+  for (const actorField of ["opened_by", "recorded_by"]) {
+    const actor = caseDoc[actorField] as JsonMap;
+    assert.strictEqual(typeof actor, "object", `${actorField} deve ser objeto`);
+    for (const sub of ["uid", "name", "internal_role"]) {
+      assert.ok(
+        typeof actor[sub] === "string" && (actor[sub] as string).trim().length > 0,
+        `${actorField}.${sub} deve ser string não vazia`,
+      );
+    }
+  }
+}
+
 const tests: Array<[string, () => Promise<void>]> = [
   ["OPEN sucesso e shape canônico", testOpenSuccess],
   ["OPEN replay sem duplicação", testOpenReplayNoDuplicate],
@@ -4973,6 +5091,8 @@ const tests: Array<[string, () => Promise<void>]> = [
   ["LIFECYCLE integridade armazenada falha fechada antes de OCC", testLifecycleStoredIntegrityFailClosed],
   ["LIFECYCLE matriz de autorização, capabilities e guards", testLifecycleGuardsAndAuthorization],
   ["LIFECYCLE invariantes case-only (sem eventos extras)", testLifecycleCaseOnlyInvariants],
+  ["MERGE callables administrativos da main sobrevivem", testAdminCallablesSurviveMerge],
+  ["MERGE contrato de leitura da Front 30 preservado", testFront30RequiredCaseShape],
 ];
 
 (async () => {
