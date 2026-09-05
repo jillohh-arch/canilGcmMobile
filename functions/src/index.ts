@@ -1850,7 +1850,12 @@ async function commitAccessProfileAssignment(input: {
         "As claims de acesso foram alteradas, a gravacao do cadastro falhou e a " +
           "reversao nao foi garantida. Confira o acesso deste integrante antes " +
           "de nova tentativa.",
-        {reason: "COMPENSATION_FAILED"},
+        {
+          reason: "COMPENSATION_FAILED",
+          operation: "adminAssignAccessProfile",
+          stage: "revert_custom_claims",
+          target_ra: input.ra,
+        },
       );
     }
     throw error;
@@ -4393,15 +4398,22 @@ export const setK9InstructorRole = onCall({region}, async (request) => {
   // atuais, compomos as claims de forma deterministica, mantemos o papel singular
   // base do perfil e implementamos compensacao completa se a gravacao no Firestore falhar.
   const currentProfileId = stringValue(userData.access_profile_id) ?? stringValue(userData.accessProfileId) ?? null;
-  const currentScope = parseAccessScope(userData.access_scope ?? userData.accessScope) ?? "global";
+  const currentScope = parseAccessScope(userData.access_scope ?? userData.accessScope);
   let profileRoleKeys: string[] = [];
+  let validProfileId: string | null = null;
+  let validScope: "global" | "own_records" | null = null;
+
   if (currentProfileId) {
     const profileSnap = await db.collection("access_profiles").doc(currentProfileId).get();
     if (profileSnap.exists) {
       const pData = profileSnap.data() ?? {};
-      profileRoleKeys = normalizedRoleKeys(pData.role_keys, [currentProfileId]);
-    } else {
-      profileRoleKeys = normalizedRoleKeys(userData.roles, [currentProfileId]);
+      const status = stringValue(pData.status) ?? "active";
+      const parsedScope = parseAccessScope(pData.scope) ?? currentScope;
+      if (status === "active" && parsedScope !== null) {
+        validProfileId = currentProfileId;
+        validScope = parsedScope;
+        profileRoleKeys = normalizedRoleKeys(pData.role_keys, [currentProfileId]);
+      }
     }
   }
 
@@ -4410,9 +4422,9 @@ export const setK9InstructorRole = onCall({region}, async (request) => {
     previousClaims,
     ra,
     {
-      profileId: currentProfileId,
+      profileId: validProfileId,
       roleKeys: profileRoleKeys,
-      accessScope: currentScope,
+      accessScope: validScope,
     },
     enabled,
   );
@@ -4424,11 +4436,14 @@ export const setK9InstructorRole = onCall({region}, async (request) => {
     ...(enabled ? ["instrutor_k9"] : []),
   ])).sort();
 
-  // Preserva a role singular base do perfil existente, a menos que nao haja perfil
+  // Preserva a role singular base do perfil existente somente se houver perfil valido.
+  // Sem perfil valido, nenhuma role singular base (operador/gestor/admin) e fabricada.
   const baseClaimRole = stringValue(userData.claim_role) ?? stringValue(userData.role);
-  const effectiveClaimRole = (baseClaimRole && baseClaimRole !== "instrutor_k9")
-    ? baseClaimRole
-    : (nextClaims.role as string);
+  const effectiveClaimRole = validProfileId
+    ? ((baseClaimRole && baseClaimRole !== "instrutor_k9")
+        ? baseClaimRole
+        : (nextClaims.role as string | null))
+    : null;
 
   const instructorFirestorePayload: JsonMap = {
     auth_uid: userRecord.uid,
@@ -4465,7 +4480,12 @@ export const setK9InstructorRole = onCall({region}, async (request) => {
         "As claims do instrutor foram alteradas, a gravacao do cadastro falhou e a " +
           "reversao nao foi garantida. Confira o acesso deste integrante antes " +
           "de nova tentativa.",
-        {reason: "COMPENSATION_FAILED"},
+        {
+          reason: "COMPENSATION_FAILED",
+          operation: "setK9InstructorRole",
+          stage: "revert_custom_claims",
+          target_ra: ra,
+        },
       );
     }
     throw firestoreError;

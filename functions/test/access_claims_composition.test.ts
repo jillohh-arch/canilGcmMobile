@@ -53,13 +53,13 @@ test("Phase D.2: Instructor ON + profile Gestor -> base claims + Instructor func
   assert.equal(result.access_profile_id, "gestor");
   // Invariante critico: a singular role continua sendo a de gestor, NUNCA sobreposta
   assert.equal(result.role, "gestor");
-  // Roles reflete a uniao deterministica
-  assert.deepEqual(result.roles, ["condutor", "gestor", "instrutor_k9"]);
+  // Roles reflete a uniao deterministica SEM fabricar condutor
+  assert.deepEqual(result.roles, ["gestor", "instrutor_k9"]);
   // Claims de instrutor presentes
   assert.equal(result.instrutor_k9, true);
   assert.equal(result.training_role, "instrutor_k9");
   assert.equal(result.training_instructor, true);
-  assert.equal(result.mobile_access, true);
+  assert.equal(result.mobile_access, false);
 });
 
 test("Phase D.3: Change profile Gestor -> Operador while Instructor ON preserves Instructor qualification", () => {
@@ -147,8 +147,8 @@ test("Phase D.5: Profile assigned + turn Instructor ON -> same Access Profile, a
   assert.equal(nextClaims.access_scope, "global");
   assert.equal(nextClaims.admin, true);
   assert.equal(nextClaims.role, "admin");
-  // Instrutor adicionado
-  assert.deepEqual(nextClaims.roles, ["admin", "administrador", "condutor", "instrutor_k9"]);
+  // Instrutor adicionado sem fabricar condutor
+  assert.deepEqual(nextClaims.roles, ["admin", "administrador", "instrutor_k9"]);
   assert.equal(nextClaims.instrutor_k9, true);
   assert.equal(nextClaims.training_role, "instrutor_k9");
   assert.equal(nextClaims.training_instructor, true);
@@ -159,7 +159,7 @@ test("Phase D.6: Turn Instructor OFF -> Access Profile and base roles remain, on
     ra: "9001",
     access_profile_id: "gestor",
     role: "gestor",
-    roles: ["condutor", "gestor", "instrutor_k9"],
+    roles: ["gestor", "instrutor_k9"],
     instrutor_k9: true,
     training_role: "instrutor_k9",
     training_instructor: true,
@@ -228,7 +228,7 @@ test("Phase D.8: Almoxarifado + Instructor ON compoe inventory_manager e instrut
   assert.equal(nextClaims.role, "inventory_manager");
   assert.equal(nextClaims.inventory_manager, true);
   assert.equal(nextClaims.instrutor_k9, true);
-  assert.deepEqual(nextClaims.roles, ["almoxarifado", "condutor", "instrutor_k9", "inventory_manager"]);
+  assert.deepEqual(nextClaims.roles, ["almoxarifado", "instrutor_k9", "inventory_manager"]);
 });
 
 test("Phase D.9 (Secao 21): Profile contendo instrutor_k9 em role_keys (perfil legado)", () => {
@@ -265,5 +265,157 @@ test("Phase D.10: Determinismo na composicao de roles e sort estavel", () => {
   );
 
   assert.deepEqual(r1.roles, r2.roles);
-  assert.deepEqual(r1.roles, ["a_custom", "b_custom", "condutor", "gestor", "instrutor_k9"]);
+  assert.deepEqual(r1.roles, ["a_custom", "b_custom", "gestor", "instrutor_k9"]);
+});
+
+// ── Novos Casos de Seguranca CT-I2-03 (Secoes 4, 5, 7, 10, 11) ───────────────
+
+test("CT-I2-03 Case 1: Personnel sem access_profile_id + ligar Instrutor -> zero base authorization fabricada", () => {
+  const result = composeEffectiveAccessClaims(
+    {},
+    "9010",
+    {
+      profileId: null,
+      roleKeys: [],
+      accessScope: null,
+    },
+    true, // Ligar Instrutor
+  );
+
+  assert.equal(result.ra, "9010");
+  assert.equal(result.access_profile_id, null);
+  assert.equal(result.access_scope, null);
+  assert.equal(result.role, null);
+  assert.equal(result.admin, false);
+  assert.equal(result.inventory_manager, undefined);
+  assert.equal(result.web_access, false);
+  assert.equal(result.mobile_access, false);
+  assert.deepEqual(result.roles, ["instrutor_k9"]);
+  assert.equal(result.instrutor_k9, true);
+  assert.equal(result.training_role, "instrutor_k9");
+  assert.equal(result.training_instructor, true);
+
+  // Invariante critico: NENHUM condutor ou operador fabricado
+  assert.ok(!result.roles.includes("condutor"));
+  assert.ok(!result.roles.includes("operador_k9"));
+});
+
+test("CT-I2-03 Case 2: Personnel sem access_profile_id + desligar Instrutor -> zero base authorization", () => {
+  const result = composeEffectiveAccessClaims(
+    {
+      roles: ["instrutor_k9"],
+      instrutor_k9: true,
+    },
+    "9010",
+    {
+      profileId: null,
+      roleKeys: [],
+      accessScope: null,
+    },
+    false, // Desligar Instrutor
+  );
+
+  assert.equal(result.access_profile_id, null);
+  assert.equal(result.access_scope, null);
+  assert.equal(result.role, null);
+  assert.deepEqual(result.roles, []);
+  assert.equal(result.instrutor_k9, undefined);
+  assert.equal(result.training_role, undefined);
+  assert.equal(result.training_instructor, undefined);
+});
+
+test("CT-I2-03 Case 3: Perfil referenciado inexistente/ausente trata base authorization como indisponivel", () => {
+  const result = composeEffectiveAccessClaims(
+    {},
+    "9011",
+    {
+      profileId: null,
+      roleKeys: [],
+      accessScope: null,
+    },
+    true,
+  );
+
+  assert.equal(result.access_profile_id, null);
+  assert.equal(result.access_scope, null);
+  assert.equal(result.role, null);
+  assert.deepEqual(result.roles, ["instrutor_k9"]);
+  assert.equal(result.instrutor_k9, true);
+});
+
+test("CT-I2-03 Case 4 / Secao 7: Limpeza de claims proprietarias obsoletas preservando claims nao pertencentes", () => {
+  const staleClaims: JsonMap = {
+    ra: "9012",
+    access_profile_id: "administrador",
+    access_scope: "global",
+    admin: true,
+    role: "admin",
+    roles: ["admin", "administrador", "resgate_k9"], // "resgate_k9" e nao-gerenciada
+    custom_tenant: "k9_sp",
+    unrelated_external_id: "ext-99",
+  };
+
+  // Sem perfil valido
+  const result = composeEffectiveAccessClaims(
+    staleClaims,
+    "9012",
+    {
+      profileId: null,
+      roleKeys: [],
+      accessScope: null,
+    },
+    false,
+  );
+
+  // Chaves proprietarias foram purgadas
+  assert.equal(result.access_profile_id, null);
+  assert.equal(result.access_scope, null);
+  assert.equal(result.admin, false);
+  assert.equal(result.role, null);
+  assert.equal(result.web_access, false);
+  // Unrelated claims preservadas
+  assert.equal(result.custom_tenant, "k9_sp");
+  assert.equal(result.unrelated_external_id, "ext-99");
+  // Apenas role nao gerenciada preservada
+  assert.deepEqual(result.roles, ["resgate_k9"]);
+});
+
+test("Secao 10: Auditoria de preservacao de roles em mudanca de perfil (Admin -> Almoxarifado)", () => {
+  const oldAdminClaims: JsonMap = {
+    ra: "9013",
+    access_profile_id: "administrador",
+    access_scope: "global",
+    admin: true,
+    role: "admin",
+    roles: ["admin", "admin_master", "administrador", "ti", "instrutor_k9", "custom_audit_unit"],
+    instrutor_k9: true,
+    training_role: "instrutor_k9",
+    training_instructor: true,
+  };
+
+  const nextClaims = composeEffectiveAccessClaims(
+    oldAdminClaims,
+    "9013",
+    {
+      profileId: "almoxarifado",
+      roleKeys: ["almoxarifado", "inventory_manager", "estoque"],
+      accessScope: "global",
+    },
+    true, // Mantem Instrutor
+  );
+
+  assert.equal(nextClaims.access_profile_id, "almoxarifado");
+  assert.equal(nextClaims.role, "inventory_manager");
+  assert.equal(nextClaims.admin, false);
+  assert.equal(nextClaims.inventory_manager, true);
+  assert.equal(nextClaims.instrutor_k9, true);
+
+  // Todas as roles de administrador ("admin", "admin_master", "administrador", "ti") foram expurgadas!
+  assert.deepEqual(nextClaims.roles, [
+    "almoxarifado",
+    "custom_audit_unit",
+    "estoque",
+    "instrutor_k9",
+    "inventory_manager",
+  ]);
 });

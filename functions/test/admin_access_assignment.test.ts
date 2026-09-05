@@ -126,8 +126,15 @@ async function simulateAssignAccessProfile(
     } catch (compErr) {
       throw new HttpsError(
         "internal",
-        "Compensation failed",
-        {reason: "COMPENSATION_FAILED"},
+        "As claims de acesso foram alteradas, a gravacao do cadastro falhou e a " +
+          "reversao nao foi garantida. Confira o acesso deste integrante antes " +
+          "de nova tentativa.",
+        {
+          reason: "COMPENSATION_FAILED",
+          operation: "adminAssignAccessProfile",
+          stage: "revert_custom_claims",
+          target_ra: ra,
+        },
       );
     }
     throw error;
@@ -260,7 +267,13 @@ test("Phase A.5: Falha na compensacao retorna COMPENSATION_FAILED", async () => 
 
   assert.ok(caughtError instanceof HttpsError);
   assert.equal((caughtError as HttpsError).code, "internal");
-  assert.equal(((caughtError as HttpsError).details as JsonMap)?.reason, "COMPENSATION_FAILED");
+  const details = (caughtError as HttpsError).details as JsonMap;
+  assert.equal(details?.reason, "COMPENSATION_FAILED");
+  assert.equal(details?.operation, "adminAssignAccessProfile");
+  assert.equal(details?.target_ra, "9001");
+  assert.equal(details?.previousClaims, undefined);
+  assert.equal(details?.claims, undefined);
+  assert.equal(details?.customClaims, undefined);
 });
 
 // ── Testes da Phase D: Cross-Writer Preservation ─────────────────────────────

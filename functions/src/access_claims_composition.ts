@@ -17,7 +17,7 @@ export type JsonMap = Record<string, unknown>;
 export interface BaseProfileState {
   profileId: string | null;
   roleKeys?: string[];
-  accessScope?: "global" | "own_records";
+  accessScope?: "global" | "own_records" | null;
 }
 
 export const MANAGED_ACCESS_ROLES = new Set<string>([
@@ -28,10 +28,12 @@ export const MANAGED_ACCESS_ROLES = new Set<string>([
   "administrador",
   "almoxarifado",
   "comando",
-  "condutor",
   "coordenador",
+  "condutor",
   "estoque",
   "gestor",
+  "gestor_canil",
+  "guarda_k9",
   "handler",
   "inspetor",
   "instrutor",
@@ -41,11 +43,12 @@ export const MANAGED_ACCESS_ROLES = new Set<string>([
   "operacional",
   "operador",
   "operador_k9",
-  "guarda_k9",
+  "operador_mobile",
   "subinspetor",
   "subinspetor_inspetor",
   "supervisor",
   "supervisor_operacional",
+  "ti",
 ]);
 
 function normalizedKey(value: unknown): string {
@@ -56,6 +59,12 @@ function normalizedKey(value: unknown): string {
 
 /**
  * Composicao deterministica de custom claims do Auth.
+ *
+ * Invariantes de seguranca (F10.ACCESS-CREDENTIALS.I2.R1):
+ * - INSTRUCTOR TOGGLE != ACCESS PROFILE ASSIGNMENT
+ * - INSTRUCTOR TOGGLE != IMPLICIT OPERATOR ACCESS
+ * - Perfil base ausente => zero autorizacao base fabricada (sem profile_id, sem escopo, sem singular role, sem condutor/operador).
+ * - Claims proprietarias de acesso antigas sao expurgadas para nao virarem autoridade acidental.
  */
 export function composeEffectiveAccessClaims(
   existingClaims: JsonMap,
@@ -63,8 +72,11 @@ export function composeEffectiveAccessClaims(
   baseProfile: BaseProfileState,
   isInstructor: boolean,
 ): JsonMap {
-  const profileKey = baseProfile.profileId ? normalizedKey(baseProfile.profileId) : "";
-  const profileRoleKeys = (baseProfile.roleKeys ?? []).map(normalizedKey).filter(Boolean);
+  const hasValidBaseProfile = Boolean(baseProfile.profileId && baseProfile.accessScope);
+  const profileKey = hasValidBaseProfile ? normalizedKey(baseProfile.profileId!) : "";
+  const profileRoleKeys = hasValidBaseProfile
+    ? (baseProfile.roleKeys ?? []).map(normalizedKey).filter(Boolean)
+    : [];
   const profileRoles = new Set<string>([
     ...profileRoleKeys,
     ...(profileKey ? [profileKey] : []),
@@ -104,7 +116,7 @@ export function composeEffectiveAccessClaims(
   // Qualificacao de instrutor efetiva: funcional direta OU perfil legado de instrutor
   const effectiveInstructor = isInstructor || isInstructorFromProfile;
 
-  // Preserva roles nao-gerenciadas existentes
+  // Preserva roles nao-gerenciadas existentes (ignora quaisquer roles gerenciadas antigas)
   const preservedRoles = Array.isArray(existingClaims.roles)
     ? (existingClaims.roles as unknown[])
         .map((r) => normalizedKey(String(r)))
@@ -120,7 +132,7 @@ export function composeEffectiveAccessClaims(
 
   if (effectiveInstructor) {
     roles.add("instrutor_k9");
-    roles.add("condutor");
+    // CT-I2-03: Instrutor NÃO adiciona condutor nem sintetiza autorizacao de operador.
   } else {
     // Se nao e instrutor, remove tokens funcionais de instrutor se nao fizerem parte do perfil base
     if (!isInstructorFromProfile) {
@@ -131,51 +143,65 @@ export function composeEffectiveAccessClaims(
     }
   }
 
-  // Role singular base: o perfil de acesso e o dono da autoridade base.
-  // Instrutor nao sobrepoe nem degrada a role de admin, gestor ou almoxarifado.
-  const primaryRole = isAdminProfile
-    ? "admin"
-    : isManagerProfile
-      ? "gestor"
-      : isInventoryProfile
-        ? "inventory_manager"
-        : (profileKey === "instrutor_k9" || isInstructorFromProfile)
-          ? "instrutor_k9"
-          : profileKey
-            ? "condutor"
-            : (effectiveInstructor ? "instrutor_k9" : "condutor");
+  // Role singular base:
+  // Se ha perfil base valido, segue o papel singular do perfil.
+  // Instrutor nao sobrepoe nem degrada a role de admin, gestor, almoxarifado ou operador.
+  // Se NAO ha perfil base valido, nenhuma role singular e fabricada.
+  let primaryRole: string | null = null;
+  if (hasValidBaseProfile) {
+    primaryRole = isAdminProfile
+      ? "admin"
+      : isManagerProfile
+        ? "gestor"
+        : isInventoryProfile
+          ? "inventory_manager"
+          : (profileKey === "instrutor_k9" || isInstructorFromProfile)
+            ? "instrutor_k9"
+            : (isHandlerProfile || profileKey === "operador_k9")
+              ? "condutor"
+              : profileKey;
+  }
 
-  const mobileAccess = isAdminProfile || effectiveInstructor || isHandlerProfile;
-  const accessScope = baseProfile.accessScope ?? "global";
-  const appAccess = mobileAccess ? ["web", "mobile"] : ["web"];
+  // Limpa chaves proprietarias de acesso do Front 10 para nao herdar autorizacao obsoleta de claims antigas
+  const cleanedExistingClaims: JsonMap = { ...existingClaims };
+  delete cleanedExistingClaims.access_profile_id;
+  delete cleanedExistingClaims.access_scope;
+  delete cleanedExistingClaims.admin;
+  delete cleanedExistingClaims.inventory_manager;
+  delete cleanedExistingClaims.instrutor_k9;
+  delete cleanedExistingClaims.training_role;
+  delete cleanedExistingClaims.training_instructor;
+  delete cleanedExistingClaims.app_access;
+  delete cleanedExistingClaims.mobile_access;
+  delete cleanedExistingClaims.web_access;
+  delete cleanedExistingClaims.role;
+  delete cleanedExistingClaims.claim_role;
+  delete cleanedExistingClaims.roles;
+
+  const mobileAccess = hasValidBaseProfile && (isAdminProfile || isHandlerProfile);
+  const appAccess = mobileAccess ? ["web", "mobile"] : (hasValidBaseProfile ? ["web"] : []);
 
   const claims: JsonMap = {
-    ...existingClaims,
+    ...cleanedExistingClaims,
     ra,
-    access_profile_id: profileKey || null,
-    access_scope: accessScope,
+    access_profile_id: hasValidBaseProfile ? profileKey : null,
+    access_scope: hasValidBaseProfile ? (baseProfile.accessScope ?? "global") : null,
     admin: isAdminProfile,
     app_access: appAccess,
     mobile_access: mobileAccess,
     role: primaryRole,
     roles: Array.from(roles).sort(),
-    web_access: true,
+    web_access: hasValidBaseProfile,
   };
 
   if (effectiveInstructor) {
     claims.instrutor_k9 = true;
     claims.training_role = "instrutor_k9";
     claims.training_instructor = true;
-  } else {
-    delete claims.instrutor_k9;
-    delete claims.training_role;
-    delete claims.training_instructor;
   }
 
   if (isInventoryProfile) {
     claims.inventory_manager = true;
-  } else {
-    delete claims.inventory_manager;
   }
 
   return claims;
