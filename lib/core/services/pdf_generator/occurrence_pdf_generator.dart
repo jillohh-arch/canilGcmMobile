@@ -68,11 +68,12 @@ class OccurrencePdfGenerator {
     required String handlerRa,
     IntegrityVerdict? integrityVerdict,
   }) async {
+    final fonts = await PdfFonts.load();
     final pdf = pw.Document(
       author: 'Canil K9 GCM Limeira',
       title: 'Registro de Ocorrencia - ${occurrence.typeName}',
+      theme: fonts.toThemeData(),
     );
-    final fonts = await PdfFonts.load();
     final docId = _buildDocId(occurrence);
     final sortedEvents = [...events]
       ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
@@ -121,7 +122,7 @@ class OccurrencePdfGenerator {
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.only(top: 0, left: 0, right: 0, bottom: 0),
         header: (_) => _header(context, 0),
-        footer: (_) => _footer(false),
+        footer: (_) => _footer(context.fonts, false),
         build: (_) => [
           pw.Padding(
             padding: const pw.EdgeInsets.fromLTRB(
@@ -209,7 +210,7 @@ class OccurrencePdfGenerator {
                 child: bodyBuilder(ctx),
               ),
             ),
-            _footer(pageNumber == 1),
+            _footer(ctx.fonts, pageNumber == 1),
           ],
         ),
       ),
@@ -498,7 +499,7 @@ class OccurrencePdfGenerator {
     );
   }
 
-  pw.Widget _footer(bool cover) {
+  pw.Widget _footer(PdfFonts fonts, bool cover) {
     return pw.Container(
       height: 38,
       padding: const pw.EdgeInsets.symmetric(horizontal: 30),
@@ -511,17 +512,21 @@ class OccurrencePdfGenerator {
           pw.SizedBox(width: 7),
           pw.Text(
             'Documento gerado automaticamente pelo $_systemName',
-            style: pw.TextStyle(fontSize: 7.5, color: _inkFaint),
+            style: pw.TextStyle(
+              font: fonts.regular,
+              fontSize: 7.5,
+              color: _inkFaint,
+            ),
           ),
           pw.Spacer(),
           pw.Text(
             cover
-                ? 'DOCUMENTO DIGITAL - assinatura e integridade na ultima pagina'
-                : 'DOCUMENTO DIGITAL - nao impresso',
+                ? 'DOCUMENTO DIGITAL — assinatura e integridade na última página'
+                : 'DOCUMENTO DIGITAL — não impresso',
             style: pw.TextStyle(
+              font: fonts.bold,
               fontSize: 7.5,
               color: _inkFaint,
-              fontWeight: pw.FontWeight.bold,
             ),
           ),
         ],
@@ -660,7 +665,7 @@ class OccurrencePdfGenerator {
 
   pw.TextStyle _mono(PdfFonts fonts, {double size = 9, PdfColor? color}) {
     return pw.TextStyle(
-      font: fonts.regular,
+      font: fonts.monoRegular,
       fontSize: size,
       color: color ?? _ink,
     );

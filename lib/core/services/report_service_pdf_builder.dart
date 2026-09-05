@@ -28,8 +28,10 @@ class _ActivityReportPdfBuilder {
   });
 
   Future<Uint8List> build() async {
-    final pdf = pw.Document();
     final fonts = await _loadFonts();
+    final pdf = pw.Document(
+      theme: pw.ThemeData.withFont(base: fonts.regular, bold: fonts.bold),
+    );
     final sortedEntries = [...entries]
       ..sort((a, b) => a.date.compareTo(b.date));
 

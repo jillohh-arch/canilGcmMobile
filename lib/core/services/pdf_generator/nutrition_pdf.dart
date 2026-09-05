@@ -24,12 +24,12 @@ class NutritionPdf {
     required int conformCount,
     required int divergentCount,
   }) async {
+    final fonts = await PdfFonts.load();
     final pdf = pw.Document(
       author: 'Canil K9 GCM Limeira',
       title: 'Relatorio Nutricional - ${dog.name}',
+      theme: fonts.toThemeData(),
     );
-
-    final fonts = await PdfFonts.load();
     final docId =
         'NUT-${dog.name.toUpperCase()}-${DateFormat('yyMM').format(DateTime.now())}';
 

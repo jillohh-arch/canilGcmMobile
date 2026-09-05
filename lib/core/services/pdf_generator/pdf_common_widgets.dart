@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -24,16 +25,62 @@ class PdfFonts {
     required this.monoBold,
   });
 
-  static Future<PdfFonts> load() async {
+  static Future<PdfFonts> load({AssetBundle? bundle}) async {
+    final b = bundle ?? rootBundle;
+    Future<pw.Font> loadOne(
+      String assetName,
+      Future<pw.Font> Function() remote,
+    ) async {
+      try {
+        final data = await b.load('assets/fonts/$assetName.ttf');
+        return pw.Font.ttf(data);
+      } catch (_) {
+        return await remote();
+      }
+    }
+
+    final regular = await loadOne(
+      'IBMPlexSans-Regular',
+      PdfGoogleFonts.iBMPlexSansRegular,
+    );
+    final medium = await loadOne(
+      'IBMPlexSans-Medium',
+      PdfGoogleFonts.iBMPlexSansMedium,
+    );
+    final bold = await loadOne(
+      'IBMPlexSans-Bold',
+      PdfGoogleFonts.iBMPlexSansBold,
+    );
+    final semiBold = await loadOne(
+      'IBMPlexSans-SemiBold',
+      PdfGoogleFonts.iBMPlexSansSemiBold,
+    );
+    final monoRegular = await loadOne(
+      'IBMPlexMono-Regular',
+      PdfGoogleFonts.iBMPlexMonoRegular,
+    );
+    final monoBold = await loadOne(
+      'IBMPlexMono-Bold',
+      PdfGoogleFonts.iBMPlexMonoBold,
+    );
+
     return PdfFonts(
-      regular: await PdfGoogleFonts.iBMPlexSansRegular(),
-      medium: await PdfGoogleFonts.iBMPlexSansMedium(),
-      bold: await PdfGoogleFonts.iBMPlexSansBold(),
-      black:
-          await PdfGoogleFonts.iBMPlexSansBold(), // Mapped to bold to maintain compatibility
-      semiBold: await PdfGoogleFonts.iBMPlexSansSemiBold(),
-      monoRegular: await PdfGoogleFonts.iBMPlexMonoRegular(),
-      monoBold: await PdfGoogleFonts.iBMPlexMonoBold(),
+      regular: regular,
+      medium: medium,
+      bold: bold,
+      black: bold, // Mapped to bold to maintain compatibility
+      semiBold: semiBold,
+      monoRegular: monoRegular,
+      monoBold: monoBold,
+    );
+  }
+
+  /// Converte para [pw.ThemeData] canônico com fontes TrueType e fallback robusto.
+  pw.ThemeData toThemeData() {
+    return pw.ThemeData.withFont(
+      base: regular,
+      bold: bold,
+      fontFallback: [regular, bold],
     );
   }
 
