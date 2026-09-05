@@ -32,12 +32,13 @@ abstract final class HealthScheduleActionAvailability {
     bool canCancelAutomaticAsAdmin = false,
     bool isItemBusy = false,
   }) {
-    if (isItemBusy) return const {};
+    if (isItemBusy || item.isPaused) return const {};
     return forFields(
       lifecycleStatus: item.lifecycleStatus,
       sourceType: item.sourceType,
       revision: item.revision,
       canCancelAutomaticAsAdmin: canCancelAutomaticAsAdmin,
+      isPaused: item.isPaused,
     );
   }
 
@@ -47,8 +48,9 @@ abstract final class HealthScheduleActionAvailability {
     required ScheduleSourceType sourceType,
     required HealthScheduleRevision revision,
     bool canCancelAutomaticAsAdmin = false,
+    bool isPaused = false,
   }) {
-    if (lifecycleStatus != ScheduleLifecycleStatus.open) {
+    if (lifecycleStatus != ScheduleLifecycleStatus.open || isPaused) {
       return const {};
     }
 

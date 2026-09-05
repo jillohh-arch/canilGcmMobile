@@ -729,6 +729,19 @@ export async function runHealthScheduleComplete(
         }
       }
 
+      if (current.is_paused === true) {
+        throwDecisionError(
+          "invalid-transition",
+          "Item de agenda pausado não pode ser concluído diretamente.",
+        );
+      }
+      if (current.source_type === "treatment_protocol") {
+        throwDecisionError(
+          "invalid-transition",
+          "Dose de tratamento deve ser registrada via healthAdministerTreatmentDose.",
+        );
+      }
+
       const decision = decideComplete(lifecycle);
       if (decision.kind === "error") {
         throwDecisionError(decision.code, decision.message);

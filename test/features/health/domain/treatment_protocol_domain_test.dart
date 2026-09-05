@@ -4,6 +4,10 @@ import 'package:canil_gcm/features/health/domain/dose_administration.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_enums_ext.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_models.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_value_objects.dart';
+import 'package:canil_gcm/features/health/domain/health_schedule_item.dart';
+import 'package:canil_gcm/features/health/domain/health_schedule_revision.dart';
+import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_action_availability.dart';
+import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_item_view.dart';
 import 'package:canil_gcm/features/health/domain/health_v1_transitions_v2.dart';
 
 void main() {
@@ -268,6 +272,103 @@ void main() {
       expect(TreatmentProtocolTransitions.canTransition(TreatmentStatus.cancelled, TreatmentStatus.active), isFalse);
       expect(TreatmentProtocolTransitions.canTransition(TreatmentStatus.cancelled, TreatmentStatus.paused), isFalse);
       expect(TreatmentProtocolTransitions.canTransition(TreatmentStatus.cancelled, TreatmentStatus.completed), isFalse);
+    });
+  });
+
+  group('Paused Treatment Schedule Item Domain & Presentation Rules', () {
+    final temporalConfig = MapHealthScheduleTemporalConfig.uniform(
+      HealthScheduleTypeTemporalConfig(
+        toleranceAfterScheduled: const Duration(hours: 4),
+        upcomingWindow: const Duration(hours: 12),
+      ),
+    );
+    final policy = HealthScheduleTemporalPolicy(config: temporalConfig);
+
+    test('isPaused schedule item suppresses overdue/pending/today to scheduled status', () {
+      final scheduledPast = now.subtract(const Duration(hours: 5));
+      final duePast = now.subtract(const Duration(hours: 1));
+
+      final pausedItem = HealthScheduleItem(
+        id: 'sch_dose_paused',
+        dogId: 'dog_456',
+        scheduleType: ScheduleType.dose,
+        title: 'Dose: Amoxicilina',
+        scheduledFor: scheduledPast,
+        dueUntil: duePast,
+        timezone: 'America/Sao_Paulo',
+        lifecycleStatus: ScheduleLifecycleStatus.open,
+        sourceType: ScheduleSourceType.treatmentProtocol,
+        createdAt: now.subtract(const Duration(days: 1)),
+        recordedBy: actor,
+        schemaVersion: 1,
+        isPaused: true,
+      );
+
+      // Sem pausa, o item seria overdue
+      final activeItem = HealthScheduleItem(
+        id: 'sch_dose_active',
+        dogId: 'dog_456',
+        scheduleType: ScheduleType.dose,
+        title: 'Dose: Amoxicilina',
+        scheduledFor: scheduledPast,
+        dueUntil: duePast,
+        timezone: 'America/Sao_Paulo',
+        lifecycleStatus: ScheduleLifecycleStatus.open,
+        sourceType: ScheduleSourceType.treatmentProtocol,
+        createdAt: now.subtract(const Duration(days: 1)),
+        recordedBy: actor,
+        schemaVersion: 1,
+        isPaused: false,
+      );
+
+      expect(policy.evaluate(activeItem, now: now), HealthScheduleTemporalStatus.overdue);
+      expect(policy.evaluate(pausedItem, now: now), HealthScheduleTemporalStatus.scheduled);
+    });
+
+    test('isPaused schedule item yields NO actionable buttons in presentation', () {
+      final viewPaused = HealthScheduleItemView(
+        id: 'sch_dose_paused',
+        dogId: 'dog_456',
+        scheduleType: ScheduleType.dose,
+        title: 'Dose: Amoxicilina',
+        scheduledFor: now,
+        timezone: 'America/Sao_Paulo',
+        lifecycleStatus: ScheduleLifecycleStatus.open,
+        sourceType: ScheduleSourceType.treatmentProtocol,
+        temporalStatus: HealthScheduleTemporalStatus.scheduled,
+        createdAt: now,
+        recordedBy: actor,
+        schemaVersion: 1,
+        revision: const HealthScheduleRevision('1'),
+        isPaused: true,
+      );
+
+      final viewActive = HealthScheduleItemView(
+        id: 'sch_dose_active',
+        dogId: 'dog_456',
+        scheduleType: ScheduleType.dose,
+        title: 'Dose: Amoxicilina',
+        scheduledFor: now,
+        timezone: 'America/Sao_Paulo',
+        lifecycleStatus: ScheduleLifecycleStatus.open,
+        sourceType: ScheduleSourceType.treatmentProtocol,
+        temporalStatus: HealthScheduleTemporalStatus.pending,
+        createdAt: now,
+        recordedBy: actor,
+        schemaVersion: 1,
+        revision: const HealthScheduleRevision('1'),
+        isPaused: false,
+      );
+
+      final pausedActions = HealthScheduleActionAvailability.forView(viewPaused);
+      expect(pausedActions, isEmpty);
+      expect(HealthScheduleActionAvailability.canComplete(viewPaused), isFalse);
+      expect(HealthScheduleActionAvailability.canEdit(viewPaused), isFalse);
+      expect(HealthScheduleActionAvailability.canCancel(viewPaused), isFalse);
+
+      final activeActions = HealthScheduleActionAvailability.forView(viewActive);
+      expect(activeActions, contains(HealthScheduleItemAction.complete));
+      expect(HealthScheduleActionAvailability.canComplete(viewActive), isTrue);
     });
   });
 }

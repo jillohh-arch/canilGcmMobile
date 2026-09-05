@@ -67,6 +67,11 @@ export interface TreatmentProtocolCallableDeps {
     auth: CallableRequest["auth"],
     caller: TreatmentCaller,
   ) => Promise<boolean>;
+  hasOtherOpenCaseSchedule: (
+    dogId: string,
+    caseId: string,
+    excludeProtocolId?: string,
+  ) => Promise<boolean>;
   now?: () => Date;
 }
 
@@ -754,6 +759,35 @@ export async function runHealthPauseTreatmentProtocol(
     };
     tx.set(evtRef, eventDoc);
 
+    // Pausar todas as doses futuras pendentes do protocolo pausado
+    const dosesPlanned = typeof pData["doses_planned"] === "number"
+      ? pData["doses_planned"]
+      : 50;
+
+    for (let i = 1; i <= dosesPlanned; i++) {
+      const plannedDoseId = `dose_${i}`;
+      const sId = deterministicDoseScheduleId(dogId, protocolId, plannedDoseId);
+      const sRef = scheduleRef(deps.db, dogId, sId);
+      const sSnap = await tx.get(sRef);
+      if (sSnap.exists) {
+        const sData = sSnap.data() as JsonMap;
+        if (sData["lifecycle_status"] === "open") {
+          const sRev = typeof sData["revision"] === "number" ? sData["revision"] : 1;
+          tx.set(
+            sRef,
+            {
+              is_paused: true,
+              paused_at: nowTs,
+              pause_reason: pauseReason,
+              updated_at: nowTs,
+              revision: sRev + 1,
+            },
+            {merge: true},
+          );
+        }
+      }
+    }
+
     const caseRev = typeof caseData["revision"] === "number" ? caseData["revision"] : 1;
     tx.set(
       cRef,
@@ -905,6 +939,35 @@ export async function runHealthResumeTreatmentProtocol(
       schema_version: 1,
     };
     tx.set(evtRef, eventDoc);
+
+    // Despausar todas as doses futuras pendentes do protocolo retomado
+    const dosesPlanned = typeof pData["doses_planned"] === "number"
+      ? pData["doses_planned"]
+      : 50;
+
+    for (let i = 1; i <= dosesPlanned; i++) {
+      const plannedDoseId = `dose_${i}`;
+      const sId = deterministicDoseScheduleId(dogId, protocolId, plannedDoseId);
+      const sRef = scheduleRef(deps.db, dogId, sId);
+      const sSnap = await tx.get(sRef);
+      if (sSnap.exists) {
+        const sData = sSnap.data() as JsonMap;
+        if (sData["lifecycle_status"] === "open" && sData["is_paused"] === true) {
+          const sRev = typeof sData["revision"] === "number" ? sData["revision"] : 1;
+          tx.set(
+            sRef,
+            {
+              is_paused: false,
+              paused_at: null,
+              pause_reason: null,
+              updated_at: nowTs,
+              revision: sRev + 1,
+            },
+            {merge: true},
+          );
+        }
+      }
+    }
 
     const caseRev = typeof caseData["revision"] === "number" ? caseData["revision"] : 1;
     tx.set(
@@ -1109,7 +1172,8 @@ export async function runHealthCompleteTreatmentProtocol(
       if (caseData["clinical_status"] === "under_treatment") {
         casePatch["clinical_status"] = "monitoring";
       }
-      casePatch["has_pending_schedule"] = false;
+      const hasOther = await deps.hasOtherOpenCaseSchedule(dogId, caseId, protocolId);
+      casePatch["has_pending_schedule"] = hasOther;
     }
 
     tx.set(cRef, casePatch, {merge: true});
@@ -1304,7 +1368,8 @@ export async function runHealthCancelTreatmentProtocol(
       casePatch["active_treatments_count"] = FieldValue.increment(-1);
     }
     if (newActiveCount === 0) {
-      casePatch["has_pending_schedule"] = false;
+      const hasOther = await deps.hasOtherOpenCaseSchedule(dogId, caseId, protocolId);
+      casePatch["has_pending_schedule"] = hasOther;
     }
     tx.set(cRef, casePatch, {merge: true});
 

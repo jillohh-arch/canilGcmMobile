@@ -35,6 +35,7 @@ final class HealthScheduleItemView {
     this.recurrenceRule,
     this.assignedToUid,
     this.assignedToName,
+    this.isPaused = false,
   });
 
   /// Constrói a view a partir do agregado canônico + política pura.
@@ -77,6 +78,7 @@ final class HealthScheduleItemView {
       recurrenceRule: item.recurrenceRule,
       assignedToUid: item.assignedToUid,
       assignedToName: item.assignedToName,
+      isPaused: item.isPaused,
     );
   }
 
@@ -114,6 +116,7 @@ final class HealthScheduleItemView {
   final String? recurrenceRule;
   final String? assignedToUid;
   final String? assignedToName;
+  final bool isPaused;
 
   bool get isTerminal =>
       temporalStatus == HealthScheduleTemporalStatus.completed ||
@@ -147,7 +150,8 @@ final class HealthScheduleItemView {
         other.notes == notes &&
         other.recurrenceRule == recurrenceRule &&
         other.assignedToUid == assignedToUid &&
-        other.assignedToName == assignedToName;
+        other.assignedToName == assignedToName &&
+        other.isPaused == isPaused;
   }
 
   @override
@@ -178,5 +182,6 @@ final class HealthScheduleItemView {
     recurrenceRule,
     assignedToUid,
     assignedToName,
+    isPaused,
   ]);
 }

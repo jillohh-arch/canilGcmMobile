@@ -19,7 +19,7 @@ final class HealthScheduleItem {
     required String title,
     required this.scheduledFor,
     required this.timezone,
-    required ScheduleLifecycleStatus lifecycleStatus,
+    required this.lifecycleStatus,
     required this.sourceType,
     required this.createdAt,
     required this.recordedBy,
@@ -36,11 +36,11 @@ final class HealthScheduleItem {
     this.recurrenceRule,
     this.assignedToUid,
     this.assignedToName,
+    this.isPaused = false,
 
     /// Revisão monotônica opaca (concorrência). Legado ausente → token `0`.
     this.revision = const HealthScheduleRevision('0'),
-  }) : lifecycleStatus = lifecycleStatus,
-       title = title.trim(),
+  }) : title = title.trim(),
        cancelReason = cancelReason?.trim(),
        notes = notes?.trim() {
     if (schemaVersion <= 0) {
@@ -131,6 +131,7 @@ final class HealthScheduleItem {
   final String? recurrenceRule;
   final String? assignedToUid;
   final String? assignedToName;
+  final bool isPaused;
 
   /// Token opaco de revisão (backend: inteiro monotônico; legado sem campo → `0`).
   final HealthScheduleRevision revision;
@@ -229,6 +230,9 @@ final class HealthScheduleTemporalPolicy {
     }
     if (item.lifecycleStatus == ScheduleLifecycleStatus.cancelled) {
       return HealthScheduleTemporalStatus.cancelled;
+    }
+    if (item.isPaused) {
+      return HealthScheduleTemporalStatus.scheduled;
     }
 
     final effectiveDue = effectiveDueUntil(item);

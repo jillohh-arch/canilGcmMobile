@@ -8563,12 +8563,7 @@ const treatmentProtocolDeps: TreatmentProtocolCallableDeps = {
       const caller = await requireAccessPermission(auth, "health", "record_routine");
       return toTreatmentCaller(caller);
     } catch {
-      try {
-        return toTreatmentCaller(await requireClinicalCapability(auth, "record_clinical"));
-      } catch {
-        const caller = await requireAccessPermission(auth, "health", "create");
-        return toTreatmentCaller(caller);
-      }
+      return toTreatmentCaller(await requireClinicalCapability(auth, "record_clinical"));
     }
   },
   requireDogAccess: async (auth, caller, dogId, dog) => {
@@ -8584,6 +8579,26 @@ const treatmentProtocolDeps: TreatmentProtocolCallableDeps = {
       auth,
       {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
     );
+  },
+  hasOtherOpenCaseSchedule: async (dogId, caseId, excludeProtocolId) => {
+    const snap = await db
+      .collection("dogs")
+      .doc(dogId)
+      .collection("health_schedule")
+      .where("case_id", "==", caseId)
+      .where("lifecycle_status", "==", "open")
+      .limit(20)
+      .get();
+    if (snap.empty) {
+      return false;
+    }
+    for (const doc of snap.docs) {
+      const data = doc.data();
+      if (!excludeProtocolId || data.source_id !== excludeProtocolId) {
+        return true;
+      }
+    }
+    return false;
   },
 };
 

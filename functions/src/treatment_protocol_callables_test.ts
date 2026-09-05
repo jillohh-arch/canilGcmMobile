@@ -149,6 +149,22 @@ function makeDeps(db: any): TreatmentProtocolCallableDeps {
     requireRecordRoutine: async () => testCaller,
     requireDogAccess: async () => {},
     isAdministrativeAuthority: async () => false,
+    hasOtherOpenCaseSchedule: async (dogId: string, caseId: string, excludeProtocolId?: string) => {
+      const prefix = `dogs/${dogId}/health_schedule/`;
+      for (const [key, val] of db._store.entries()) {
+        if (key.startsWith(prefix)) {
+          const d = val as any;
+          if (
+            d.case_id === caseId &&
+            d.lifecycle_status === "open" &&
+            (!excludeProtocolId || d.source_id !== excludeProtocolId)
+          ) {
+            return true;
+          }
+        }
+      }
+      return false;
+    },
     now: () => new Date("2026-09-05T12:00:00Z"),
   };
 }
@@ -350,9 +366,10 @@ async function runTests() {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // 3. PAUSE & RESUME TREATMENT PROTOCOL
+  // 3. PAUSE & RESUME TREATMENT PROTOCOL (With Schedule is_paused toggling)
   // ───────────────────────────────────────────────────────────────────────────
   {
+    const schedId = deterministicDoseScheduleId("dog-01", "tp-01", "dose_1");
     const initial: Record<string, JsonMap> = {
       "dogs/dog-01": {id: "dog-01"},
       "dogs/dog-01/clinical_cases/case-01": {
@@ -368,6 +385,17 @@ async function runTests() {
         dog_id: "dog-01",
         status: "active",
         medication_name: "Amoxicilina",
+        revision: 1,
+        doses_planned: 1,
+      },
+      [`dogs/dog-01/health_schedule/${schedId}`]: {
+        id: schedId,
+        dog_id: "dog-01",
+        lifecycle_status: "open",
+        source_type: "treatment_protocol",
+        source_id: "tp-01",
+        case_id: "case-01",
+        planned_dose_id: "dose_1",
         revision: 1,
       },
     };
@@ -389,6 +417,11 @@ async function runTests() {
     assert.strictEqual(pDocAfterPause["status"], "paused");
     assert.strictEqual(pDocAfterPause["pause_reason"], "Reação gástrica temporária");
 
+    const schedAfterPause = db._store.get(`dogs/dog-01/health_schedule/${schedId}`)!;
+    assert.strictEqual(schedAfterPause["is_paused"], true, "Schedule marcado como is_paused=true");
+    assert.strictEqual(schedAfterPause["pause_reason"], "Reação gástrica temporária");
+    assert.strictEqual(schedAfterPause["revision"], 2);
+
     const caseAfterPause = db._store.get("dogs/dog-01/clinical_cases/case-01")!;
     assert.strictEqual(caseAfterPause["active_treatments_count"], 0, "active treatments decrementado");
     assert.strictEqual(caseAfterPause["event_count"], 6, "event_count incrementado");
@@ -407,11 +440,18 @@ async function runTests() {
     assert.strictEqual(pDocAfterResume["status"], "active");
     assert.strictEqual(pDocAfterResume["paused_at"], null);
 
+    const schedAfterResume = db._store.get(`dogs/dog-01/health_schedule/${schedId}`)!;
+    assert.strictEqual(schedAfterResume["is_paused"], false, "Schedule restaurado com is_paused=false");
+    assert.strictEqual(schedAfterResume["paused_at"], null);
+    assert.strictEqual(schedAfterResume["pause_reason"], null);
+    assert.strictEqual(schedAfterResume["revision"], 3);
+    assert.strictEqual(schedAfterResume["id"], schedId, "Mesmo documento de schedule mantido (sem regeneração)");
+
     const caseAfterResume = db._store.get("dogs/dog-01/clinical_cases/case-01")!;
     assert.strictEqual(caseAfterResume["active_treatments_count"], 1, "active treatments restaurado");
     assert.strictEqual(caseAfterResume["event_count"], 7, "event_count incrementado");
 
-    console.log("✓ Pause & Resume TreatmentProtocol: lifecycle, events & active count passed");
+    console.log("✓ Pause & Resume TreatmentProtocol: lifecycle, events, active count & schedule is_paused toggle passed");
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -475,6 +515,160 @@ async function runTests() {
     assert.strictEqual(caseDoc["event_count"], 8);
 
     console.log("✓ Complete TreatmentProtocol: transition to monitoring & schedule cancelled passed");
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // 4B. COMPLETE TREATMENT PROTOCOL WITH OTHER OPEN CASE SCHEDULE (Option A projection)
+  // ───────────────────────────────────────────────────────────────────────────
+  {
+    const schedDoseId = deterministicDoseScheduleId("dog-01", "tp-01", "dose_1");
+    const schedExamId = "sch_exam_unrelated_01";
+    const initial: Record<string, JsonMap> = {
+      "dogs/dog-01": {id: "dog-01"},
+      "dogs/dog-01/clinical_cases/case-01": {
+        id: "case-01",
+        clinical_status: "under_treatment",
+        event_count: 7,
+        revision: 4,
+        active_treatments_count: 1,
+        has_pending_schedule: true,
+      },
+      "dogs/dog-01/treatment_protocols/tp-01": {
+        id: "tp-01",
+        case_id: "case-01",
+        dog_id: "dog-01",
+        status: "active",
+        medication_name: "Amoxicilina",
+        revision: 2,
+        doses_planned: 1,
+      },
+      [`dogs/dog-01/health_schedule/${schedDoseId}`]: {
+        id: schedDoseId,
+        dog_id: "dog-01",
+        lifecycle_status: "open",
+        source_type: "treatment_protocol",
+        source_id: "tp-01",
+        case_id: "case-01",
+      },
+      [`dogs/dog-01/health_schedule/${schedExamId}`]: {
+        id: schedExamId,
+        dog_id: "dog-01",
+        lifecycle_status: "open",
+        source_type: "exam",
+        source_id: "exam_01",
+        case_id: "case-01",
+      },
+    };
+    const db = createFakeDb(initial);
+    const deps = makeDeps(db);
+
+    const compReq = makeCallableRequest({
+      dogId: "dog-01",
+      protocolId: "tp-01",
+      operationId: "op-comp-other-sched",
+    });
+    const compRes = await runHealthCompleteTreatmentProtocol(compReq, deps);
+    assert.strictEqual(compRes["success"], true);
+
+    const caseDoc = db._store.get("dogs/dog-01/clinical_cases/case-01")!;
+    assert.strictEqual(caseDoc["active_treatments_count"], 0);
+    assert.strictEqual(
+      caseDoc["has_pending_schedule"],
+      true,
+      "has_pending_schedule permanece true devido a agendamento de exame pendente no mesmo caso",
+    );
+    console.log("✓ Complete TreatmentProtocol with other open case schedule: has_pending_schedule correctly preserved as true");
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // 4C. MULTIPLE TREATMENTS COEXISTENCE (Treatment A + Treatment B in same case)
+  // ───────────────────────────────────────────────────────────────────────────
+  {
+    const schedA = deterministicDoseScheduleId("dog-01", "tp-a", "dose_1");
+    const schedB = deterministicDoseScheduleId("dog-01", "tp-b", "dose_1");
+    const initial: Record<string, JsonMap> = {
+      "dogs/dog-01": {id: "dog-01"},
+      "dogs/dog-01/clinical_cases/case-01": {
+        id: "case-01",
+        clinical_status: "under_treatment",
+        event_count: 10,
+        revision: 5,
+        active_treatments_count: 2,
+        has_pending_schedule: true,
+      },
+      "dogs/dog-01/treatment_protocols/tp-a": {
+        id: "tp-a",
+        case_id: "case-01",
+        dog_id: "dog-01",
+        status: "active",
+        medication_name: "Antibiótico A",
+        revision: 1,
+        doses_planned: 1,
+      },
+      "dogs/dog-01/treatment_protocols/tp-b": {
+        id: "tp-b",
+        case_id: "case-01",
+        dog_id: "dog-01",
+        status: "active",
+        medication_name: "Anti-inflamatório B",
+        revision: 1,
+        doses_planned: 1,
+      },
+      [`dogs/dog-01/health_schedule/${schedA}`]: {
+        id: schedA,
+        dog_id: "dog-01",
+        lifecycle_status: "open",
+        source_type: "treatment_protocol",
+        source_id: "tp-a",
+        case_id: "case-01",
+      },
+      [`dogs/dog-01/health_schedule/${schedB}`]: {
+        id: schedB,
+        dog_id: "dog-01",
+        lifecycle_status: "open",
+        source_type: "treatment_protocol",
+        source_id: "tp-b",
+        case_id: "case-01",
+      },
+    };
+    const db = createFakeDb(initial);
+    const deps = makeDeps(db);
+
+    // Conclui apenas Tratamento A
+    const compAReq = makeCallableRequest({
+      dogId: "dog-01",
+      protocolId: "tp-a",
+      operationId: "op-comp-a",
+    });
+    const resA = await runHealthCompleteTreatmentProtocol(compAReq, deps);
+    assert.strictEqual(resA["success"], true);
+
+    const caseAfterA = db._store.get("dogs/dog-01/clinical_cases/case-01")!;
+    assert.strictEqual(caseAfterA["active_treatments_count"], 1, "Tratamento B continua ativo");
+    assert.strictEqual(caseAfterA["clinical_status"], "under_treatment", "Status permanece under_treatment");
+    assert.strictEqual(caseAfterA["has_pending_schedule"], true, "has_pending_schedule permanece true");
+
+    const schedDocA = db._store.get(`dogs/dog-01/health_schedule/${schedA}`)!;
+    assert.strictEqual(schedDocA["lifecycle_status"], "cancelled", "Dose do Tratamento A cancelada");
+
+    const schedDocB = db._store.get(`dogs/dog-01/health_schedule/${schedB}`)!;
+    assert.strictEqual(schedDocB["lifecycle_status"], "open", "Dose do Tratamento B continua open");
+
+    // Conclui Tratamento B
+    const compBReq = makeCallableRequest({
+      dogId: "dog-01",
+      protocolId: "tp-b",
+      operationId: "op-comp-b",
+    });
+    const resB = await runHealthCompleteTreatmentProtocol(compBReq, deps);
+    assert.strictEqual(resB["success"], true);
+
+    const caseAfterB = db._store.get("dogs/dog-01/clinical_cases/case-01")!;
+    assert.strictEqual(caseAfterB["active_treatments_count"], 0, "Nenhum tratamento ativo restante");
+    assert.strictEqual(caseAfterB["clinical_status"], "monitoring", "Transita para monitoring");
+    assert.strictEqual(caseAfterB["has_pending_schedule"], false, "Sem mais pendências de agenda");
+
+    console.log("✓ Multiple treatments coexistence: independent lifecycles, projections & schedules passed");
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -776,9 +970,34 @@ async function runTests() {
     const dbC = createFakeDb(initial);
     const depsC = makeDeps(dbC);
     const resC = await runHealthAdministerTreatmentDose(reqA, depsC);
-    assert.strictEqual(resC["success"], true, "Ator autorizado executa dose com sucesso");
+    assert.strictEqual(resC["success"], true, "Ator com record_routine executa dose com sucesso");
 
-    console.log("✓ Authorization matrix: routine/clinical/dogAccess access checks passed");
+    // Cenário D: Ator com permissão clínica e acesso ao cão -> Autorizado
+    const dbD = createFakeDb(initial);
+    const depsD = makeDeps(dbD);
+    depsD.requireRecordRoutine = async () => ({
+      uid: "uid-vet",
+      name: "Veterinário",
+      email: "vet@gcm.com.br",
+      ra: "654321",
+    });
+    const resD = await runHealthAdministerTreatmentDose(reqA, depsD);
+    assert.strictEqual(resD["success"], true, "Ator com record_clinical executa dose com sucesso");
+
+    // Cenário E: Ator com apenas permissão genérica CRUD health.create (sem rotina nem clínica) -> Negado
+    const dbE = createFakeDb(initial);
+    const depsE = makeDeps(dbE);
+    depsE.requireRecordRoutine = async () => {
+      // Simula a nova implementação de index.ts onde health.create NÃO concede execução de dose
+      throw new Error("permission-denied: Permissão 'health.create' insuficiente para administração de dose (exige record_routine ou record_clinical)");
+    };
+    await assert.rejects(
+      () => runHealthAdministerTreatmentDose(reqA, depsE),
+      /permission-denied/,
+      "health.create não deve autorizar administração de dose",
+    );
+
+    console.log("✓ Authorization matrix: routine/clinical/dogAccess access checks and health.create rejection passed");
   }
 
   console.log("\nALL TreatmentProtocol backend test groups passed successfully!");
