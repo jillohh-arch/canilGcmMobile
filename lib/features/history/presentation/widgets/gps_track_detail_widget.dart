@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import 'package:canil_gcm/core/theme/app_map_style.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 
 /// Widget reutilizável que exibe o mapa da rota GPS + métricas
@@ -66,62 +66,43 @@ class GpsTrackDetailWidget extends StatelessWidget {
   }
 
   Widget _buildMap(List<LatLng> points) {
-    final bounds = LatLngBounds.fromPoints(points);
+    final bounds = AppMapStyle.boundsFromPoints(points);
 
-    return FlutterMap(
-      options: MapOptions(
-        initialCameraFit: CameraFit.bounds(
-          bounds: bounds,
-          padding: const EdgeInsets.all(30),
-        ),
-        interactionOptions: const InteractionOptions(
-          flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-        ),
+    return GoogleMap(
+      initialCameraPosition: CameraPosition(
+        target: points.first,
+        zoom: 15,
       ),
-      children: [
-        TileLayer(
-          urlTemplate:
-              'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-          subdomains: const ['a', 'b', 'c', 'd'],
-          userAgentPackageName: 'com.gcm.limeira.canilk9',
-          maxZoom: 19,
+      style: AppMapStyle.darkStyle,
+      rotateGesturesEnabled: false,
+      zoomControlsEnabled: false,
+      myLocationButtonEnabled: false,
+      mapToolbarEnabled: false,
+      onMapCreated: (controller) {
+        controller.animateCamera(
+          CameraUpdate.newLatLngBounds(bounds, 30),
+        );
+      },
+      polylines: {
+        Polyline(
+          polylineId: const PolylineId('gps_track'),
+          points: points,
+          color: AppTheme.primary,
+          width: 4,
         ),
-        PolylineLayer(
-          polylines: [
-            Polyline(points: points, color: AppTheme.primary, strokeWidth: 4),
-          ],
+      },
+      markers: {
+        Marker(
+          markerId: const MarkerId('start'),
+          position: points.first,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
         ),
-        MarkerLayer(
-          markers: [
-            // Start (green)
-            Marker(
-              point: points.first,
-              width: 14,
-              height: 14,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppTheme.success,
-                  borderRadius: BorderRadius.circular(7),
-                  border: Border.all(color: AppTheme.background, width: 2),
-                ),
-              ),
-            ),
-            // End (red)
-            Marker(
-              point: points.last,
-              width: 14,
-              height: 14,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppTheme.error,
-                  borderRadius: BorderRadius.circular(7),
-                  border: Border.all(color: AppTheme.background, width: 2),
-                ),
-              ),
-            ),
-          ],
+        Marker(
+          markerId: const MarkerId('end'),
+          position: points.last,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
         ),
-      ],
+      },
     );
   }
 

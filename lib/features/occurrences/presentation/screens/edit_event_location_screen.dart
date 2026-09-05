@@ -1,13 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart' as gmaps;
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import 'package:canil_gcm/core/services/osm_geocoding_service.dart';
+import 'package:canil_gcm/core/theme/app_map_style.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
@@ -61,7 +62,7 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
 
   final _searchController = TextEditingController();
   final _geocodingService = OsmGeocodingService();
-  final _mapController = MapController();
+  gmaps.GoogleMapController? _mapController;
 
   Timer? _debounce;
   List<GeocodingResult> _suggestions = [];
@@ -89,6 +90,7 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
     _debounce?.cancel();
     _searchController.dispose();
     _geocodingService.dispose();
+    _mapController?.dispose();
     super.dispose();
   }
 
@@ -194,7 +196,12 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
   }
 
   void _animateToPoint(LatLng point) {
-    _mapController.move(point, 16.0);
+    _mapController?.animateCamera(
+      gmaps.CameraUpdate.newLatLngZoom(
+        gmaps.LatLng(point.latitude, point.longitude),
+        16.0,
+      ),
+    );
   }
 
   Future<void> _save() async {
@@ -581,51 +588,36 @@ class _EditEventLocationScreenState extends State<EditEventLocationScreen> {
           clipBehavior: Clip.antiAlias,
           child: Stack(
             children: [
-              FlutterMap(
-                mapController: _mapController,
-                options: MapOptions(
-                  initialCenter: center,
-                  initialZoom: _selectedPoint != null ? 16.0 : 13.0,
-                  onTap: (_, point) => _onMapTap(point),
+              gmaps.GoogleMap(
+                initialCameraPosition: gmaps.CameraPosition(
+                  target: gmaps.LatLng(center.latitude, center.longitude),
+                  zoom: _selectedPoint != null ? 16.0 : 13.0,
                 ),
-                children: [
-                  TileLayer(
-                    urlTemplate:
-                        'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-                    subdomains: const ['a', 'b', 'c', 'd'],
-                    userAgentPackageName: 'com.gcm.limeira.canilk9',
-                    maxZoom: 19,
-                  ),
-                  if (_selectedPoint != null)
-                    MarkerLayer(
-                      markers: [
-                        Marker(
-                          point: _selectedPoint!,
-                          width: 30,
-                          height: 30,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: _cyan,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: _bg, width: 2.5),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: _cyan.withAlpha(60),
-                                  blurRadius: 8,
-                                  spreadRadius: 2,
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.circle,
-                              color: AppTheme.surfacePanelStrong,
-                              size: 10,
-                            ),
+                style: AppMapStyle.darkStyle,
+                rotateGesturesEnabled: false,
+                zoomControlsEnabled: false,
+                myLocationButtonEnabled: false,
+                mapToolbarEnabled: false,
+                onMapCreated: (controller) => _mapController = controller,
+                onTap: (point) =>
+                    _onMapTap(LatLng(point.latitude, point.longitude)),
+                markers: _selectedPoint != null
+                    ? {
+                        gmaps.Marker(
+                          markerId: const gmaps.MarkerId('selected_pin'),
+                          position: gmaps.LatLng(
+                            _selectedPoint!.latitude,
+                            _selectedPoint!.longitude,
+                          ),
+                          icon: gmaps.BitmapDescriptor.defaultMarkerWithHue(
+                            gmaps.BitmapDescriptor.hueCyan,
+                          ),
+                          infoWindow: gmaps.InfoWindow(
+                            title: _selectedLabel ?? 'Local Selecionado',
                           ),
                         ),
-                      ],
-                    ),
-                ],
+                      }
+                    : {},
               ),
               // Tag "arraste o pino"
               Positioned(

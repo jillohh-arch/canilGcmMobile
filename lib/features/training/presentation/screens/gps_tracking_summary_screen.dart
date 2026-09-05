@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:latlong2/latlong.dart' as ll2;
 
 import 'package:canil_gcm/core/services/gps_tracking_service.dart';
+import 'package:canil_gcm/core/theme/app_map_style.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 
 /// Tela de resumo após finalizar o rastreamento GPS.
@@ -170,7 +171,7 @@ class _GpsTrackingSummaryScreenState extends State<GpsTrackingSummaryScreen> {
     );
   }
 
-  Widget _buildMap(List<LatLng> route) {
+  Widget _buildMap(List<ll2.LatLng> route) {
     if (route.isEmpty) {
       return Container(
         color: AppTheme.surfacePanelSoft,
@@ -182,68 +183,44 @@ class _GpsTrackingSummaryScreenState extends State<GpsTrackingSummaryScreen> {
       );
     }
 
-    // Calcular bounds
-    final bounds = LatLngBounds.fromPoints(route);
+    final gmapRoute = AppMapStyle.toGoogleLatLngList(route);
+    final bounds = AppMapStyle.boundsFromPoints(gmapRoute);
 
-    return FlutterMap(
-      options: MapOptions(
-        initialCameraFit: CameraFit.bounds(
-          bounds: bounds,
-          padding: const EdgeInsets.all(40),
-        ),
-        interactionOptions: const InteractionOptions(
-          flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-        ),
+    return GoogleMap(
+      initialCameraPosition: CameraPosition(
+        target: gmapRoute.first,
+        zoom: 15,
       ),
-      children: [
-        TileLayer(
-          urlTemplate:
-              'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-          subdomains: const ['a', 'b', 'c', 'd'],
-          userAgentPackageName: 'com.gcm.limeira.canilk9',
-          maxZoom: 19,
+      style: AppMapStyle.darkStyle,
+      rotateGesturesEnabled: false,
+      zoomControlsEnabled: false,
+      myLocationButtonEnabled: false,
+      mapToolbarEnabled: false,
+      onMapCreated: (controller) {
+        controller.animateCamera(
+          CameraUpdate.newLatLngBounds(bounds, 40),
+        );
+      },
+      polylines: {
+        Polyline(
+          polylineId: const PolylineId('summary_route'),
+          points: gmapRoute,
+          color: AppTheme.primary,
+          width: 4,
         ),
-        PolylineLayer(
-          polylines: [
-            Polyline(points: route, color: AppTheme.primary, strokeWidth: 4.5),
-          ],
+      },
+      markers: {
+        Marker(
+          markerId: const MarkerId('start'),
+          position: gmapRoute.first,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
         ),
-        MarkerLayer(
-          markers: [
-            // Start (green)
-            Marker(
-              point: route.first,
-              width: 16,
-              height: 16,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppTheme.success,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppTheme.background, width: 2.5),
-                ),
-              ),
-            ),
-            // End (red flag)
-            Marker(
-              point: route.last,
-              width: 18,
-              height: 18,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppTheme.error,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppTheme.background, width: 2),
-                ),
-                child: const Icon(
-                  Icons.flag_rounded,
-                  color: AppTheme.textPrimary,
-                  size: 10,
-                ),
-              ),
-            ),
-          ],
+        Marker(
+          markerId: const MarkerId('end'),
+          position: gmapRoute.last,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
         ),
-      ],
+      },
     );
   }
 

@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
-import 'package:latlong2/latlong.dart';
 
 import 'package:canil_gcm/core/services/occurrence_location_service.dart';
+import 'package:canil_gcm/core/theme/app_map_style.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 
 /// Widget que exibe o mapa de deslocamento de uma ocorrência:
 /// pinos numerados por local, trilha conectando, legenda com horários.
 /// Tocar num pino chama [onLocationTap] com o índice do local.
-class OccurrenceDisplacementMap extends StatelessWidget {
+class OccurrenceDisplacementMap extends StatefulWidget {
   final List<OccurrenceLocation> locations;
   final void Function(int locationIndex)? onLocationTap;
 
@@ -21,8 +21,44 @@ class OccurrenceDisplacementMap extends StatelessWidget {
   });
 
   @override
+  State<OccurrenceDisplacementMap> createState() =>
+      _OccurrenceDisplacementMapState();
+}
+
+class _OccurrenceDisplacementMapState extends State<OccurrenceDisplacementMap> {
+  final Map<int, BitmapDescriptor> _customIcons = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMarkerIcons();
+  }
+
+  @override
+  void didUpdateWidget(OccurrenceDisplacementMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.locations != oldWidget.locations) {
+      _loadMarkerIcons();
+    }
+  }
+
+  Future<void> _loadMarkerIcons() async {
+    for (final loc in widget.locations) {
+      final icon = await AppMapStyle.createNumberedMarkerIcon(
+        number: loc.index,
+        isFirst: loc.index == 1,
+      );
+      if (mounted) {
+        setState(() {
+          _customIcons[loc.index] = icon;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (locations.isEmpty) return const SizedBox.shrink();
+    if (widget.locations.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -43,7 +79,7 @@ class OccurrenceDisplacementMap extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                '${locations.length} ${locations.length == 1 ? 'local' : 'locais'}',
+                '${widget.locations.length} ${widget.locations.length == 1 ? 'local' : 'locais'}',
                 style: GoogleFonts.ibmPlexMono(
                   color: AppTheme.textMuted,
                   fontSize: 10,
@@ -78,88 +114,64 @@ class OccurrenceDisplacementMap extends StatelessWidget {
   }
 
   Widget _buildMap() {
-    final points = locations.map((l) => LatLng(l.lat, l.lng)).toList();
-    final bounds = LatLngBounds.fromPoints(points);
+    final points = widget.locations
+        .map((l) => LatLng(l.lat, l.lng))
+        .toList();
+    final bounds = AppMapStyle.boundsFromPoints(points);
 
-    return FlutterMap(
-      options: MapOptions(
-        initialCameraFit: CameraFit.bounds(
-          bounds: bounds,
-          padding: const EdgeInsets.all(40),
-        ),
-        interactionOptions: const InteractionOptions(
-          flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
-        ),
+    return GoogleMap(
+      initialCameraPosition: CameraPosition(
+        target: points.first,
+        zoom: 15,
       ),
-      children: [
-        TileLayer(
-          urlTemplate:
-              'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-          subdomains: const ['a', 'b', 'c', 'd'],
-          userAgentPackageName: 'com.gcm.limeira.canilk9',
-          maxZoom: 19,
-        ),
-        // Trilha conectando os locais
-        if (points.length > 1)
-          PolylineLayer(
-            polylines: [
+      style: AppMapStyle.darkStyle,
+      rotateGesturesEnabled: false,
+      zoomControlsEnabled: false,
+      myLocationButtonEnabled: false,
+      mapToolbarEnabled: false,
+      onMapCreated: (controller) {
+        controller.animateCamera(
+          CameraUpdate.newLatLngBounds(bounds, 40),
+        );
+      },
+      polylines: points.length > 1
+          ? {
               Polyline(
+                polylineId: const PolylineId('displacement_track'),
                 points: points,
                 color: AppTheme.primary,
-                strokeWidth: 2.5,
+                width: 3,
               ),
-            ],
-          ),
-        // Pinos numerados
-        MarkerLayer(
-          markers: locations.map((loc) {
-            final isFirst = loc.index == 1;
-            return Marker(
-              point: LatLng(loc.lat, loc.lng),
-              width: 28,
-              height: 28,
-              child: GestureDetector(
-                onTap: () => onLocationTap?.call(loc.index),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isFirst ? AppTheme.success : AppTheme.primary,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppTheme.background, width: 2.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: (isFirst ? AppTheme.success : AppTheme.primary)
-                            .withAlpha(50),
-                        blurRadius: 6,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    '${loc.index}',
-                    style: GoogleFonts.ibmPlexMono(
-                      color: AppTheme.background,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
+            }
+          : {},
+      markers: widget.locations.map((loc) {
+        final isFirst = loc.index == 1;
+        final icon = _customIcons[loc.index] ??
+            BitmapDescriptor.defaultMarkerWithHue(
+              isFirst ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueCyan,
             );
-          }).toList(),
-        ),
-      ],
+        return Marker(
+          markerId: MarkerId('loc_${loc.index}'),
+          position: LatLng(loc.lat, loc.lng),
+          icon: icon,
+          infoWindow: InfoWindow(
+            title: 'Local ${loc.index}',
+            snippet: loc.label,
+          ),
+          onTap: () => widget.onLocationTap?.call(loc.index),
+        );
+      }).toSet(),
     );
   }
 
   List<Widget> _buildLegend() {
     final timeFormat = DateFormat('HH:mm');
-    return locations.map((loc) {
+    return widget.locations.map((loc) {
       final isFirst = loc.index == 1;
       return Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: GestureDetector(
-          onTap: () => onLocationTap?.call(loc.index),
+          onTap: () => widget.onLocationTap?.call(loc.index),
           child: Row(
             children: [
               Container(
