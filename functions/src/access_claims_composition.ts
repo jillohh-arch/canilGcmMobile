@@ -72,7 +72,15 @@ export function composeEffectiveAccessClaims(
   baseProfile: BaseProfileState,
   isInstructor: boolean,
 ): JsonMap {
-  const hasValidBaseProfile = Boolean(baseProfile.profileId && baseProfile.accessScope);
+  const isLegacyInstructorProfile =
+    baseProfile.profileId !== null &&
+    normalizedKey(baseProfile.profileId) === "instrutor_k9";
+
+  const hasValidBaseProfile = Boolean(
+    baseProfile.profileId &&
+    !isLegacyInstructorProfile &&
+    baseProfile.accessScope,
+  );
   const profileKey = hasValidBaseProfile ? normalizedKey(baseProfile.profileId!) : "";
   const profileRoleKeys = hasValidBaseProfile
     ? (baseProfile.roleKeys ?? []).map(normalizedKey).filter(Boolean)
@@ -107,11 +115,13 @@ export function composeEffectiveAccessClaims(
     profileRoles.has("operador_k9") ||
     profileRoles.has("guarda_k9");
 
+  const rawProfileRoleKeys = (baseProfile.roleKeys ?? []).map(normalizedKey).filter(Boolean);
   const isInstructorFromProfile =
-    profileRoles.has("instrutor_k9") ||
-    profileRoles.has("instrutor") ||
-    profileRoles.has("adestrador") ||
-    profileRoles.has("adestrador_k9");
+    rawProfileRoleKeys.includes("instrutor_k9") ||
+    rawProfileRoleKeys.includes("instrutor") ||
+    rawProfileRoleKeys.includes("adestrador") ||
+    rawProfileRoleKeys.includes("adestrador_k9") ||
+    normalizedKey(baseProfile.profileId) === "instrutor_k9";
 
   // Qualificacao de instrutor efetiva: funcional direta OU perfil legado de instrutor
   const effectiveInstructor = isInstructor || isInstructorFromProfile;

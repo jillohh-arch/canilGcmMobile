@@ -1879,9 +1879,24 @@ export const adminAssignAccessProfile = onCall({region}, async (request) => {
   if (!profileSnap.exists) {
     throw new HttpsError("not-found", "Perfil de acesso nao encontrado.");
   }
+
+  // F10.ACCESS-CREDENTIALS.I2.R2: O perfil legado 'instrutor_k9' foi descontinuado como
+  // perfil de acesso base. Novas atribuicoes sao recusadas fail-closed antes de qualquer
+  // busca no Auth, mutacao de claims ou escrita no Firestore.
+  if (profileId === "instrutor_k9" || profileSnap.data()?.deprecated === true) {
+    throw new HttpsError(
+      "failed-precondition",
+      "O perfil 'instrutor_k9' foi descontinuado como perfil de acesso base e nao " +
+        "pode receber novas atribuicoes. Utilize a qualificacao funcional de Instrutor.",
+      { reason: "ACCESS_PROFILE_DEPRECATED" },
+    );
+  }
+
   const profile = profileSnap.data() ?? {};
   if (profile.status === "inactive") {
-    throw new HttpsError("failed-precondition", "Perfil inativo nao pode ser atribuido.");
+    throw new HttpsError("failed-precondition", "Perfil inativo nao pode ser atribuido.", {
+      reason: "ACCESS_PROFILE_INACTIVE",
+    });
   }
   const profileName = stringValue(profile.name) ?? profileId;
   const seedVersion = optionalNumberValue(profile.seed_version) ?? null;
@@ -4395,9 +4410,20 @@ export const setK9InstructorRole = onCall({region}, async (request) => {
 
   // FRONT10.ACCESS-CREDENTIALS.D: A qualificacao funcional de Instrutor K9 e
   // ortogonal ao Perfil de Acesso base. Preservamos o perfil de acesso e escopo
-  // atuais, compomos as claims de forma deterministica, mantemos o papel singular
-  // base do perfil e implementamos compensacao completa se a gravacao no Firestore falhar.
   const currentProfileId = stringValue(userData.access_profile_id) ?? stringValue(userData.accessProfileId) ?? null;
+
+  // F10.ACCESS-CREDENTIALS.I2.R2: Se o integrante esta vinculado ao perfil legado 'instrutor_k9',
+  // ele nao pode ser reinterpretado como autorizacao base. A operacao falha closed com
+  // razao tipada antes de qualquer mutacao de claims ou gravacao no Firestore.
+  if (currentProfileId === "instrutor_k9") {
+    throw new HttpsError(
+      "failed-precondition",
+      "O integrante esta vinculado ao perfil legado 'instrutor_k9'. E necessario " +
+        "migrar para um perfil de acesso base valido antes de alterar a qualificacao funcional de instrutor.",
+      { reason: "LEGACY_ACCESS_PROFILE_REQUIRES_MIGRATION" },
+    );
+  }
+
   const currentScope = parseAccessScope(userData.access_scope ?? userData.accessScope);
   let profileRoleKeys: string[] = [];
   let validProfileId: string | null = null;

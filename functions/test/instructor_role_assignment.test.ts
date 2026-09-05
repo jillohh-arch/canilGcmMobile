@@ -94,6 +94,16 @@ async function simulateSetK9InstructorRole(
   }
 
   const currentProfileId = (userData.access_profile_id as string) ?? null;
+
+  if (currentProfileId === "instrutor_k9") {
+    throw new HttpsError(
+      "failed-precondition",
+      "O integrante esta vinculado ao perfil legado 'instrutor_k9'. E necessario " +
+        "migrar para um perfil de acesso base valido antes de alterar a qualificacao funcional de instrutor.",
+      { reason: "LEGACY_ACCESS_PROFILE_REQUIRES_MIGRATION" },
+    );
+  }
+
   const currentScope = (userData.access_scope as "global" | "own_records") ?? null;
   let profileRoleKeys: string[] = [];
   let validProfileId: string | null = null;
@@ -477,4 +487,26 @@ test("CT-I2-03 Integration Case 4: Perfil referenciado inativo nao sintetiza ope
   assert.equal(claims.role, null);
   assert.equal(claims.access_profile_id, null);
   assert.deepEqual(claims.roles, ["instrutor_k9"]);
+});
+
+test("Phase D.22 / I2.R2: Integrante vinculado ao perfil legado instrutor_k9 falha closed com LEGACY_ACCESS_PROFILE_REQUIRES_MIGRATION", async () => {
+  let caughtError: unknown = null;
+  let recordedState: InstructorRecorded | null = null;
+  try {
+    const { recorded } = await simulateSetK9InstructorRole("9023", true, {
+      userData: {
+        access_profile_id: "instrutor_k9",
+        email: "9023@gcm.com.br",
+      },
+    });
+    recordedState = recorded;
+  } catch (err) {
+    caughtError = err;
+  }
+
+  assert.ok(caughtError instanceof HttpsError);
+  assert.equal((caughtError as HttpsError).code, "failed-precondition");
+  const details = (caughtError as HttpsError).details as JsonMap;
+  assert.equal(details?.reason, "LEGACY_ACCESS_PROFILE_REQUIRES_MIGRATION");
+  assert.equal(recordedState, null);
 });

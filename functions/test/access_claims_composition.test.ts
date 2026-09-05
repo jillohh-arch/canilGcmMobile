@@ -231,7 +231,7 @@ test("Phase D.8: Almoxarifado + Instructor ON compoe inventory_manager e instrut
   assert.deepEqual(nextClaims.roles, ["almoxarifado", "instrutor_k9", "inventory_manager"]);
 });
 
-test("Phase D.9 (Secao 21): Profile contendo instrutor_k9 em role_keys (perfil legado)", () => {
+test("Phase D.9 (Secao 21): Profile contendo instrutor_k9 em role_keys (perfil legado aposentado como base profile)", () => {
   const nextClaims = composeEffectiveAccessClaims(
     {},
     "9003",
@@ -240,12 +240,17 @@ test("Phase D.9 (Secao 21): Profile contendo instrutor_k9 em role_keys (perfil l
       roleKeys: ["instrutor_k9", "instrutor", "adestrador"],
       accessScope: "global",
     },
-    false, // Flag direta false, mas o perfil legado e de instrutor
+    false, // Flag direta false, mas perfil legado contem tokens de instrutor
   );
 
-  assert.equal(nextClaims.role, "instrutor_k9");
-  assert.equal(nextClaims.access_profile_id, "instrutor_k9");
+  // Como instrutor_k9 foi aposentado como perfil base de autorizacao (I2.R2),
+  // nao gera autoridade de perfil base (role nula e access_profile_id nulo).
+  assert.equal(nextClaims.role, null);
+  assert.equal(nextClaims.access_profile_id, null);
+  // Porem a qualificacao funcional de instrutor e preservada
   assert.equal(nextClaims.instrutor_k9, true);
+  assert.equal(nextClaims.training_role, "instrutor_k9");
+  assert.equal(nextClaims.training_instructor, true);
   assert.ok((nextClaims.roles as string[]).includes("instrutor_k9"));
 });
 

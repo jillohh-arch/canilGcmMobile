@@ -34,6 +34,7 @@ interface AssignmentRecorded {
   claimsSet: Array<{uid: string; claims: JsonMap}>;
   firestoreWrites: Array<{payload: JsonMap}>;
   compensationAttempts: Array<{uid: string; claims: JsonMap}>;
+  authLookupsCount: number;
 }
 
 async function simulateAssignAccessProfile(
@@ -48,7 +49,17 @@ async function simulateAssignAccessProfile(
     claimsSet: [],
     firestoreWrites: [],
     compensationAttempts: [],
+    authLookupsCount: 0,
   };
+
+  // F10.ACCESS-CREDENTIALS.I2.R2: Rejeicao de perfil descontinuado ANTES de qualquer operacao
+  if (profileId === "instrutor_k9" || options.profileData?.deprecated === true) {
+    throw new HttpsError(
+      "failed-precondition",
+      "O perfil 'instrutor_k9' foi descontinuado como perfil de acesso base.",
+      { reason: "ACCESS_PROFILE_DEPRECATED" },
+    );
+  }
 
   const userData = options.userData ?? {
     active: true,
@@ -70,6 +81,7 @@ async function simulateAssignAccessProfile(
 
   let authUser: {uid: string; customClaims?: JsonMap} | null = null;
   if (authUid) {
+    recorded.authLookupsCount++;
     try {
       if (options.authUidError) throw options.authUidError;
       authUser = options.authUserByUid !== undefined ? options.authUserByUid : {uid: authUid, customClaims: {role: "condutor"}};
@@ -83,6 +95,7 @@ async function simulateAssignAccessProfile(
   }
 
   if (!authUser) {
+    recorded.authLookupsCount++;
     try {
       if (options.authEmailError) throw options.authEmailError;
       authUser = options.authUserByEmail !== undefined ? options.authUserByEmail : (authUid ? null : {uid: "uid-by-email", customClaims: {role: "condutor"}});
@@ -313,17 +326,26 @@ test("Phase D.20 (Cenario 7b): Atribuicao de perfil PRESERVA is_k9_instructor=fa
   assert.equal(write.training_instructor, null);
 });
 
-test("Phase D.21 (Secao 21): Atribuicao de perfil legado com role_keys de instrutor NAO altera flag direta se false", async () => {
-  const { recorded } = await simulateAssignAccessProfile("9001", "instrutor_k9", {
-    userData: {
-      active: true,
-      status: "Ativo",
-      email: "9001@gcm.com.br",
-      is_k9_instructor: false, // flag funcional direta desativada
-    },
-  });
+test("Phase D.21 / I2.R2: Atribuicao de perfil legado instrutor_k9 e rejeitada com ACCESS_PROFILE_DEPRECATED antes de qualquer mutacao", async () => {
+  let caughtError: unknown = null;
+  let recordedState: AssignmentRecorded | null = null;
+  try {
+    const { recorded } = await simulateAssignAccessProfile("9001", "instrutor_k9", {
+      userData: {
+        active: true,
+        status: "Ativo",
+        email: "9001@gcm.com.br",
+        is_k9_instructor: false,
+      },
+    });
+    recordedState = recorded;
+  } catch (err) {
+    caughtError = err;
+  }
 
-  const write = recorded.firestoreWrites[0].payload;
-  // A flag funcional direta NAO e mutada pela atribuicao de perfil
-  assert.equal(write.is_k9_instructor, false);
+  assert.ok(caughtError instanceof HttpsError);
+  assert.equal((caughtError as HttpsError).code, "failed-precondition");
+  const details = (caughtError as HttpsError).details as JsonMap;
+  assert.equal(details?.reason, "ACCESS_PROFILE_DEPRECATED");
+  assert.equal(recordedState, null);
 });
