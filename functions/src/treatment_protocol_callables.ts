@@ -611,8 +611,12 @@ export async function runHealthCreateTreatmentProtocol(
       has_pending_schedule: true,
     };
 
-    // Iniciar tratamento leva o caso para under_treatment se estiver open ou under_investigation
-    if (currentCaseStatus === "open" || currentCaseStatus === "under_investigation") {
+    // Iniciar tratamento leva o caso para under_treatment se estiver open, under_investigation ou monitoring
+    if (
+      currentCaseStatus === "open" ||
+      currentCaseStatus === "under_investigation" ||
+      currentCaseStatus === "monitoring"
+    ) {
       casePatch["clinical_status"] = "under_treatment";
     }
 

@@ -372,6 +372,137 @@ async function runTests() {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
+  // 2B. CLINICAL CASE STATUS TRANSITIONS ON TREATMENT CREATION
+  //     (open, under_investigation, monitoring -> under_treatment; under_treatment preserved)
+  // ───────────────────────────────────────────────────────────────────────────
+  {
+    for (const originStatus of ["open", "under_investigation", "monitoring"] as const) {
+      const db = createFakeDb({
+        "dogs/dog-01": {id: "dog-01"},
+        "dogs/dog-01/clinical_cases/case-trans": {
+          id: "case-trans",
+          clinical_status: originStatus,
+          event_count: 2,
+          revision: 1,
+          active_treatments_count: 0,
+          has_pending_schedule: false,
+        },
+      });
+      const deps = makeDeps(db);
+
+      const req = makeCallableRequest({
+        dogId: "dog-01",
+        caseId: "case-trans",
+        medicationName: "Meloxicam",
+        dose: {value: 10, unit: "mg", route: "oral"},
+        schedule: {type: "interval", interval_minutes: 1440},
+        durationDays: 2,
+        professional: {name: "Dr. Silva"},
+        sourceDocument: {health_document_id: "doc-rec-01"},
+        operationId: `op-create-from-${originStatus}`,
+      });
+
+      const res = await runHealthCreateTreatmentProtocol(req, deps);
+      assert.strictEqual(res["success"], true);
+
+      const caseDoc = db._store.get("dogs/dog-01/clinical_cases/case-trans")!;
+      assert.strictEqual(
+        caseDoc["clinical_status"],
+        "under_treatment",
+        `Caso em status '${originStatus}' DEVE transitar para 'under_treatment'`,
+      );
+      assert.strictEqual(caseDoc["active_treatments_count"], 1);
+      assert.strictEqual(caseDoc["has_pending_schedule"], true);
+      assert.strictEqual(caseDoc["event_count"], 3);
+      assert.strictEqual(caseDoc["revision"], 2);
+
+      // Prova agendamento com due_until
+      const protId = res["protocolId"] as string;
+      const schedDose = db._store.get(
+        `dogs/dog-01/health_schedule/${deterministicDoseScheduleId("dog-01", protId, "dose_1")}`,
+      )!;
+      assert.ok(schedDose["due_until"], "due_until deve ser materializado");
+      assert.strictEqual(schedDose["lifecycle_status"], "open");
+    }
+
+    // Caso já em under_treatment permanece em under_treatment com active_treatments_count incrementado
+    {
+      const db = createFakeDb({
+        "dogs/dog-01": {id: "dog-01"},
+        "dogs/dog-01/clinical_cases/case-trans": {
+          id: "case-trans",
+          clinical_status: "under_treatment",
+          event_count: 5,
+          revision: 4,
+          active_treatments_count: 1,
+          has_pending_schedule: true,
+        },
+      });
+      const deps = makeDeps(db);
+
+      const req = makeCallableRequest({
+        dogId: "dog-01",
+        caseId: "case-trans",
+        medicationName: "Amoxicilina",
+        dose: {value: 250, unit: "mg", route: "oral"},
+        schedule: {type: "interval", interval_minutes: 720},
+        durationDays: 2,
+        professional: {name: "Dr. Silva"},
+        sourceDocument: {health_document_id: "doc-rec-02"},
+        operationId: "op-create-while-under-treatment",
+      });
+
+      const res = await runHealthCreateTreatmentProtocol(req, deps);
+      assert.strictEqual(res["success"], true);
+
+      const caseDoc = db._store.get("dogs/dog-01/clinical_cases/case-trans")!;
+      assert.strictEqual(
+        caseDoc["clinical_status"],
+        "under_treatment",
+        "Caso já em under_treatment permanece em under_treatment",
+      );
+      assert.strictEqual(caseDoc["active_treatments_count"], 2, "active_treatments_count incrementado de 1 para 2");
+      assert.strictEqual(caseDoc["has_pending_schedule"], true);
+      assert.strictEqual(caseDoc["event_count"], 6);
+      assert.strictEqual(caseDoc["revision"], 5);
+    }
+
+    // Casos em estados terminais são rejeitados
+    for (const terminalStatus of ["discharged", "cancelled"] as const) {
+      const db = createFakeDb({
+        "dogs/dog-01": {id: "dog-01"},
+        "dogs/dog-01/clinical_cases/case-terminal": {
+          id: "case-terminal",
+          clinical_status: terminalStatus,
+          event_count: 5,
+          revision: 4,
+        },
+      });
+      const deps = makeDeps(db);
+
+      const req = makeCallableRequest({
+        dogId: "dog-01",
+        caseId: "case-terminal",
+        medicationName: "Amoxicilina",
+        dose: {value: 250, unit: "mg", route: "oral"},
+        schedule: {type: "interval", interval_minutes: 720},
+        durationDays: 2,
+        professional: {name: "Dr. Silva"},
+        sourceDocument: {health_document_id: "doc-rec-02"},
+        operationId: `op-create-terminal-${terminalStatus}`,
+      });
+
+      await assert.rejects(
+        () => runHealthCreateTreatmentProtocol(req, deps),
+        /está em estado terminal/,
+        `Caso em '${terminalStatus}' deve ser rejeitado ao tentar criar tratamento`,
+      );
+    }
+
+    console.log("✓ Create TreatmentProtocol status transitions: open, under_investigation, monitoring -> under_treatment & terminal rejection passed");
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
   // 3. PAUSE & RESUME TREATMENT PROTOCOL (With Schedule is_paused toggling)
   // ───────────────────────────────────────────────────────────────────────────
   {
