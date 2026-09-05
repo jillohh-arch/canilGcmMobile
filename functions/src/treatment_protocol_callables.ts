@@ -723,6 +723,30 @@ export async function runHealthPauseTreatmentProtocol(
       .doc(auditDocId(dogId, caseId, operationId));
 
     const pRev = typeof pData["revision"] === "number" ? pData["revision"] : 1;
+
+    // Leitura estrita de todas as doses antes de qualquer mutação (Firestore transaction read-before-write invariant)
+    const dosesPlanned = typeof pData["doses_planned"] === "number"
+      ? pData["doses_planned"]
+      : 50;
+
+    const scheduleItemsToPause: {
+      ref: FirebaseFirestore.DocumentReference;
+      data: JsonMap;
+    }[] = [];
+
+    for (let i = 1; i <= dosesPlanned; i++) {
+      const plannedDoseId = `dose_${i}`;
+      const sId = deterministicDoseScheduleId(dogId, protocolId, plannedDoseId);
+      const sRef = scheduleRef(deps.db, dogId, sId);
+      const sSnap = await tx.get(sRef);
+      if (sSnap.exists) {
+        const sData = sSnap.data() as JsonMap;
+        if (sData["lifecycle_status"] === "open") {
+          scheduleItemsToPause.push({ref: sRef, data: sData});
+        }
+      }
+    }
+
     tx.set(
       pRef,
       {
@@ -760,32 +784,19 @@ export async function runHealthPauseTreatmentProtocol(
     tx.set(evtRef, eventDoc);
 
     // Pausar todas as doses futuras pendentes do protocolo pausado
-    const dosesPlanned = typeof pData["doses_planned"] === "number"
-      ? pData["doses_planned"]
-      : 50;
-
-    for (let i = 1; i <= dosesPlanned; i++) {
-      const plannedDoseId = `dose_${i}`;
-      const sId = deterministicDoseScheduleId(dogId, protocolId, plannedDoseId);
-      const sRef = scheduleRef(deps.db, dogId, sId);
-      const sSnap = await tx.get(sRef);
-      if (sSnap.exists) {
-        const sData = sSnap.data() as JsonMap;
-        if (sData["lifecycle_status"] === "open") {
-          const sRev = typeof sData["revision"] === "number" ? sData["revision"] : 1;
-          tx.set(
-            sRef,
-            {
-              is_paused: true,
-              paused_at: nowTs,
-              pause_reason: pauseReason,
-              updated_at: nowTs,
-              revision: sRev + 1,
-            },
-            {merge: true},
-          );
-        }
-      }
+    for (const item of scheduleItemsToPause) {
+      const sRev = typeof item.data["revision"] === "number" ? item.data["revision"] : 1;
+      tx.set(
+        item.ref,
+        {
+          is_paused: true,
+          paused_at: nowTs,
+          pause_reason: pauseReason,
+          updated_at: nowTs,
+          revision: sRev + 1,
+        },
+        {merge: true},
+      );
     }
 
     const caseRev = typeof caseData["revision"] === "number" ? caseData["revision"] : 1;
@@ -905,6 +916,30 @@ export async function runHealthResumeTreatmentProtocol(
       .doc(auditDocId(dogId, caseId, operationId));
 
     const pRev = typeof pData["revision"] === "number" ? pData["revision"] : 1;
+
+    // Leitura estrita de todas as doses antes de qualquer mutação (Firestore transaction read-before-write invariant)
+    const dosesPlanned = typeof pData["doses_planned"] === "number"
+      ? pData["doses_planned"]
+      : 50;
+
+    const scheduleItemsToResume: {
+      ref: FirebaseFirestore.DocumentReference;
+      data: JsonMap;
+    }[] = [];
+
+    for (let i = 1; i <= dosesPlanned; i++) {
+      const plannedDoseId = `dose_${i}`;
+      const sId = deterministicDoseScheduleId(dogId, protocolId, plannedDoseId);
+      const sRef = scheduleRef(deps.db, dogId, sId);
+      const sSnap = await tx.get(sRef);
+      if (sSnap.exists) {
+        const sData = sSnap.data() as JsonMap;
+        if (sData["lifecycle_status"] === "open" && sData["is_paused"] === true) {
+          scheduleItemsToResume.push({ref: sRef, data: sData});
+        }
+      }
+    }
+
     tx.set(
       pRef,
       {
@@ -941,32 +976,19 @@ export async function runHealthResumeTreatmentProtocol(
     tx.set(evtRef, eventDoc);
 
     // Despausar todas as doses futuras pendentes do protocolo retomado
-    const dosesPlanned = typeof pData["doses_planned"] === "number"
-      ? pData["doses_planned"]
-      : 50;
-
-    for (let i = 1; i <= dosesPlanned; i++) {
-      const plannedDoseId = `dose_${i}`;
-      const sId = deterministicDoseScheduleId(dogId, protocolId, plannedDoseId);
-      const sRef = scheduleRef(deps.db, dogId, sId);
-      const sSnap = await tx.get(sRef);
-      if (sSnap.exists) {
-        const sData = sSnap.data() as JsonMap;
-        if (sData["lifecycle_status"] === "open" && sData["is_paused"] === true) {
-          const sRev = typeof sData["revision"] === "number" ? sData["revision"] : 1;
-          tx.set(
-            sRef,
-            {
-              is_paused: false,
-              paused_at: null,
-              pause_reason: null,
-              updated_at: nowTs,
-              revision: sRev + 1,
-            },
-            {merge: true},
-          );
-        }
-      }
+    for (const item of scheduleItemsToResume) {
+      const sRev = typeof item.data["revision"] === "number" ? item.data["revision"] : 1;
+      tx.set(
+        item.ref,
+        {
+          is_paused: false,
+          paused_at: null,
+          pause_reason: null,
+          updated_at: nowTs,
+          revision: sRev + 1,
+        },
+        {merge: true},
+      );
     }
 
     const caseRev = typeof caseData["revision"] === "number" ? caseData["revision"] : 1;
@@ -1087,6 +1109,40 @@ export async function runHealthCompleteTreatmentProtocol(
       .doc(auditDocId(dogId, caseId, operationId));
 
     const pRev = typeof pData["revision"] === "number" ? pData["revision"] : 1;
+
+    // Leitura estrita de todas as doses antes de qualquer mutação (Firestore transaction read-before-write invariant)
+    const dosesPlanned = typeof pData["doses_planned"] === "number"
+      ? pData["doses_planned"]
+      : 50;
+
+    const scheduleItemsToCancel: {
+      ref: FirebaseFirestore.DocumentReference;
+      data: JsonMap;
+    }[] = [];
+
+    for (let i = 1; i <= dosesPlanned; i++) {
+      const plannedDoseId = `dose_${i}`;
+      const sId = deterministicDoseScheduleId(dogId, protocolId, plannedDoseId);
+      const sRef = scheduleRef(deps.db, dogId, sId);
+      const sSnap = await tx.get(sRef);
+      if (sSnap.exists) {
+        const sData = sSnap.data() as JsonMap;
+        if (sData["lifecycle_status"] === "open") {
+          scheduleItemsToCancel.push({ref: sRef, data: sData});
+        }
+      }
+    }
+
+    const currentActiveCount = typeof caseData["active_treatments_count"] === "number"
+      ? caseData["active_treatments_count"]
+      : 1;
+    const newActiveCount = prevStatus === "active" ? Math.max(0, currentActiveCount - 1) : currentActiveCount;
+
+    let hasOtherPending = false;
+    if (newActiveCount === 0) {
+      hasOtherPending = await deps.hasOtherOpenCaseSchedule(dogId, caseId, protocolId);
+    }
+
     tx.set(
       pRef,
       {
@@ -1122,40 +1178,23 @@ export async function runHealthCompleteTreatmentProtocol(
     tx.set(evtRef, eventDoc);
 
     // Cancelar todas as doses futuras pendentes do protocolo concluído
-    const dosesPlanned = typeof pData["doses_planned"] === "number"
-      ? pData["doses_planned"]
-      : 50;
-
-    for (let i = 1; i <= dosesPlanned; i++) {
-      const plannedDoseId = `dose_${i}`;
-      const sId = deterministicDoseScheduleId(dogId, protocolId, plannedDoseId);
-      const sRef = scheduleRef(deps.db, dogId, sId);
-      const sSnap = await tx.get(sRef);
-      if (sSnap.exists) {
-        const sData = sSnap.data() as JsonMap;
-        if (sData["lifecycle_status"] === "open") {
-          const sRev = typeof sData["revision"] === "number" ? sData["revision"] : 1;
-          tx.set(
-            sRef,
-            {
-              lifecycle_status: "cancelled",
-              cancelled_at: nowTs,
-              cancelled_by: recordedBy,
-              cancel_reason: "Tratamento concluído",
-              updated_at: nowTs,
-              revision: sRev + 1,
-            },
-            {merge: true},
-          );
-        }
-      }
+    for (const item of scheduleItemsToCancel) {
+      const sRev = typeof item.data["revision"] === "number" ? item.data["revision"] : 1;
+      tx.set(
+        item.ref,
+        {
+          lifecycle_status: "cancelled",
+          cancelled_at: nowTs,
+          cancelled_by: recordedBy,
+          cancel_reason: "Tratamento concluído",
+          updated_at: nowTs,
+          revision: sRev + 1,
+        },
+        {merge: true},
+      );
     }
 
     const caseRev = typeof caseData["revision"] === "number" ? caseData["revision"] : 1;
-    const currentActiveCount = typeof caseData["active_treatments_count"] === "number"
-      ? caseData["active_treatments_count"]
-      : 1;
-    const newActiveCount = prevStatus === "active" ? Math.max(0, currentActiveCount - 1) : currentActiveCount;
 
     const casePatch: JsonMap = {
       event_count: FieldValue.increment(1),
@@ -1172,8 +1211,7 @@ export async function runHealthCompleteTreatmentProtocol(
       if (caseData["clinical_status"] === "under_treatment") {
         casePatch["clinical_status"] = "monitoring";
       }
-      const hasOther = await deps.hasOtherOpenCaseSchedule(dogId, caseId, protocolId);
-      casePatch["has_pending_schedule"] = hasOther;
+      casePatch["has_pending_schedule"] = hasOtherPending;
     }
 
     tx.set(cRef, casePatch, {merge: true});
@@ -1286,6 +1324,40 @@ export async function runHealthCancelTreatmentProtocol(
       .doc(auditDocId(dogId, caseId, operationId));
 
     const pRev = typeof pData["revision"] === "number" ? pData["revision"] : 1;
+
+    // Leitura estrita de todas as doses antes de qualquer mutação (Firestore transaction read-before-write invariant)
+    const dosesPlanned = typeof pData["doses_planned"] === "number"
+      ? pData["doses_planned"]
+      : 50;
+
+    const scheduleItemsToCancel: {
+      ref: FirebaseFirestore.DocumentReference;
+      data: JsonMap;
+    }[] = [];
+
+    for (let i = 1; i <= dosesPlanned; i++) {
+      const plannedDoseId = `dose_${i}`;
+      const sId = deterministicDoseScheduleId(dogId, protocolId, plannedDoseId);
+      const sRef = scheduleRef(deps.db, dogId, sId);
+      const sSnap = await tx.get(sRef);
+      if (sSnap.exists) {
+        const sData = sSnap.data() as JsonMap;
+        if (sData["lifecycle_status"] === "open") {
+          scheduleItemsToCancel.push({ref: sRef, data: sData});
+        }
+      }
+    }
+
+    const currentActiveCount = typeof caseData["active_treatments_count"] === "number"
+      ? caseData["active_treatments_count"]
+      : 1;
+    const newActiveCount = prevStatus === "active" ? Math.max(0, currentActiveCount - 1) : currentActiveCount;
+
+    let hasOtherPending = false;
+    if (newActiveCount === 0) {
+      hasOtherPending = await deps.hasOtherOpenCaseSchedule(dogId, caseId, protocolId);
+    }
+
     tx.set(
       pRef,
       {
@@ -1323,40 +1395,23 @@ export async function runHealthCancelTreatmentProtocol(
     tx.set(evtRef, eventDoc);
 
     // Cancelar todas as doses futuras pendentes do protocolo cancelado
-    const dosesPlanned = typeof pData["doses_planned"] === "number"
-      ? pData["doses_planned"]
-      : 50;
-
-    for (let i = 1; i <= dosesPlanned; i++) {
-      const plannedDoseId = `dose_${i}`;
-      const sId = deterministicDoseScheduleId(dogId, protocolId, plannedDoseId);
-      const sRef = scheduleRef(deps.db, dogId, sId);
-      const sSnap = await tx.get(sRef);
-      if (sSnap.exists) {
-        const sData = sSnap.data() as JsonMap;
-        if (sData["lifecycle_status"] === "open") {
-          const sRev = typeof sData["revision"] === "number" ? sData["revision"] : 1;
-          tx.set(
-            sRef,
-            {
-              lifecycle_status: "cancelled",
-              cancelled_at: nowTs,
-              cancelled_by: recordedBy,
-              cancel_reason: cancelReason,
-              updated_at: nowTs,
-              revision: sRev + 1,
-            },
-            {merge: true},
-          );
-        }
-      }
+    for (const item of scheduleItemsToCancel) {
+      const sRev = typeof item.data["revision"] === "number" ? item.data["revision"] : 1;
+      tx.set(
+        item.ref,
+        {
+          lifecycle_status: "cancelled",
+          cancelled_at: nowTs,
+          cancelled_by: recordedBy,
+          cancel_reason: cancelReason,
+          updated_at: nowTs,
+          revision: sRev + 1,
+        },
+        {merge: true},
+      );
     }
 
     const caseRev = typeof caseData["revision"] === "number" ? caseData["revision"] : 1;
-    const currentActiveCount = typeof caseData["active_treatments_count"] === "number"
-      ? caseData["active_treatments_count"]
-      : 1;
-    const newActiveCount = prevStatus === "active" ? Math.max(0, currentActiveCount - 1) : currentActiveCount;
 
     const casePatch: JsonMap = {
       event_count: FieldValue.increment(1),
@@ -1368,8 +1423,7 @@ export async function runHealthCancelTreatmentProtocol(
       casePatch["active_treatments_count"] = FieldValue.increment(-1);
     }
     if (newActiveCount === 0) {
-      const hasOther = await deps.hasOtherOpenCaseSchedule(dogId, caseId, protocolId);
-      casePatch["has_pending_schedule"] = hasOther;
+      casePatch["has_pending_schedule"] = hasOtherPending;
     }
     tx.set(cRef, casePatch, {merge: true});
 
@@ -1518,6 +1572,12 @@ export async function runHealthAdministerTreatmentDose(
     }
     const caseData = (caseSnap.data() ?? {}) as JsonMap;
 
+    // Leitura estrita da agenda antes de qualquer escrita (Firestore transaction read-before-write invariant)
+    const resolvedScheduleId =
+      scheduleItemId ?? deterministicDoseScheduleId(dogId, protocolId, plannedDoseId);
+    const sRef = scheduleRef(deps.db, dogId, resolvedScheduleId);
+    const sSnap = await tx.get(sRef);
+
     const recordedBy = recordedByPayload(caller, isAdmin);
     const eventId = deterministicEventId(dogId, caseId, "dose_admin", operationId);
     const evtRef = clinicalEventRef(deps.db, dogId, caseId, eventId);
@@ -1545,10 +1605,6 @@ export async function runHealthAdministerTreatmentDose(
     tx.set(dRef, doseDoc);
 
     // Reconciliação do HealthScheduleItem se existir
-    const resolvedScheduleId =
-      scheduleItemId ?? deterministicDoseScheduleId(dogId, protocolId, plannedDoseId);
-    const sRef = scheduleRef(deps.db, dogId, resolvedScheduleId);
-    const sSnap = await tx.get(sRef);
     if (sSnap.exists) {
       tx.set(
         sRef,
@@ -1749,6 +1805,12 @@ export async function runHealthSkipTreatmentDose(
     }
     const caseData = (caseSnap.data() ?? {}) as JsonMap;
 
+    // Leitura estrita da agenda antes de qualquer escrita (Firestore transaction read-before-write invariant)
+    const resolvedScheduleId =
+      scheduleItemId ?? deterministicDoseScheduleId(dogId, protocolId, plannedDoseId);
+    const sRef = scheduleRef(deps.db, dogId, resolvedScheduleId);
+    const sSnap = await tx.get(sRef);
+
     const recordedBy = recordedByPayload(caller, isAdmin);
     const eventId = deterministicEventId(dogId, caseId, "dose_skip", operationId);
     const evtRef = clinicalEventRef(deps.db, dogId, caseId, eventId);
@@ -1774,10 +1836,6 @@ export async function runHealthSkipTreatmentDose(
     tx.set(dRef, doseDoc);
 
     // Reconciliação do HealthScheduleItem se existir
-    const resolvedScheduleId =
-      scheduleItemId ?? deterministicDoseScheduleId(dogId, protocolId, plannedDoseId);
-    const sRef = scheduleRef(deps.db, dogId, resolvedScheduleId);
-    const sSnap = await tx.get(sRef);
     if (sSnap.exists) {
       tx.set(
         sRef,
