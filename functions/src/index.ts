@@ -24,8 +24,13 @@ import {
 import {
   deactivateHuman,
   HumanLifecycleTransaction,
+  isCurrentlyActive,
   reactivateHuman,
 } from "./admin_human_lifecycle";
+import {
+  buildAdminGetAccessHomologationSnapshotHandler,
+  createAdminAccessHomologationSnapshotDeps,
+} from "./admin_access_homologation_snapshot";
 import {isAuthUserNotFound} from "./auth_error_classification";
 import {
   AccessScope,
@@ -200,6 +205,44 @@ function emailMatchesRa(email: string, ra: unknown): boolean {
 
 function emailForRa(ra: string): string {
   return `${ra.trim().toLowerCase()}@gcm.com.br`;
+}
+
+/**
+ * FRONT10.ACCESS-CREDENTIALS.A (AUTH-WIRING-01) — busca de identidade Auth que
+ * FALHA FECHADO.
+ *
+ * O anti-padrao que estes dois helpers substituem era `catch { user = null; }`.
+ * Ele tratava QUALQUER falha do Auth — uid invalido, erro interno, timeout de
+ * rede, quota, credencial sem permissao — como "a identidade nao existe". O
+ * chamador recebia sucesso e as claims simplesmente nao eram escritas, ou (pior,
+ * no `adminUpsertHuman`) a ausencia aparente virava caminho de CRIACAO de conta.
+ *
+ * `auth/user-not-found` e a UNICA condicao que significa ausencia. Todo o resto
+ * propaga. `isAuthUserNotFound` e a autoridade compartilhada, ja usada pelo
+ * Lifecycle — nao duplicamos a classificacao aqui e nao a alargamos para
+ * "engolir erro do Auth".
+ */
+async function lookupAuthUserByUid(
+  uid: string,
+): Promise<admin.auth.UserRecord | null> {
+  try {
+    return await admin.auth().getUser(uid);
+  } catch (error) {
+    if (isAuthUserNotFound(error)) return null;
+    throw error;
+  }
+}
+
+/** Par de `lookupAuthUserByUid` para busca por e-mail. Mesma regra fail-closed. */
+async function lookupAuthUserByEmail(
+  email: string,
+): Promise<admin.auth.UserRecord | null> {
+  try {
+    return await admin.auth().getUserByEmail(email);
+  } catch (error) {
+    if (isAuthUserNotFound(error)) return null;
+    throw error;
+  }
 }
 
 function stringValue(value: unknown): string | undefined {
@@ -1863,6 +1906,56 @@ export const adminSetAccessProfileStatus = onCall({region}, async (request) => {
   return {id: profileId, status};
 });
 
+/**
+ * FRONT10.ACCESS-CREDENTIALS.A (F-03) — escrita canonica da atribuicao COM
+ * compensacao de claims.
+ *
+ * Auth e Firestore nao compartilham transacao. As claims sao mutadas primeiro
+ * (o token precisa refletir o novo perfil), entao uma falha na escrita
+ * subsequente deixaria claims novas com espelho antigo — divergencia silenciosa
+ * de autorizacao. Aqui restauramos as claims anteriores e propagamos o erro
+ * original: nunca reportamos sucesso.
+ *
+ * Se a propria compensacao falhar, o resultado NAO e o erro original: e um
+ * estado possivelmente divergente, e o chamador precisa saber a diferenca. Por
+ * isso `COMPENSATION_FAILED` tem caminho proprio. O log carrega apenas `ra` e
+ * `uid` — jamais o conteudo das claims.
+ */
+async function commitAccessProfileAssignment(input: {
+  authUser: admin.auth.UserRecord | null;
+  claimsMutated: boolean;
+  payload: JsonMap;
+  previousClaims: JsonMap | null;
+  ra: string;
+  userRef: admin.firestore.DocumentReference;
+}): Promise<void> {
+  try {
+    await input.userRef.set(input.payload, {merge: true});
+  } catch (error) {
+    if (!input.claimsMutated || input.authUser === null) throw error;
+    try {
+      await admin.auth().setCustomUserClaims(
+        input.authUser.uid,
+        input.previousClaims ?? {},
+      );
+    } catch (compensationError) {
+      logger.error("admin_assign_access_profile_compensation_failed", {
+        error: String(compensationError),
+        ra: input.ra,
+        uid: input.authUser.uid,
+      });
+      throw new HttpsError(
+        "internal",
+        "As claims de acesso foram alteradas, a gravacao do cadastro falhou e a " +
+          "reversao nao foi garantida. Confira o acesso deste integrante antes " +
+          "de nova tentativa.",
+        {reason: "COMPENSATION_FAILED"},
+      );
+    }
+    throw error;
+  }
+}
+
 export const adminAssignAccessProfile = onCall({region}, async (request) => {
   const caller = await requireAccessPermission(request.auth, "access", "edit");
   const data = request.data as JsonMap;
@@ -1925,26 +2018,54 @@ export const adminAssignAccessProfile = onCall({region}, async (request) => {
     roleSet.has("guarda_k9");
   const appAccess = mobileAccess ? ["web", "mobile"] : ["web"];
   const userData = userSnap.data() ?? {};
+
+  // FRONT10.ACCESS-CREDENTIALS.B — politica congelada: atribuir ou TROCAR o
+  // perfil de um Personnel INATIVO e recusado FAIL-CLOSED.
+  //
+  // Isto NAO funde Lifecycle e Access. Um Personnel inativo CONTINUA com o
+  // perfil que ja possuia: desativar nao remove Access nem limpa claims, e
+  // atribuir Access nunca reativa Personnel. O que se proibe e a MUDANCA de
+  // privilegio enquanto o cadastro esta fora do fluxo administrativo — caso
+  // contrario seria possivel preparar acesso invisivel numa identidade
+  // arquivada. A Web ja sugere isso omitindo inativos da lista; aqui o contrato
+  // passa a ser do servidor.
+  //
+  // `isCurrentlyActive` e a autoridade canonica do Lifecycle (importada, nao
+  // reimplementada): considera `active`, `deleted_at`, `archived_at` e `status`.
+  // Recusa ANTES de qualquer leitura ou mutacao de Auth — nenhuma claim e lida,
+  // escrita ou revertida neste caminho.
+  if (!isCurrentlyActive(userData)) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Cadastro inativo nao pode receber ou trocar perfil de acesso. " +
+        "Reative o integrante antes de alterar o acesso.",
+      {reason: "PERSONNEL_INACTIVE"},
+    );
+  }
+
   const authUid =
     stringValue(userData.auth_uid) ??
     stringValue(userData.authUid) ??
     stringValue(userData.uid);
   const authEmail = stringValue(userData.email) ?? emailForRa(ra);
+  // AUTH-WIRING-01 (A1/A2): buscas classificadas. Ausencia real -> null;
+  // qualquer outra falha do Auth propaga e a atribuicao NAO reporta sucesso.
   let authUser: admin.auth.UserRecord | null = null;
   if (authUid) {
-    try {
-      authUser = await admin.auth().getUser(authUid);
-    } catch {
-      authUser = null;
-    }
+    authUser = await lookupAuthUserByUid(authUid);
   }
   if (!authUser) {
-    try {
-      authUser = await admin.auth().getUserByEmail(authEmail);
-    } catch {
-      authUser = null;
-    }
+    authUser = await lookupAuthUserByEmail(authEmail);
   }
+
+  // Compensacao (F-03): as claims sao mutadas ANTES da escrita canonica no
+  // Firestore, e as duas nao sao uma transacao. Guardamos o valor anterior para
+  // poder restaura-lo se a escrita falhar — o padrao seguro que o
+  // `adminUpsertHuman` ja aplica. Nunca logamos o conteudo das claims.
+  const previousClaims: JsonMap | null = authUser
+    ? ({...(authUser.customClaims ?? {})} as JsonMap)
+    : null;
+  let claimsMutated = false;
   if (authUser) {
     await admin.auth().setCustomUserClaims(
       authUser.uid,
@@ -1956,61 +2077,126 @@ export const adminAssignAccessProfile = onCall({region}, async (request) => {
         accessScope,
       ),
     );
+    claimsMutated = true;
   }
 
-  await userRef.set(
-    {
-      ...(authUser ? {auth_uid: authUser.uid, email: authEmail} : {}),
+  const assignmentPayload: JsonMap = {
+    ...(authUser ? {auth_uid: authUser.uid, email: authEmail} : {}),
+    access_profile_id: profileId,
+    access_profile: profileName,
+    accessProfile: profileName,
+    accessProfileId: profileId,
+    access_scope: accessScope,
+    accessScope,
+    admin: isAdminProfile,
+    app_access: appAccess,
+    claim_role: isAdminProfile
+      ? "admin"
+      : isInstructorProfile
+        ? "instrutor_k9"
+        : isInventoryProfile
+          ? "inventory_manager"
+          : isManagerProfile
+            ? "gestor"
+            : "condutor",
+    inventory_manager: isInventoryProfile,
+    is_k9_instructor: isInstructorProfile,
+    mobile_access: mobileAccess,
+    permissions_version: seedVersion,
+    role: isAdminProfile
+      ? "admin"
+      : isInstructorProfile
+        ? "instrutor_k9"
+        : isInventoryProfile
+          ? "inventory_manager"
+          : isManagerProfile
+            ? "gestor"
+            : "condutor",
+    roles: roleKeys,
+    training_instructor: isInstructorProfile,
+    training_role: isInstructorProfile ? "instrutor_k9" : null,
+    web_access: true,
+    claim_refresh_required: authUser != null,
+    claim_updated_at: authUser
+      ? admin.firestore.FieldValue.serverTimestamp()
+      : null,
+    updated_at: admin.firestore.FieldValue.serverTimestamp(),
+    updated_by: caller.ra,
+    audit_trail: admin.firestore.FieldValue.arrayUnion({
+      ...auditEntry("assign_access_profile", caller),
       access_profile_id: profileId,
-      access_profile: profileName,
-      accessProfile: profileName,
-      accessProfileId: profileId,
-      access_scope: accessScope,
-      accessScope,
-      admin: isAdminProfile,
-      app_access: appAccess,
-      claim_role: isAdminProfile
-        ? "admin"
-        : isInstructorProfile
-          ? "instrutor_k9"
-          : isInventoryProfile
-            ? "inventory_manager"
-            : isManagerProfile
-              ? "gestor"
-              : "condutor",
-      inventory_manager: isInventoryProfile,
-      is_k9_instructor: isInstructorProfile,
-      mobile_access: mobileAccess,
-      permissions_version: seedVersion,
-      role: isAdminProfile
-        ? "admin"
-        : isInstructorProfile
-          ? "instrutor_k9"
-          : isInventoryProfile
-            ? "inventory_manager"
-            : isManagerProfile
-              ? "gestor"
-              : "condutor",
-      roles: roleKeys,
-      training_instructor: isInstructorProfile,
-      training_role: isInstructorProfile ? "instrutor_k9" : null,
-      web_access: true,
-      claim_refresh_required: authUser != null,
-      claim_updated_at: authUser
-        ? admin.firestore.FieldValue.serverTimestamp()
-        : null,
-      updated_at: admin.firestore.FieldValue.serverTimestamp(),
-      updated_by: caller.ra,
-      audit_trail: admin.firestore.FieldValue.arrayUnion({
-        ...auditEntry("assign_access_profile", caller),
-        access_profile_id: profileId,
-        access_profile_name: profileName,
-      }),
-    },
-    {merge: true},
-  );
+      access_profile_name: profileName,
+    }),
+  };
+
+  await commitAccessProfileAssignment({
+    authUser,
+    claimsMutated,
+    payload: assignmentPayload,
+    previousClaims,
+    ra,
+    userRef,
+  });
   return {ra, profileId, profileName};
 });
+
+/**
+ * FRONT10.ACCESS-CREDENTIALS — RECUPERACAO DE PARIDADE DE SOURCE.
+ *
+ * `adminGetAccessHomologationSnapshot` esta ATIVA em producao (canil-gcm) e nao
+ * existia no trunk: um `firebase deploy --only functions` amplo a DELETARIA. O
+ * modulo foi transplantado byte a byte de `f2948f0`
+ * (`origin/feature/health-auth-readonly-inspection`) — nao houve merge, rebase
+ * nem cherry-pick daquela branch obsoleta — e apenas o wiring foi reconciliado
+ * com o trunk atual.
+ *
+ * A callable e READ-ONLY: nao escreve Firestore, nao muta Auth e nao altera
+ * claims. Existe para inspecao controlada de autoridade em homologacao.
+ *
+ * UNICO desvio deliberado em relacao ao historico: `projectId` era o literal
+ * "canil-gcm". Um snapshot tirado em staging se identificaria como producao —
+ * mentira num artefato de auditoria. Passa a ser resolvido do runtime, o que
+ * mantem o valor observavel IDENTICO em producao e o torna verdadeiro nos outros
+ * ambientes.
+ */
+const runAdminGetAccessHomologationSnapshot =
+  buildAdminGetAccessHomologationSnapshotHandler(
+    createAdminAccessHomologationSnapshotDeps({
+      auth: admin.auth(),
+      authorize: async (auth) => {
+        const typedAuth = auth as
+          | {uid: string; token: admin.auth.DecodedIdToken}
+          | undefined;
+        const caller = requireAuth(typedAuth);
+        if (typedAuth && isAdminToken(typedAuth.token)) {
+          return {uid: caller.uid, ra: caller.ra};
+        }
+        const user = await db.collection("users").doc(caller.ra).get();
+        if (user.exists && isAdminUserRecord(user.data() ?? {})) {
+          return {uid: caller.uid, ra: caller.ra};
+        }
+        throw new HttpsError(
+          "permission-denied",
+          "Autoridade administrativa obrigatoria.",
+        );
+      },
+      db,
+      logInfo: (event) =>
+        logger.info("admin_access_homologation_snapshot_read", event),
+      logWarning: (event) =>
+        logger.warn("admin_access_homologation_snapshot_read_failed", event),
+      projectId:
+        admin.app().options.projectId ??
+        process.env.GCLOUD_PROJECT ??
+        "unknown",
+    }),
+  );
+
+/** Read-only, admin-only authorization snapshot for controlled homologation. */
+export const adminGetAccessHomologationSnapshot = onCall(
+  {region},
+  async (request) => runAdminGetAccessHomologationSnapshot(request),
+);
 
 export const adminSeedAccessProfiles = onCall({region}, async (request) => {
   return runAdminSeedAccessProfiles(request, accessProfileWriterDeps);
@@ -2862,18 +3048,18 @@ export const adminUpsertHuman = onCall({region}, async (request) => {
   let createdNewAuthUser = false;
 
   if (existingUid) {
-    try {
-      authUser = await admin.auth().getUser(existingUid);
-    } catch {
-      authUser = null;
-    }
+    // AUTH-WIRING-01 (A3): correcao NARROW. O `catch { authUser = null; }`
+    // anterior era a mais grave das quatro: `authUser === null` e exatamente a
+    // condicao que, abaixo, autoriza `admin.auth().createUser`. Uma falha
+    // transitoria de leitura sobre uma conta EXISTENTE podia portanto escalar
+    // para criacao de identidade — conta duplicada ou orfa. Somente
+    // `auth/user-not-found` significa ausencia; todo o resto propaga.
+    authUser = await lookupAuthUserByUid(existingUid);
   }
   if (!authUser) {
-    try {
-      authUser = await admin.auth().getUserByEmail(email);
-    } catch {
-      authUser = null;
-    }
+    // AUTH-WIRING-01 (A4): mesma correcao no fallback por e-mail, que e o
+    // caminho comum de quem nao tem espelho `auth_uid`.
+    authUser = await lookupAuthUserByEmail(email);
   }
 
   let temporaryPassword: string | null = null;
@@ -4282,11 +4468,19 @@ export const setK9InstructorRole = onCall({region}, async (request) => {
   const userData = userSnap.data() ?? {};
   const uidFromDoc = stringValue(userData.auth_uid) ?? stringValue(userData.authUid) ?? stringValue(userData.uid);
   const email = stringValue(userData.email) ?? emailForRa(ra);
-  let userRecord: admin.auth.UserRecord;
+  let userRecord: admin.auth.UserRecord | null = null;
   if (uidFromDoc) {
-    userRecord = await admin.auth().getUser(uidFromDoc);
-  } else {
-    userRecord = await admin.auth().getUserByEmail(email);
+    userRecord = await lookupAuthUserByUid(uidFromDoc);
+  }
+  if (!userRecord) {
+    userRecord = await lookupAuthUserByEmail(email);
+  }
+  if (!userRecord) {
+    throw new HttpsError(
+      "not-found",
+      "Conta de autenticacao nao encontrada para este integrante.",
+      {reason: "AUTH_IDENTITY_NOT_FOUND"},
+    );
   }
 
   const existingClaims = userRecord.customClaims ?? {};
@@ -4322,6 +4516,7 @@ export const setK9InstructorRole = onCall({region}, async (request) => {
     claim_refresh_required: true,
     claim_updated_at: admin.firestore.FieldValue.serverTimestamp(),
     updated_at: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     audit_trail: admin.firestore.FieldValue.arrayUnion(auditEntry(
       enabled ? "k9_instructor_role_granted" : "k9_instructor_role_revoked",
       caller,
