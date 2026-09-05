@@ -2316,6 +2316,21 @@ service cloud.firestore {
           && canAccessDogRecord(dogId);
         allow create, update, delete: if false;
       }
+
+      // F20.TREATMENT-V1 — Agregado TreatmentProtocol e DoseAdministration.
+      // Leitura fail-closed: hasClinicalReadAuthority() + canAccessDogRecord(dogId).
+      // Escrita de cliente estritamente proibida (backend Admin SDK via callables).
+      match /treatment_protocols/{protocolId} {
+        allow read: if hasClinicalReadAuthority()
+          && canAccessDogRecord(dogId);
+        allow create, update, delete: if false;
+
+        match /doses/{doseId} {
+          allow read: if hasClinicalReadAuthority()
+            && canAccessDogRecord(dogId);
+          allow create, update, delete: if false;
+        }
+      }
     }
 
     // Health v1 — HW-4A.2C.5: Agenda Preventiva GLOBAL (collection group).

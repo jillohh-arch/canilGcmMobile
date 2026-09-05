@@ -76,6 +76,17 @@ import {
   runHealthCancelExam,
 } from "./exam_process_callables";
 import {
+  type TreatmentCaller,
+  type TreatmentProtocolCallableDeps,
+  runHealthCreateTreatmentProtocol,
+  runHealthPauseTreatmentProtocol,
+  runHealthResumeTreatmentProtocol,
+  runHealthCompleteTreatmentProtocol,
+  runHealthCancelTreatmentProtocol,
+  runHealthAdministerTreatmentDose,
+  runHealthSkipTreatmentDose,
+} from "./treatment_protocol_callables";
+import {
   RestrictionCaller,
   runHealthRestrictionCancel,
   runHealthRestrictionEnd,
@@ -8525,6 +8536,104 @@ export const healthAssessExamImpact = onCall({region}, async (request) => {
  */
 export const healthCancelExam = onCall({region}, async (request) => {
   return runHealthCancelExam(request, examProcessDeps);
+});
+
+function toTreatmentCaller(caller: CallerIdentity): TreatmentCaller {
+  return {
+    uid: caller.uid,
+    email: caller.email,
+    ra: caller.ra,
+    name: caller.name,
+  };
+}
+
+const treatmentProtocolDeps: TreatmentProtocolCallableDeps = {
+  db,
+  requireRecordClinical: async (auth) => {
+    return toTreatmentCaller(await requireClinicalCapability(auth, "record_clinical"));
+  },
+  requireFinalizeClinical: async (auth) => {
+    return toTreatmentCaller(await requireClinicalCapability(auth, "finalize_clinical"));
+  },
+  requireAmendClinical: async (auth) => {
+    return toTreatmentCaller(await requireClinicalCapability(auth, "amend_clinical"));
+  },
+  requireRecordRoutine: async (auth) => {
+    try {
+      const caller = await requireAccessPermission(auth, "health", "record_routine");
+      return toTreatmentCaller(caller);
+    } catch {
+      try {
+        return toTreatmentCaller(await requireClinicalCapability(auth, "record_clinical"));
+      } catch {
+        const caller = await requireAccessPermission(auth, "health", "create");
+        return toTreatmentCaller(caller);
+      }
+    }
+  },
+  requireDogAccess: async (auth, caller, dogId, dog) => {
+    await requireDogRecordAccess(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+      dogId,
+      dog,
+    );
+  },
+  isAdministrativeAuthority: async (auth, caller) => {
+    return isAdministrativeHealthAuthority(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+    );
+  },
+};
+
+/**
+ * F20.TREATMENT-V1: Cria e ativa um protocolo de tratamento (prescrição externa).
+ */
+export const healthCreateTreatmentProtocol = onCall({region}, async (request) => {
+  return runHealthCreateTreatmentProtocol(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Pausa protocolo de tratamento com motivo obrigatório.
+ */
+export const healthPauseTreatmentProtocol = onCall({region}, async (request) => {
+  return runHealthPauseTreatmentProtocol(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Retoma protocolo de tratamento previamente pausado.
+ */
+export const healthResumeTreatmentProtocol = onCall({region}, async (request) => {
+  return runHealthResumeTreatmentProtocol(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Conclui protocolo de tratamento e atualiza ClinicalCase para monitoring.
+ */
+export const healthCompleteTreatmentProtocol = onCall({region}, async (request) => {
+  return runHealthCompleteTreatmentProtocol(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Cancela protocolo de tratamento com justificativa obrigatória.
+ */
+export const healthCancelTreatmentProtocol = onCall({region}, async (request) => {
+  return runHealthCancelTreatmentProtocol(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Registra administração de dose com doseId determinístico e idempotência.
+ */
+export const healthAdministerTreatmentDose = onCall({region}, async (request) => {
+  return runHealthAdministerTreatmentDose(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Registra dose pulada com justificativa obrigatória.
+ */
+export const healthSkipTreatmentDose = onCall({region}, async (request) => {
+  return runHealthSkipTreatmentDose(request, treatmentProtocolDeps);
 });
 
 function toRestrictionCaller(caller: CallerIdentity): RestrictionCaller {

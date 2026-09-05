@@ -175,4 +175,122 @@ final class DoseAdministration {
 
   String get doseId => identity.deriveDoseId();
   String get idempotencyKey => identity.deriveDoseId();
+
+  Map<String, dynamic> toMap() {
+    return {
+      'dose_id': doseId,
+      'protocol_id': protocolId,
+      'dog_id': dogId,
+      'planned_dose_id': identity.plannedDoseId,
+      if (scheduleItemId != null) 'schedule_item_id': scheduleItemId,
+      'idempotency_key': idempotencyKey,
+      'scheduled_for': scheduledFor.toUtc().toIso8601String(),
+      'status': status.wireName,
+      'recorded_by': {
+        'uid': recordedBy.uid,
+        'name': recordedBy.name,
+        'internal_role': recordedBy.internalRole,
+      },
+      'recorded_at': recordedAt.toUtc().toIso8601String(),
+      'schema_version': schemaVersion,
+      if (administeredAt != null)
+        'administered_at': administeredAt!.toUtc().toIso8601String(),
+      if (administeredBy != null)
+        'administered_by': {
+          'uid': administeredBy!.uid,
+          'name': administeredBy!.name,
+          'internal_role': administeredBy!.internalRole,
+        },
+      if (skipReason != null) 'skip_reason': skipReason,
+      if (observations != null) 'observations': observations,
+      if (attachmentRefs.isNotEmpty) 'attachment_refs': attachmentRefs,
+    };
+  }
+
+  factory DoseAdministration.fromMap(
+    Map<String, dynamic> map, {
+    String? documentId,
+  }) {
+    final protocolId =
+        map['protocol_id'] as String? ?? map['protocolId'] as String? ?? '';
+    final plannedDoseId = map['planned_dose_id'] as String? ??
+        map['plannedDoseId'] as String? ??
+        '';
+    final identity =
+        DoseIdentity(protocolId: protocolId, plannedDoseId: plannedDoseId);
+    final dogId = map['dog_id'] as String? ?? map['dogId'] as String? ?? '';
+    final scheduledFor =
+        _parseDateTime(map['scheduled_for'] ?? map['scheduledFor']) ??
+            DateTime.now();
+    final recordedAt =
+        _parseDateTime(map['recorded_at'] ?? map['recordedAt']) ??
+            DateTime.now();
+
+    final statusStr = map['status'] as String? ?? 'administered';
+    final status = DoseStatus.values.firstWhere(
+      (s) => s.wireName == statusStr,
+      orElse: () => DoseStatus.administered,
+    );
+    final schemaVersion = (map['schema_version'] as num?)?.toInt() ??
+        (map['schemaVersion'] as num?)?.toInt() ??
+        1;
+
+    final recordedByMap =
+        (map['recorded_by'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final recordedBy = RecordedBy(
+      uid: recordedByMap['uid'] as String? ?? '',
+      name: recordedByMap['name'] as String? ?? '',
+      internalRole: recordedByMap['internal_role'] as String? ??
+          recordedByMap['internalRole'] as String? ??
+          'condutor',
+    );
+
+    final administeredByMap =
+        (map['administered_by'] as Map?)?.cast<String, dynamic>();
+    final administeredBy = administeredByMap != null
+        ? RecordedBy(
+            uid: administeredByMap['uid'] as String? ?? '',
+            name: administeredByMap['name'] as String? ?? '',
+            internalRole: administeredByMap['internal_role'] as String? ??
+                administeredByMap['internalRole'] as String? ??
+                'condutor',
+          )
+        : null;
+
+    final rawAttachments = map['attachment_refs'] ?? map['attachmentRefs'];
+    final attachmentRefs = rawAttachments is List
+        ? rawAttachments.map((e) => e.toString()).toList()
+        : <String>[];
+
+    return DoseAdministration(
+      identity: identity,
+      protocolId: protocolId,
+      dogId: dogId,
+      scheduledFor: scheduledFor,
+      status: status,
+      recordedBy: recordedBy,
+      recordedAt: recordedAt,
+      schemaVersion: schemaVersion,
+      administeredAt:
+          _parseDateTime(map['administered_at'] ?? map['administeredAt']),
+      administeredBy: administeredBy,
+      skipReason: map['skip_reason'] as String? ?? map['skipReason'] as String?,
+      observations: map['observations'] as String?,
+      attachmentRefs: attachmentRefs,
+      scheduleItemId: map['schedule_item_id'] as String? ??
+          map['scheduleItemId'] as String?,
+    );
+  }
+
+  static DateTime? _parseDateTime(Object? raw) {
+    if (raw == null) return null;
+    if (raw is DateTime) return raw;
+    if (raw is String) return DateTime.tryParse(raw);
+    try {
+      final dynamic dyn = raw;
+      final toDate = dyn.toDate;
+      if (toDate is Function) return toDate() as DateTime;
+    } catch (_) {}
+    return null;
+  }
 }

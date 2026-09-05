@@ -26,7 +26,8 @@
     "test:health-restriction": "npm run build && node lib/health_restriction_logic_test.js && node lib/health_restriction_callables_test.js",
     "test:restriction-capability": "npm run build && node lib/restriction_capability_test.js",
     "test:health-clinical": "npm run build && node lib/clinical_domain_test.js && node lib/clinical_case_callables_test.js",
-    "test:health-exam": "npm run build && node lib/exam_process_callables_test.js"
+    "test:health-exam": "npm run build && node lib/exam_process_callables_test.js",
+    "test:health-treatment": "npm run build && node lib/treatment_protocol_callables_test.js"
   },
   "dependencies": {
     "firebase-admin": "^13.4.0",

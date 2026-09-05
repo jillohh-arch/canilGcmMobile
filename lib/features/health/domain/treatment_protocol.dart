@@ -18,7 +18,7 @@ final class TreatmentProtocol {
     required this.recordedBy,
     required this.professional,
     required this.sourceDocument,
-    required TreatmentStatus status,
+    required this.status,
     required this.schemaVersion,
     String? instructions,
     this.endDate,
@@ -30,8 +30,7 @@ final class TreatmentProtocol {
     this.completedAt,
     this.cancelledAt,
     String? cancelReason,
-  }) : status = status,
-       instructions = instructions?.trim(),
+  }) : instructions = instructions?.trim(),
        dosageDisplay = dosageDisplay?.trim(),
        frequencyDisplay = frequencyDisplay?.trim(),
        pauseReason = pauseReason?.trim(),
@@ -170,4 +169,219 @@ final class TreatmentProtocol {
     cancelledAt,
     cancelReason,
   ]);
+
+  Map<String, dynamic> toMap() {
+    return {
+      'protocol_id': id,
+      'id': id,
+      'dog_id': dogId,
+      'case_id': caseId,
+      'medication_name': medicationName,
+      'dose': {
+        'value': dose.value,
+        'unit': dose.unit.wireName,
+        'per_kg': dose.perKg,
+        'route': dose.route.wireName,
+      },
+      'schedule': {
+        'type': schedule.type.wireName,
+        if (schedule.intervalMinutes != null)
+          'interval_minutes': schedule.intervalMinutes,
+        'times_of_day': schedule.timesOfDay,
+        'timezone': schedule.timezone,
+        'tolerance_minutes': schedule.toleranceMinutes,
+      },
+      'start_date': startDate.toUtc().toIso8601String(),
+      'recorded_by': {
+        'uid': recordedBy.uid,
+        'name': recordedBy.name,
+        'internal_role': recordedBy.internalRole,
+      },
+      'professional': {
+        'name': professional.name,
+        'registration_type': professional.registrationType.wireName,
+        'registration_number': professional.registrationNumber,
+        'clinic': professional.clinic,
+        if (professional.specialty != null) 'specialty': professional.specialty,
+      },
+      'source_document': {
+        'health_document_id': sourceDocument.healthDocumentId,
+        if (sourceDocument.description != null)
+          'description': sourceDocument.description,
+      },
+      'status': status.wireName,
+      'schema_version': schemaVersion,
+      if (instructions != null) 'instructions': instructions,
+      if (endDate != null) 'end_date': endDate!.toUtc().toIso8601String(),
+      if (durationDays != null) 'duration_days': durationDays,
+      if (dosageDisplay != null) 'dosage_display': dosageDisplay,
+      if (frequencyDisplay != null) 'frequency_display': frequencyDisplay,
+      if (pausedAt != null) 'paused_at': pausedAt!.toUtc().toIso8601String(),
+      if (pauseReason != null) 'pause_reason': pauseReason,
+      if (completedAt != null)
+        'completed_at': completedAt!.toUtc().toIso8601String(),
+      if (cancelledAt != null)
+        'cancelled_at': cancelledAt!.toUtc().toIso8601String(),
+      if (cancelReason != null) 'cancel_reason': cancelReason,
+    };
+  }
+
+  factory TreatmentProtocol.fromMap(
+    Map<String, dynamic> map, {
+    String? documentId,
+  }) {
+    final id = documentId ??
+        map['protocol_id'] as String? ??
+        map['id'] as String? ??
+        '';
+    final dogId = map['dog_id'] as String? ?? map['dogId'] as String? ?? '';
+    final caseId = map['case_id'] as String? ?? map['caseId'] as String? ?? '';
+    final medicationName = map['medication_name'] as String? ??
+        map['medicationName'] as String? ??
+        '';
+
+    final doseMap = (map['dose'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final doseValue = (doseMap['value'] as num?)?.toDouble() ?? 1.0;
+    final doseUnitStr = doseMap['unit'] as String? ?? 'mg';
+    final doseUnit = DoseUnit.values.firstWhere(
+      (u) => u.wireName == doseUnitStr,
+      orElse: () => DoseUnit.mg,
+    );
+    final dosePerKg =
+        doseMap['per_kg'] as bool? ?? doseMap['perKg'] as bool? ?? false;
+    final doseRouteStr = doseMap['route'] as String? ?? 'oral';
+    final doseRoute = DoseRoute.values.firstWhere(
+      (r) => r.wireName == doseRouteStr,
+      orElse: () => DoseRoute.oral,
+    );
+    final dose = DoseBlock(
+      value: doseValue,
+      unit: doseUnit,
+      perKg: dosePerKg,
+      route: doseRoute,
+    );
+
+    final schedMap =
+        (map['schedule'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final schedTypeStr = schedMap['type'] as String? ?? 'interval';
+    final schedType = ScheduleTypeBlock.values.firstWhere(
+      (s) => s.wireName == schedTypeStr,
+      orElse: () => ScheduleTypeBlock.interval,
+    );
+    final intervalMinutes = (schedMap['interval_minutes'] as num?)?.toInt() ??
+        (schedMap['intervalMinutes'] as num?)?.toInt() ??
+        (schedType == ScheduleTypeBlock.interval ? 720 : null);
+    final timesOfDayRaw = schedMap['times_of_day'] ?? schedMap['timesOfDay'];
+    final timesOfDay = timesOfDayRaw is List
+        ? timesOfDayRaw.map((t) => t.toString()).toList()
+        : <String>[];
+    final timezone = schedMap['timezone'] as String? ?? 'America/Sao_Paulo';
+    final toleranceMinutes = (schedMap['tolerance_minutes'] as num?)?.toInt() ??
+        (schedMap['toleranceMinutes'] as num?)?.toInt() ??
+        30;
+    final schedule = ScheduleBlock(
+      type: schedType,
+      intervalMinutes: intervalMinutes,
+      timesOfDay: timesOfDay,
+      timezone: timezone,
+      toleranceMinutes: toleranceMinutes,
+    );
+
+    final startDate = _parseDateTime(map['start_date'] ?? map['startDate']) ??
+        DateTime.now();
+    final endDate = _parseDateTime(map['end_date'] ?? map['endDate']);
+    final durationDays = (map['duration_days'] as num?)?.toInt() ??
+        (map['durationDays'] as num?)?.toInt();
+
+    final recordedByMap =
+        (map['recorded_by'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final recordedBy = RecordedBy(
+      uid: recordedByMap['uid'] as String? ?? '',
+      name: recordedByMap['name'] as String? ?? '',
+      internalRole: recordedByMap['internal_role'] as String? ??
+          recordedByMap['internalRole'] as String? ??
+          'condutor',
+    );
+
+    final profMap =
+        (map['professional'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final regTypeStr = profMap['registration_type'] as String? ??
+        profMap['registrationType'] as String? ??
+        'CRMV';
+    final regType = ProfessionalRegistrationType.values.firstWhere(
+      (r) => r.wireName == regTypeStr || r.name == regTypeStr,
+      orElse: () => ProfessionalRegistrationType.crmv,
+    );
+    final professional = ProfessionalIdentity(
+      name: profMap['name'] as String? ?? 'Veterinário',
+      registrationType: regType,
+      registrationNumber: profMap['registration_number'] as String? ??
+          profMap['registrationNumber'] as String? ??
+          'CRMV-0000',
+      clinic: profMap['clinic'] as String? ?? 'Clínica Veterinária',
+      specialty: profMap['specialty'] as String?,
+    );
+
+    final srcDocMap =
+        (map['source_document'] as Map?)?.cast<String, dynamic>() ??
+        (map['sourceDocument'] as Map?)?.cast<String, dynamic>() ??
+        const {};
+    final sourceDocument = HealthDocumentRef(
+      healthDocumentId: srcDocMap['health_document_id'] as String? ??
+          srcDocMap['healthDocumentId'] as String? ??
+          'doc_default',
+      description: srcDocMap['description'] as String?,
+    );
+
+    final statusStr = map['status'] as String? ?? 'active';
+    final status = TreatmentStatus.values.firstWhere(
+      (s) => s.wireName == statusStr,
+      orElse: () => TreatmentStatus.active,
+    );
+    final schemaVersion = (map['schema_version'] as num?)?.toInt() ??
+        (map['schemaVersion'] as num?)?.toInt() ??
+        1;
+
+    return TreatmentProtocol(
+      id: id,
+      dogId: dogId,
+      caseId: caseId,
+      medicationName: medicationName,
+      dose: dose,
+      schedule: schedule,
+      startDate: startDate,
+      endDate: endDate,
+      durationDays: durationDays,
+      recordedBy: recordedBy,
+      professional: professional,
+      sourceDocument: sourceDocument,
+      status: status,
+      schemaVersion: schemaVersion,
+      instructions: map['instructions'] as String?,
+      dosageDisplay:
+          map['dosage_display'] as String? ?? map['dosageDisplay'] as String?,
+      frequencyDisplay:
+          map['frequency_display'] as String? ??
+          map['frequencyDisplay'] as String?,
+      pausedAt: _parseDateTime(map['paused_at'] ?? map['pausedAt']),
+      pauseReason:
+          map['pause_reason'] as String? ?? map['pauseReason'] as String?,
+      completedAt: _parseDateTime(map['completed_at'] ?? map['completedAt']),
+      cancelledAt: _parseDateTime(map['cancelled_at'] ?? map['cancelledAt']),
+      cancelReason:
+          map['cancel_reason'] as String? ?? map['cancelReason'] as String?,
+    );
+  }
+
+  static DateTime? _parseDateTime(Object? raw) {
+    if (raw == null) return null;
+    if (raw is DateTime) return raw;
+    if (raw is String) return DateTime.tryParse(raw);
+    try {
+      final dynamic dyn = raw;
+      final toDate = dyn.toDate;
+      if (toDate is Function) return toDate() as DateTime;
+    } catch (_) {}
+    return null;
+  }
 }
