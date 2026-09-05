@@ -217,7 +217,6 @@ export const VALID_DOSE_ROUTES = new Set([
 export const VALID_SCHEDULE_TYPES = new Set([
   "interval",
   "fixed_times",
-  "prn",
 ]);
 
 async function loadDog(
@@ -276,6 +275,12 @@ export async function runHealthCreateTreatmentProtocol(
 
   const scheduleRaw = (data["schedule"] ?? {}) as JsonMap;
   const scheduleType = parseRequiredString(scheduleRaw, "type");
+  if (scheduleType === "prn") {
+    throw new HttpsError(
+      "failed-precondition",
+      "Tipo de agendamento 'prn' (se necessário) não é suportado em Treatment V1. Use 'interval' ou 'fixed_times'.",
+    );
+  }
   if (!VALID_SCHEDULE_TYPES.has(scheduleType)) {
     throw new HttpsError(
       "invalid-argument",
@@ -311,10 +316,42 @@ export async function runHealthCreateTreatmentProtocol(
       ? scheduleRaw["toleranceMinutes"]
       : 30;
 
-  const durationDays =
-    data["durationDays"] != null || data["duration_days"] != null
-      ? parsePositiveNumber(data["durationDays"] ?? data["duration_days"], "durationDays")
-      : null;
+  const rawDuration = data["durationDays"] ?? data["duration_days"];
+  if (rawDuration == null) {
+    throw new HttpsError(
+      "invalid-argument",
+      "durationDays é obrigatório em Treatment V1 (1 a 30 dias) para materialização determinística e finita de todas as doses.",
+    );
+  }
+  const durationDays = parsePositiveNumber(rawDuration, "durationDays");
+  if (durationDays > 30) {
+    throw new HttpsError(
+      "invalid-argument",
+      "durationDays não pode exceder 30 dias em Treatment V1.",
+    );
+  }
+
+  let totalDoses = 0;
+  if (scheduleType === "interval" && intervalMinutes) {
+    const totalMinutes = durationDays * 24 * 60;
+    totalDoses = Math.floor(totalMinutes / intervalMinutes);
+  } else if (scheduleType === "fixed_times" && timesOfDay.length > 0) {
+    totalDoses = durationDays * timesOfDay.length;
+  }
+
+  if (totalDoses <= 0) {
+    throw new HttpsError(
+      "invalid-argument",
+      "Configuração de agendamento resultou em 0 doses calculadas para a duração informada.",
+    );
+  }
+
+  if (totalDoses > 50) {
+    throw new HttpsError(
+      "invalid-argument",
+      `Protocolo excede o limite máximo de 50 doses planejadas em Treatment V1 (${totalDoses} doses calculadas para ${durationDays} dias). Ajuste o intervalo ou a duração do tratamento.`,
+    );
+  }
 
   const instructions = stringValue(data["instructions"]) ?? null;
   const dosageDisplay = stringValue(data["dosageDisplay"] ?? data["dosage_display"]) ?? null;
@@ -452,17 +489,14 @@ export async function runHealthCreateTreatmentProtocol(
     if (dosageDisplay) protocolDoc["dosage_display"] = dosageDisplay;
     if (frequencyDisplay) protocolDoc["frequency_display"] = frequencyDisplay;
 
-    // Gerar plano inicial de doses na agenda (até 14 dias ou durationDays)
+    // Gerar plano completo de doses na agenda (todas as doses até totalDoses, máximo 50)
     const plannedDoseIds: string[] = [];
     const scheduleItemIds: string[] = [];
-    const maxDays = durationDays ? Math.min(durationDays, 30) : 14;
 
     if (scheduleType === "interval" && intervalMinutes) {
       const intervalMs = intervalMinutes * 60 * 1000;
-      const totalSpanMs = maxDays * 24 * 60 * 60 * 1000;
-      const maxCount = Math.min(Math.floor(totalSpanMs / intervalMs), 50);
 
-      for (let i = 0; i < maxCount; i++) {
+      for (let i = 0; i < totalDoses; i++) {
         const doseInstantMs = startDate.getTime() + i * intervalMs;
         const doseTs = Timestamp.fromMillis(doseInstantMs);
         const plannedDoseId = `dose_${i + 1}`;
@@ -491,10 +525,10 @@ export async function runHealthCreateTreatmentProtocol(
       }
     } else if (scheduleType === "fixed_times" && timesOfDay.length > 0) {
       let count = 0;
-      for (let day = 0; day < maxDays; day++) {
+      for (let day = 0; day < durationDays; day++) {
         for (const tod of timesOfDay) {
           count++;
-          if (count > 50) break;
+          if (count > totalDoses) break;
           const [hhStr, mmStr] = tod.split(":");
           const hh = parseInt(hhStr, 10) || 0;
           const mm = parseInt(mmStr, 10) || 0;
@@ -528,9 +562,8 @@ export async function runHealthCreateTreatmentProtocol(
       }
     }
 
-    if (scheduleItemIds.length > 0) {
-      protocolDoc["doses_remaining"] = scheduleItemIds.length;
-    }
+    protocolDoc["doses_planned"] = totalDoses;
+    protocolDoc["doses_remaining"] = totalDoses;
 
     const eventDoc: JsonMap = {
       entity_kind: "clinical_event",
@@ -1025,6 +1058,36 @@ export async function runHealthCompleteTreatmentProtocol(
     };
     tx.set(evtRef, eventDoc);
 
+    // Cancelar todas as doses futuras pendentes do protocolo concluído
+    const dosesPlanned = typeof pData["doses_planned"] === "number"
+      ? pData["doses_planned"]
+      : 50;
+
+    for (let i = 1; i <= dosesPlanned; i++) {
+      const plannedDoseId = `dose_${i}`;
+      const sId = deterministicDoseScheduleId(dogId, protocolId, plannedDoseId);
+      const sRef = scheduleRef(deps.db, dogId, sId);
+      const sSnap = await tx.get(sRef);
+      if (sSnap.exists) {
+        const sData = sSnap.data() as JsonMap;
+        if (sData["lifecycle_status"] === "open") {
+          const sRev = typeof sData["revision"] === "number" ? sData["revision"] : 1;
+          tx.set(
+            sRef,
+            {
+              lifecycle_status: "cancelled",
+              cancelled_at: nowTs,
+              cancelled_by: recordedBy,
+              cancel_reason: "Tratamento concluído",
+              updated_at: nowTs,
+              revision: sRev + 1,
+            },
+            {merge: true},
+          );
+        }
+      }
+    }
+
     const caseRev = typeof caseData["revision"] === "number" ? caseData["revision"] : 1;
     const currentActiveCount = typeof caseData["active_treatments_count"] === "number"
       ? caseData["active_treatments_count"]
@@ -1042,8 +1105,11 @@ export async function runHealthCompleteTreatmentProtocol(
     }
 
     // Se nenhum tratamento ativo restar e caso estiver under_treatment -> transitar para monitoring
-    if (newActiveCount === 0 && caseData["clinical_status"] === "under_treatment") {
-      casePatch["clinical_status"] = "monitoring";
+    if (newActiveCount === 0) {
+      if (caseData["clinical_status"] === "under_treatment") {
+        casePatch["clinical_status"] = "monitoring";
+      }
+      casePatch["has_pending_schedule"] = false;
     }
 
     tx.set(cRef, casePatch, {merge: true});
@@ -1192,7 +1258,42 @@ export async function runHealthCancelTreatmentProtocol(
     };
     tx.set(evtRef, eventDoc);
 
+    // Cancelar todas as doses futuras pendentes do protocolo cancelado
+    const dosesPlanned = typeof pData["doses_planned"] === "number"
+      ? pData["doses_planned"]
+      : 50;
+
+    for (let i = 1; i <= dosesPlanned; i++) {
+      const plannedDoseId = `dose_${i}`;
+      const sId = deterministicDoseScheduleId(dogId, protocolId, plannedDoseId);
+      const sRef = scheduleRef(deps.db, dogId, sId);
+      const sSnap = await tx.get(sRef);
+      if (sSnap.exists) {
+        const sData = sSnap.data() as JsonMap;
+        if (sData["lifecycle_status"] === "open") {
+          const sRev = typeof sData["revision"] === "number" ? sData["revision"] : 1;
+          tx.set(
+            sRef,
+            {
+              lifecycle_status: "cancelled",
+              cancelled_at: nowTs,
+              cancelled_by: recordedBy,
+              cancel_reason: cancelReason,
+              updated_at: nowTs,
+              revision: sRev + 1,
+            },
+            {merge: true},
+          );
+        }
+      }
+    }
+
     const caseRev = typeof caseData["revision"] === "number" ? caseData["revision"] : 1;
+    const currentActiveCount = typeof caseData["active_treatments_count"] === "number"
+      ? caseData["active_treatments_count"]
+      : 1;
+    const newActiveCount = prevStatus === "active" ? Math.max(0, currentActiveCount - 1) : currentActiveCount;
+
     const casePatch: JsonMap = {
       event_count: FieldValue.increment(1),
       last_event_at: nowTs,
@@ -1201,6 +1302,9 @@ export async function runHealthCancelTreatmentProtocol(
     };
     if (prevStatus === "active") {
       casePatch["active_treatments_count"] = FieldValue.increment(-1);
+    }
+    if (newActiveCount === 0) {
+      casePatch["has_pending_schedule"] = false;
     }
     tx.set(cRef, casePatch, {merge: true});
 
