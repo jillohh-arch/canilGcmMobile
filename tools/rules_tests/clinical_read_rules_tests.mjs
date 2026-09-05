@@ -76,6 +76,8 @@ const CASE_A = 'case-a-1';
 const EVENT_A = 'event-a-1';
 const AMEND_A = 'amend-a-1';
 const EXAM_A = 'exam-a-1';
+const PROTOCOL_A = 'protocol-a-1';
+const DOSE_A = 'dose-a-1';
 
 const testEnv = await initializeTestEnvironment({projectId: PROJECT_ID});
 
@@ -159,6 +161,29 @@ function examPayload({dogId = DOG_A} = {}) {
     current_stage: 'requested',
     schema_version: 1,
     created_at: now(),
+  };
+}
+
+function protocolPayload({dogId = DOG_A} = {}) {
+  return {
+    dog_id: dogId,
+    case_id: CASE_A,
+    protocol_id: PROTOCOL_A,
+    medication_name: 'Amoxicilina',
+    status: 'active',
+    schema_version: 1,
+    created_at: now(),
+  };
+}
+
+function dosePayload({dogId = DOG_A} = {}) {
+  return {
+    dog_id: dogId,
+    protocol_id: PROTOCOL_A,
+    dose_id: DOSE_A,
+    status: 'administered',
+    schema_version: 1,
+    administered_at: now(),
   };
 }
 
@@ -330,6 +355,14 @@ async function seedClinicalWorld() {
         doc(db, 'dogs', dogId, 'clinical_cases', CASE_A, 'exams', EXAM_A),
         examPayload({dogId}),
       );
+      await setDoc(
+        doc(db, 'dogs', dogId, 'treatment_protocols', PROTOCOL_A),
+        protocolPayload({dogId}),
+      );
+      await setDoc(
+        doc(db, 'dogs', dogId, 'treatment_protocols', PROTOCOL_A, 'doses', DOSE_A),
+        dosePayload({dogId}),
+      );
     }
   });
 }
@@ -349,6 +382,12 @@ const amendRef = (db, dogId = DOG_A) =>
 
 const examRef = (db, dogId = DOG_A, caseId = CASE_A, examId = EXAM_A) =>
   doc(db, 'dogs', dogId, 'clinical_cases', caseId, 'exams', examId);
+
+const protocolRef = (db, dogId = DOG_A, protocolId = PROTOCOL_A) =>
+  doc(db, 'dogs', dogId, 'treatment_protocols', protocolId);
+
+const doseRef = (db, dogId = DOG_A, protocolId = PROTOCOL_A, doseId = DOSE_A) =>
+  doc(db, 'dogs', dogId, 'treatment_protocols', protocolId, 'doses', doseId);
 
 const casesCol = (db, dogId = DOG_A) =>
   collection(db, 'dogs', dogId, 'clinical_cases');
@@ -985,6 +1024,160 @@ test('EXAM-07 regra de exams não amplia acesso a outros nós clínicos ou K9 al
   await assertFails(getDoc(eventRef(dbFor(OUTSIDER_RA))));
   await assertFails(getDoc(amendRef(dbFor(OUTSIDER_RA))));
   await assertFails(getDoc(examRef(dbFor(OUTSIDER_RA))));
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// TREATMENT PROTOCOLS & DOSES — TREAT-01..TREAT-07 (F20.TREATMENT-V1)
+// ═════════════════════════════════════════════════════════════════════════════
+
+test('TREAT-01 leitor clínico autorizado com acesso ao cão LÊ treatment_protocol e dose', async () => {
+  await clearAll();
+  await seedClinicalWorld();
+
+  const pSnapGlobal = await assertSucceeds(getDoc(protocolRef(dbFor(GLOBAL_RA))));
+  assert.equal(pSnapGlobal.exists(), true);
+  assert.equal(pSnapGlobal.data().medication_name, 'Amoxicilina');
+
+  const dSnapGlobal = await assertSucceeds(getDoc(doseRef(dbFor(GLOBAL_RA))));
+  assert.equal(dSnapGlobal.exists(), true);
+  assert.equal(dSnapGlobal.data().status, 'administered');
+
+  const pSnapConductor = await assertSucceeds(getDoc(protocolRef(dbFor(PRIMARY_RA))));
+  assert.equal(pSnapConductor.exists(), true);
+
+  const dSnapConductor = await assertSucceeds(getDoc(doseRef(dbFor(PRIMARY_RA))));
+  assert.equal(dSnapConductor.exists(), true);
+});
+
+test('TREAT-02 usuário sem health.read é NEGADO na leitura de treatment_protocol e dose', async () => {
+  await clearAll();
+  await seedClinicalWorld();
+
+  await assertFails(getDoc(protocolRef(dbFor(NO_CAPABILITY_RA))));
+  await assertFails(getDoc(doseRef(dbFor(NO_CAPABILITY_RA))));
+
+  await assertFails(getDoc(protocolRef(dbFor(LEGACY_VIEW_RA))));
+  await assertFails(getDoc(doseRef(dbFor(LEGACY_VIEW_RA))));
+
+  await assertFails(getDoc(protocolRef(dbFor(ANONYMOUS))));
+  await assertFails(getDoc(doseRef(dbFor(ANONYMOUS))));
+});
+
+test('TREAT-03 leitor sem acesso ao K9 é NEGADO na leitura de treatment_protocol e dose', async () => {
+  await clearAll();
+  await seedClinicalWorld();
+
+  // OUTSIDER_RA tem health.read mas não tem vínculo com DOG_A
+  await assertFails(getDoc(protocolRef(dbFor(OUTSIDER_RA))));
+  await assertFails(getDoc(doseRef(dbFor(OUTSIDER_RA))));
+
+  // Condutor de DOG_B não acessa treatment_protocol nem doses de DOG_A
+  await assertFails(getDoc(protocolRef(dbFor(DOG_B_RA), DOG_A)));
+  await assertFails(getDoc(doseRef(dbFor(DOG_B_RA), DOG_A)));
+});
+
+test('TREAT-04 escrita direta de cliente CREATE treatment_protocol e dose é NEGADA', async () => {
+  await clearAll();
+  await seedClinicalWorld();
+
+  await assertFails(
+    setDoc(protocolRef(dbFor(GLOBAL_RA), DOG_A, 'tp-novo'), {
+      dog_id: DOG_A,
+      case_id: CASE_A,
+      medication_name: 'Dipirona',
+    }),
+  );
+  await assertFails(
+    setDoc(doseRef(dbFor(GLOBAL_RA), DOG_A, PROTOCOL_A, 'dose-nova'), {
+      dog_id: DOG_A,
+      protocol_id: PROTOCOL_A,
+      status: 'administered',
+    }),
+  );
+
+  await assertFails(
+    setDoc(protocolRef(dbFor(PRIMARY_RA), DOG_A, 'tp-novo'), {
+      dog_id: DOG_A,
+      case_id: CASE_A,
+      medication_name: 'Dipirona',
+    }),
+  );
+  await assertFails(
+    setDoc(doseRef(dbFor(PRIMARY_RA), DOG_A, PROTOCOL_A, 'dose-nova'), {
+      dog_id: DOG_A,
+      protocol_id: PROTOCOL_A,
+      status: 'administered',
+    }),
+  );
+
+  await assertFails(
+    setDoc(protocolRef(dbForTechAdmin(), DOG_A, 'tp-novo'), {
+      dog_id: DOG_A,
+      case_id: CASE_A,
+      medication_name: 'Dipirona',
+    }),
+  );
+  await assertFails(
+    setDoc(doseRef(dbForTechAdmin(), DOG_A, PROTOCOL_A, 'dose-nova'), {
+      dog_id: DOG_A,
+      protocol_id: PROTOCOL_A,
+      status: 'administered',
+    }),
+  );
+});
+
+test('TREAT-05 escrita direta de cliente UPDATE treatment_protocol e dose é NEGADA', async () => {
+  await clearAll();
+  await seedClinicalWorld();
+
+  await assertFails(
+    updateDoc(protocolRef(dbFor(GLOBAL_RA)), {
+      status: 'completed',
+    }),
+  );
+  await assertFails(
+    updateDoc(doseRef(dbFor(GLOBAL_RA)), {
+      status: 'skipped',
+    }),
+  );
+
+  await assertFails(
+    updateDoc(protocolRef(dbFor(PRIMARY_RA)), {
+      status: 'paused',
+    }),
+  );
+  await assertFails(
+    updateDoc(doseRef(dbFor(PRIMARY_RA)), {
+      status: 'skipped',
+    }),
+  );
+});
+
+test('TREAT-06 escrita direta de cliente DELETE treatment_protocol e dose é NEGADA', async () => {
+  await clearAll();
+  await seedClinicalWorld();
+
+  await assertFails(deleteDoc(protocolRef(dbFor(GLOBAL_RA))));
+  await assertFails(deleteDoc(doseRef(dbFor(GLOBAL_RA))));
+
+  await assertFails(deleteDoc(protocolRef(dbFor(PRIMARY_RA))));
+  await assertFails(deleteDoc(doseRef(dbFor(PRIMARY_RA))));
+
+  await assertFails(deleteDoc(protocolRef(dbForTechAdmin())));
+  await assertFails(deleteDoc(doseRef(dbForTechAdmin())));
+});
+
+test('TREAT-07 regra de treatment_protocols não amplia acesso a outros nós clínicos ou K9 alheio', async () => {
+  await clearAll();
+  await seedClinicalWorld();
+
+  // Condutor de DOG_B não acessa treatment_protocols nem doses de DOG_A
+  await assertFails(getDoc(protocolRef(dbFor(DOG_B_RA), DOG_A)));
+  await assertFails(getDoc(doseRef(dbFor(DOG_B_RA), DOG_A)));
+
+  // Leitor sem vínculo não acessa events nem amendments nem protocols nem doses
+  await assertFails(getDoc(protocolRef(dbFor(OUTSIDER_RA))));
+  await assertFails(getDoc(doseRef(dbFor(OUTSIDER_RA))));
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
