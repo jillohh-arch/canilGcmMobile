@@ -286,6 +286,12 @@ async function runTests() {
     assert.ok(sched1, "Primeira dose na agenda existe");
     assert.strictEqual(sched1["lifecycle_status"], "open");
     assert.strictEqual(sched1["source_type"], "treatment_protocol");
+    assert.ok(sched1["due_until"], "due_until deve ser materializado na agenda para a dose");
+    assert.strictEqual(
+      (sched1["due_until"] as any).toMillis() - (sched1["scheduled_for"] as any).toMillis(),
+      30 * 60 * 1000,
+      "due_until deve refletir scheduled_for + toleranceMinutes (30m padrão)",
+    );
 
     // Prova idempotência com mesmo payload
     const replay = await runHealthCreateTreatmentProtocol(req, deps);

@@ -504,6 +504,7 @@ export async function runHealthCreateTreatmentProtocol(
       for (let i = 0; i < totalDoses; i++) {
         const doseInstantMs = startDate.getTime() + i * intervalMs;
         const doseTs = Timestamp.fromMillis(doseInstantMs);
+        const dueUntilTs = Timestamp.fromMillis(doseInstantMs + toleranceMinutes * 60 * 1000);
         const plannedDoseId = `dose_${i + 1}`;
         const sId = deterministicDoseScheduleId(dogId, protocolId, plannedDoseId);
         const sRef = scheduleRef(deps.db, dogId, sId);
@@ -513,6 +514,7 @@ export async function runHealthCreateTreatmentProtocol(
           schedule_type: "dose",
           title: `Dose: ${medicationName} (${doseValue} ${doseUnit})`,
           scheduled_for: doseTs,
+          due_until: dueUntilTs,
           timezone,
           lifecycle_status: "open",
           source_type: "treatment_protocol",
@@ -540,6 +542,7 @@ export async function runHealthCreateTreatmentProtocol(
           const doseDate = new Date(startDate.getTime() + day * 24 * 60 * 60 * 1000);
           doseDate.setHours(hh, mm, 0, 0);
           const doseTs = Timestamp.fromDate(doseDate);
+          const dueUntilTs = Timestamp.fromMillis(doseDate.getTime() + toleranceMinutes * 60 * 1000);
           const plannedDoseId = `dose_${count}`;
           const sId = deterministicDoseScheduleId(dogId, protocolId, plannedDoseId);
           const sRef = scheduleRef(deps.db, dogId, sId);
@@ -549,6 +552,7 @@ export async function runHealthCreateTreatmentProtocol(
             schedule_type: "dose",
             title: `Dose: ${medicationName} (${doseValue} ${doseUnit})`,
             scheduled_for: doseTs,
+            due_until: dueUntilTs,
             timezone,
             lifecycle_status: "open",
             source_type: "treatment_protocol",
