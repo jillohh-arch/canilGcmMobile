@@ -8,7 +8,7 @@
  */
 
 import * as crypto from "crypto";
-import {Timestamp} from "firebase-admin/firestore";
+import {FieldValue, Timestamp} from "firebase-admin/firestore";
 import {CallableRequest, HttpsError} from "firebase-functions/v2/https";
 
 import {
@@ -136,6 +136,41 @@ export function auditDocId(
   operationId: string,
 ): string {
   return `audit_exam_${sha256Hex(`${dogId}:${caseId}:${operationId}`).slice(0, 20)}`;
+}
+
+/**
+ * Projeta a adição de um novo ClinicalEvent no ClinicalCase pai de forma atômica.
+ *
+ * Contrato canônico:
+ * - `event_count`: incrementado em 1 via FieldValue.increment(1)
+ * - `last_event_at`: avançado para nowTs (Timestamp canônico de gravação do evento)
+ * - `updated_at`: avançado para nowTs
+ * - `revision`: avançado em 1 step estrito
+ * - Se `transitionOpenToUnderInvestigation` for true e `caseStatus === "open"`, atualiza `clinical_status` para `"under_investigation"`.
+ */
+export function applyCaseEventProjection(
+  tx: FirebaseFirestore.Transaction,
+  cRef: FirebaseFirestore.DocumentReference,
+  caseData: JsonMap,
+  nowTs: Timestamp,
+  options?: { transitionOpenToUnderInvestigation?: boolean },
+): void {
+  const caseRev = typeof caseData["revision"] === "number" ? caseData["revision"] : 1;
+  const rawStatus = stringValue(caseData["clinical_status"]);
+  const caseStatus = rawStatus ? parseClinicalCaseStatus(rawStatus) : null;
+
+  const patch: JsonMap = {
+    event_count: FieldValue.increment(1),
+    last_event_at: nowTs,
+    updated_at: nowTs,
+    revision: caseRev + 1,
+  };
+
+  if (options?.transitionOpenToUnderInvestigation && caseStatus === "open") {
+    patch["clinical_status"] = "under_investigation";
+  }
+
+  tx.set(cRef, patch, {merge: true});
 }
 
 async function loadDog(
@@ -310,15 +345,10 @@ export async function runHealthRequestExam(
     };
     if (professionalRaw) eventDoc["professional"] = professionalRaw;
 
-    // Transição de caso: open -> under_investigation
-    if (caseStatus === "open") {
-      const caseRev = typeof caseData["revision"] === "number" ? caseData["revision"] : 1;
-      tx.update(cRef, {
-        clinical_status: "under_investigation",
-        updated_at: nowTs,
-        revision: caseRev + 1,
-      });
-    }
+    // Atualiza projeção derivada do ClinicalCase (event_count, last_event_at, revision, clinical_status)
+    applyCaseEventProjection(tx, cRef, caseData, nowTs, {
+      transitionOpenToUnderInvestigation: true,
+    });
 
     // HealthScheduleItem
     const scheduleDoc: JsonMap = {
@@ -392,6 +422,7 @@ export async function runHealthRecordExamCollection(
   const isAdmin = await deps.isAdministrativeAuthority(request.auth, caller);
 
   const eventId = deterministicEventId(dogId, caseId, "collected", operationId);
+  const cRef = caseRef(deps.db, dogId, caseId);
   const eRef = examRef(deps.db, dogId, caseId, examId);
   const evtRef = clinicalEventRef(deps.db, dogId, caseId, eventId);
   const opRef = examOperationRef(deps.db, dogId, caseId, operationId);
@@ -426,10 +457,26 @@ export async function runHealthRecordExamCollection(
       );
     }
 
-    const examSnap = await tx.get(eRef);
+    const [examSnap, caseSnap] = await Promise.all([
+      tx.get(eRef),
+      tx.get(cRef),
+    ]);
     if (!examSnap.exists) {
       throw new HttpsError("not-found", `Exame ${examId} não encontrado.`);
     }
+    if (!caseSnap.exists) {
+      throw new HttpsError("not-found", `ClinicalCase ${caseId} não encontrado.`);
+    }
+    const caseData = caseSnap.data() as JsonMap;
+    const rawCaseStatus = stringValue(caseData["clinical_status"]);
+    const caseStatus = rawCaseStatus ? parseClinicalCaseStatus(rawCaseStatus) : null;
+    if (caseStatus && isTerminalCaseStatus(caseStatus)) {
+      throw new HttpsError(
+        "failed-precondition",
+        `Caso ${caseId} está em estado terminal (${caseStatus}) e não aceita novos eventos.`,
+      );
+    }
+
     const examData = examSnap.data() as JsonMap;
     const currentStage = stringValue(examData["current_stage"]);
     if (currentStage !== "requested") {
@@ -476,6 +523,7 @@ export async function runHealthRecordExamCollection(
 
     tx.update(eRef, examUpdate);
     tx.set(evtRef, eventDoc);
+    applyCaseEventProjection(tx, cRef, caseData, nowTs);
 
     const result: JsonMap = {
       success: true,
@@ -529,6 +577,7 @@ export async function runHealthRecordExamResult(
   const eventId = deterministicEventId(dogId, caseId, "resulted", operationId);
   const scheduleId = deterministicScheduleId(dogId, examId);
 
+  const cRef = caseRef(deps.db, dogId, caseId);
   const eRef = examRef(deps.db, dogId, caseId, examId);
   const evtRef = clinicalEventRef(deps.db, dogId, caseId, eventId);
   const schedRef = deps.db
@@ -568,10 +617,27 @@ export async function runHealthRecordExamResult(
       );
     }
 
-    const examSnap = await tx.get(eRef);
+    const [examSnap, caseSnap, schedSnap] = await Promise.all([
+      tx.get(eRef),
+      tx.get(cRef),
+      tx.get(schedRef),
+    ]);
     if (!examSnap.exists) {
       throw new HttpsError("not-found", `Exame ${examId} não encontrado.`);
     }
+    if (!caseSnap.exists) {
+      throw new HttpsError("not-found", `ClinicalCase ${caseId} não encontrado.`);
+    }
+    const caseData = caseSnap.data() as JsonMap;
+    const rawCaseStatus = stringValue(caseData["clinical_status"]);
+    const caseStatus = rawCaseStatus ? parseClinicalCaseStatus(rawCaseStatus) : null;
+    if (caseStatus && isTerminalCaseStatus(caseStatus)) {
+      throw new HttpsError(
+        "failed-precondition",
+        `Caso ${caseId} está em estado terminal (${caseStatus}) e não aceita novos eventos.`,
+      );
+    }
+
     const examData = examSnap.data() as JsonMap;
     const currentStage = stringValue(examData["current_stage"]);
     if (currentStage !== "collected") {
@@ -620,7 +686,6 @@ export async function runHealthRecordExamResult(
     }
 
     // Schedule: marca concluído se existir e estiver open
-    const schedSnap = await tx.get(schedRef);
     if (schedSnap.exists) {
       const schedData = (schedSnap.data() ?? {}) as JsonMap;
       if (schedData["lifecycle_status"] === "open") {
@@ -636,6 +701,7 @@ export async function runHealthRecordExamResult(
 
     tx.update(eRef, examUpdate);
     tx.set(evtRef, eventDoc);
+    applyCaseEventProjection(tx, cRef, caseData, nowTs);
 
     const result: JsonMap = {
       success: true,
@@ -700,6 +766,7 @@ export async function runHealthRecordExamInterpretation(
   const isAdmin = await deps.isAdministrativeAuthority(request.auth, caller);
 
   const eventId = deterministicEventId(dogId, caseId, "interpreted", operationId);
+  const cRef = caseRef(deps.db, dogId, caseId);
   const eRef = examRef(deps.db, dogId, caseId, examId);
   const evtRef = clinicalEventRef(deps.db, dogId, caseId, eventId);
   const opRef = examOperationRef(deps.db, dogId, caseId, operationId);
@@ -735,10 +802,26 @@ export async function runHealthRecordExamInterpretation(
       );
     }
 
-    const examSnap = await tx.get(eRef);
+    const [examSnap, caseSnap] = await Promise.all([
+      tx.get(eRef),
+      tx.get(cRef),
+    ]);
     if (!examSnap.exists) {
       throw new HttpsError("not-found", `Exame ${examId} não encontrado.`);
     }
+    if (!caseSnap.exists) {
+      throw new HttpsError("not-found", `ClinicalCase ${caseId} não encontrado.`);
+    }
+    const caseData = caseSnap.data() as JsonMap;
+    const rawCaseStatus = stringValue(caseData["clinical_status"]);
+    const caseStatus = rawCaseStatus ? parseClinicalCaseStatus(rawCaseStatus) : null;
+    if (caseStatus && isTerminalCaseStatus(caseStatus)) {
+      throw new HttpsError(
+        "failed-precondition",
+        `Caso ${caseId} está em estado terminal (${caseStatus}) e não aceita novos eventos.`,
+      );
+    }
+
     const examData = examSnap.data() as JsonMap;
     const currentStage = stringValue(examData["current_stage"]);
     if (currentStage !== "resulted") {
@@ -792,6 +875,7 @@ export async function runHealthRecordExamInterpretation(
 
     tx.update(eRef, examUpdate);
     tx.set(evtRef, eventDoc);
+    applyCaseEventProjection(tx, cRef, caseData, nowTs);
 
     const result: JsonMap = {
       success: true,
@@ -848,6 +932,7 @@ export async function runHealthAssessExamImpact(
   const isAdmin = await deps.isAdministrativeAuthority(request.auth, caller);
 
   const eventId = deterministicEventId(dogId, caseId, "impact_assessed", operationId);
+  const cRef = caseRef(deps.db, dogId, caseId);
   const eRef = examRef(deps.db, dogId, caseId, examId);
   const evtRef = clinicalEventRef(deps.db, dogId, caseId, eventId);
   const opRef = examOperationRef(deps.db, dogId, caseId, operationId);
@@ -881,10 +966,26 @@ export async function runHealthAssessExamImpact(
       );
     }
 
-    const examSnap = await tx.get(eRef);
+    const [examSnap, caseSnap] = await Promise.all([
+      tx.get(eRef),
+      tx.get(cRef),
+    ]);
     if (!examSnap.exists) {
       throw new HttpsError("not-found", `Exame ${examId} não encontrado.`);
     }
+    if (!caseSnap.exists) {
+      throw new HttpsError("not-found", `ClinicalCase ${caseId} não encontrado.`);
+    }
+    const caseData = caseSnap.data() as JsonMap;
+    const rawCaseStatus = stringValue(caseData["clinical_status"]);
+    const caseStatus = rawCaseStatus ? parseClinicalCaseStatus(rawCaseStatus) : null;
+    if (caseStatus && isTerminalCaseStatus(caseStatus)) {
+      throw new HttpsError(
+        "failed-precondition",
+        `Caso ${caseId} está em estado terminal (${caseStatus}) e não aceita novos eventos.`,
+      );
+    }
+
     const examData = examSnap.data() as JsonMap;
     const currentStage = stringValue(examData["current_stage"]);
     if (currentStage !== "interpreted") {
@@ -931,6 +1032,7 @@ export async function runHealthAssessExamImpact(
 
     tx.update(eRef, examUpdate);
     tx.set(evtRef, eventDoc);
+    applyCaseEventProjection(tx, cRef, caseData, nowTs);
 
     const result: JsonMap = {
       success: true,

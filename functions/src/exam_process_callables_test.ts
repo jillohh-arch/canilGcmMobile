@@ -23,6 +23,19 @@ const testCaller: ExamCaller = {
   name: "GCM Operador",
 };
 
+function applyPatch(prev: JsonMap, patch: JsonMap): JsonMap {
+  const next = {...prev};
+  for (const [k, v] of Object.entries(patch)) {
+    if (v && typeof v === "object" && "operand" in v) {
+      const cur = typeof next[k] === "number" ? (next[k] as number) : 0;
+      next[k] = cur + ((v as any).operand as number);
+    } else {
+      next[k] = v;
+    }
+  }
+  return next;
+}
+
 function createFakeDb(initial: Record<string, JsonMap> = {}) {
   const store = new Map<string, JsonMap>();
   const versions = new Map<string, number>();
@@ -86,11 +99,11 @@ function createFakeDb(initial: Record<string, JsonMap> = {}) {
           const prev = options?.merge
             ? pending.get(ref.path) ?? store.get(ref.path) ?? {}
             : {};
-          pending.set(ref.path, {...prev, ...data});
+          pending.set(ref.path, applyPatch(prev, data));
         },
         update(ref: {path: string}, data: JsonMap) {
           const prev = pending.get(ref.path) ?? store.get(ref.path) ?? {};
-          pending.set(ref.path, {...prev, ...data});
+          pending.set(ref.path, applyPatch(prev, data));
         },
       };
       const result = await fn(tx);
@@ -984,7 +997,259 @@ async function runTests() {
     console.log("✓ Transactional safety: failure leaves database completely untouched (all-or-nothing) passed");
   }
 
-  console.log("\nALL 13 ExamProcess backend test groups passed successfully!");
+  // ── 14. CLINICALCASE DERIVED PROJECTIONS & ATOMICITY (F20.EXAM-V1) ──
+  {
+    const initialT0 = new Date("2026-09-04T10:00:00.000Z");
+    const tReq = new Date("2026-09-04T11:00:00.000Z");
+    const tCol = new Date("2026-09-04T12:00:00.000Z");
+    const tRes = new Date("2026-09-04T13:00:00.000Z");
+    const tInt = new Date("2026-09-04T14:00:00.000Z");
+    const tImp = new Date("2026-09-04T15:00:00.000Z");
+
+    const casePath = "dogs/dog-1/clinical_cases/case-proj-1";
+    const initialCase = {
+      id: "case-proj-1",
+      dog_id: "dog-1",
+      clinical_status: "open",
+      revision: 1,
+      event_count: 1,
+      last_event_at: initialT0,
+    };
+
+    const db = createFakeDb({
+      "dogs/dog-1": dogDoc,
+      [casePath]: initialCase,
+    });
+
+    let currentTestTime = tReq;
+    const testDeps = {
+      ...depsFor({db}),
+      now: () => currentTestTime,
+    };
+
+    // 1. REQUEST: count 1 -> 2, last_event_at -> tReq
+    const reqRes = await runHealthRequestExam(
+      {
+        auth: {uid: testCaller.uid},
+        data: {
+          dogId: "dog-1",
+          caseId: "case-proj-1",
+          title: "Hemograma Projeção",
+          examType: "blood_work",
+          operationId: "op-proj-req",
+        },
+      } as any,
+      testDeps,
+    );
+    const examId = reqRes["examId"] as string;
+    let caseAfterReq = db._store.get(casePath)!;
+    assert.strictEqual(caseAfterReq["event_count"], 2, "event_count increments 1 -> 2 on exam request");
+    assert.strictEqual(caseAfterReq["revision"], 2, "case revision increments 1 -> 2");
+    assert.strictEqual(caseAfterReq["clinical_status"], "under_investigation");
+    assert.strictEqual(
+      (caseAfterReq["last_event_at"] as any).toMillis(),
+      tReq.getTime(),
+      "last_event_at matches request recorded_at",
+    );
+
+    // 2. COLLECTION: count 2 -> 3, last_event_at -> tCol
+    currentTestTime = tCol;
+    await runHealthRecordExamCollection(
+      {
+        auth: {uid: testCaller.uid},
+        data: {
+          dogId: "dog-1",
+          caseId: "case-proj-1",
+          examId,
+          collectionSite: "Veia cefálica",
+          operationId: "op-proj-col",
+        },
+      } as any,
+      testDeps,
+    );
+    let caseAfterCol = db._store.get(casePath)!;
+    assert.strictEqual(caseAfterCol["event_count"], 3, "event_count increments 2 -> 3 on collection");
+    assert.strictEqual(caseAfterCol["revision"], 3, "case revision increments 2 -> 3");
+    assert.strictEqual(
+      (caseAfterCol["last_event_at"] as any).toMillis(),
+      tCol.getTime(),
+      "last_event_at matches collection recorded_at",
+    );
+
+    // 3. RESULT: count 3 -> 4, last_event_at -> tRes
+    currentTestTime = tRes;
+    await runHealthRecordExamResult(
+      {
+        auth: {uid: testCaller.uid},
+        data: {
+          dogId: "dog-1",
+          caseId: "case-proj-1",
+          examId,
+          resultSummary: "Plaquetas normais",
+          operationId: "op-proj-res",
+        },
+      } as any,
+      testDeps,
+    );
+    let caseAfterRes = db._store.get(casePath)!;
+    assert.strictEqual(caseAfterRes["event_count"], 4, "event_count increments 3 -> 4 on result");
+    assert.strictEqual(caseAfterRes["revision"], 4, "case revision increments 3 -> 4");
+    assert.strictEqual(
+      (caseAfterRes["last_event_at"] as any).toMillis(),
+      tRes.getTime(),
+      "last_event_at matches result recorded_at",
+    );
+
+    // 4. INTERPRETATION: count 4 -> 5, last_event_at -> tInt
+    currentTestTime = tInt;
+    await runHealthRecordExamInterpretation(
+      {
+        auth: {uid: testCaller.uid},
+        data: {
+          dogId: "dog-1",
+          caseId: "case-proj-1",
+          examId,
+          interpretationText: "Cão saudável",
+          professional: {
+            name: "Dr. Veterinário",
+            registration_type: "CRMV",
+            registration_number: "CRMV-1234",
+            clinic: "Clínica Central",
+          },
+          operationId: "op-proj-int",
+        },
+      } as any,
+      testDeps,
+    );
+    let caseAfterInt = db._store.get(casePath)!;
+    assert.strictEqual(caseAfterInt["event_count"], 5, "event_count increments 4 -> 5 on interpretation");
+    assert.strictEqual(caseAfterInt["revision"], 5, "case revision increments 4 -> 5");
+    assert.strictEqual(
+      (caseAfterInt["last_event_at"] as any).toMillis(),
+      tInt.getTime(),
+      "last_event_at matches interpretation recorded_at",
+    );
+
+    // 5. IMPACT ASSESSMENT: count 5 -> 6, last_event_at -> tImp
+    currentTestTime = tImp;
+    await runHealthAssessExamImpact(
+      {
+        auth: {uid: testCaller.uid},
+        data: {
+          dogId: "dog-1",
+          caseId: "case-proj-1",
+          examId,
+          operationalImpact: {
+            level: "none",
+            description: "Apto para serviço operacional",
+          },
+          operationId: "op-proj-imp",
+        },
+      } as any,
+      testDeps,
+    );
+    let caseAfterImp = db._store.get(casePath)!;
+    assert.strictEqual(caseAfterImp["event_count"], 6, "event_count increments 5 -> 6 on impact assessment");
+    assert.strictEqual(caseAfterImp["revision"], 6, "case revision increments 5 -> 6");
+    assert.strictEqual(
+      (caseAfterImp["last_event_at"] as any).toMillis(),
+      tImp.getTime(),
+      "last_event_at matches impact recorded_at",
+    );
+
+    // 6. IDEMPOTENT REPLAY: must NOT increment event_count or mutate last_event_at
+    const replayRes = await runHealthAssessExamImpact(
+      {
+        auth: {uid: testCaller.uid},
+        data: {
+          dogId: "dog-1",
+          caseId: "case-proj-1",
+          examId,
+          operationalImpact: {
+            level: "none",
+            description: "Apto para serviço operacional",
+          },
+          operationId: "op-proj-imp",
+        },
+      } as any,
+      testDeps,
+    );
+    assert.strictEqual(replayRes["stage"], "impact_assessed");
+    let caseAfterReplay = db._store.get(casePath)!;
+    assert.strictEqual(caseAfterReplay["event_count"], 6, "event_count UNCHANGED on idempotent replay");
+    assert.strictEqual(caseAfterReplay["revision"], 6, "case revision UNCHANGED on idempotent replay");
+    assert.strictEqual(
+      (caseAfterReplay["last_event_at"] as any).toMillis(),
+      tImp.getTime(),
+      "last_event_at UNCHANGED on idempotent replay",
+    );
+
+    // 7. CANCELLATION: cancellation creates no ClinicalEvent, so event_count is preserved
+    const req2Res = await runHealthRequestExam(
+      {
+        auth: {uid: testCaller.uid},
+        data: {
+          dogId: "dog-1",
+          caseId: "case-proj-1",
+          title: "Exame Cancelável",
+          examType: "urinalysis",
+          operationId: "op-proj-cancel-req",
+        },
+      } as any,
+      testDeps,
+    );
+    const exam2Id = req2Res["examId"] as string;
+    let caseAfterReq2 = db._store.get(casePath)!;
+    assert.strictEqual(caseAfterReq2["event_count"], 7, "event_count increments to 7 for 2nd exam request");
+
+    await runHealthCancelExam(
+      {
+        auth: {uid: testCaller.uid},
+        data: {
+          dogId: "dog-1",
+          caseId: "case-proj-1",
+          examId: exam2Id,
+          cancelReason: "Cancelado pelo veterinário",
+          operationId: "op-proj-cancel",
+        },
+      } as any,
+      testDeps,
+    );
+    let caseAfterCancel = db._store.get(casePath)!;
+    assert.strictEqual(caseAfterCancel["event_count"], 7, "event_count remains 7 after cancel (no clinical event)");
+
+    // 8. FAILURE ATOMICITY: forced failure leaves event_count, revision and events untouched
+    const failingDb = {
+      ...db,
+      async runTransaction<T>(_fn: any): Promise<T> {
+        throw new Error("Forced transaction failure for atomicity test");
+      },
+    } as any;
+    await assert.rejects(
+      () =>
+        runHealthRequestExam(
+          {
+            auth: {uid: testCaller.uid},
+            data: {
+              dogId: "dog-1",
+              caseId: "case-proj-1",
+              title: "Exame Falho",
+              examType: "blood_work",
+              operationId: "op-proj-fail",
+            },
+          } as any,
+          depsFor({db: failingDb}),
+        ),
+      /Forced transaction failure for atomicity test/,
+    );
+    let caseAfterFail = db._store.get(casePath)!;
+    assert.strictEqual(caseAfterFail["event_count"], 7, "event_count untouched on transaction failure");
+    assert.strictEqual(caseAfterFail["revision"], 7, "revision untouched on transaction failure");
+
+    console.log("✓ ClinicalCase derived event projections, idempotency, cancellation & atomicity passed");
+  }
+
+  console.log("\nALL 14 ExamProcess backend test groups passed successfully!");
 }
 
 runTests().catch((err) => {
