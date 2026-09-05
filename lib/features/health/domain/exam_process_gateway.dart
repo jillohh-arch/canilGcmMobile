@@ -34,6 +34,11 @@ abstract interface class ExamProcessGateway {
     required String caseId,
   });
 
+  Stream<List<ExamProcess>> watchCaseExams({
+    required String dogId,
+    required String caseId,
+  });
+
   Future<ExamProcessResult> requestExam(RequestExamCommand command);
 
   Future<ExamProcessResult> recordCollection(RecordExamCollectionCommand command);

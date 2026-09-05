@@ -31,6 +31,14 @@ class MockExamProcessGateway implements ExamProcessGateway {
   }
 
   @override
+  Stream<List<ExamProcess>> watchCaseExams({
+    required String dogId,
+    required String caseId,
+  }) {
+    return Stream.value(examsToReturn);
+  }
+
+  @override
   Future<ExamProcessResult> requestExam(RequestExamCommand command) async {
     recordedCommands.add(command);
     final exam = ExamProcess(

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -45,6 +47,7 @@ class _ExamProcessFlowScreenState extends State<ExamProcessFlowScreen> {
   List<ExamProcess> _exams = const [];
   bool _loadingExams = false;
   String? _examLoadError;
+  StreamSubscription<List<ExamProcess>>? _examsSubscription;
 
   bool _isActionSubmitting = false;
 
@@ -55,6 +58,12 @@ class _ExamProcessFlowScreenState extends State<ExamProcessFlowScreen> {
     _selectedCaseId = widget.caseId;
     _gateway = widget.gateway ?? FirebaseFunctionsExamProcessGateway();
     _loadCases();
+  }
+
+  @override
+  void dispose() {
+    _examsSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadCases() async {
@@ -93,11 +102,42 @@ class _ExamProcessFlowScreenState extends State<ExamProcessFlowScreen> {
   }
 
   Future<void> _loadExams(String caseId) async {
+    _examsSubscription?.cancel();
     setState(() {
       _loadingExams = true;
       _examLoadError = null;
     });
 
+    // 1. Escuta contínua reativa do Firestore
+    _examsSubscription = _gateway
+        .watchCaseExams(dogId: _dogId, caseId: caseId)
+        .listen(
+      (streamExams) {
+        if (!mounted) return;
+        setState(() {
+          final existingIds = streamExams.map((e) => e.id).toSet();
+          final locallyKnown = _exams.where(
+            (e) => !existingIds.contains(e.id) && e.caseId == caseId,
+          );
+          final combined = [...streamExams, ...locallyKnown];
+          combined.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          _exams = combined;
+          _loadingExams = false;
+          _examLoadError = null;
+        });
+      },
+      onError: (e) {
+        if (!mounted) return;
+        if (_exams.isEmpty) {
+          setState(() {
+            _loadingExams = false;
+            _examLoadError = 'Erro ao sincronizar exames: $e';
+          });
+        }
+      },
+    );
+
+    // 2. Leitura pontual concorrente
     try {
       final exams = await _gateway.loadCaseExams(
         dogId: _dogId,
@@ -116,10 +156,12 @@ class _ExamProcessFlowScreenState extends State<ExamProcessFlowScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _loadingExams = false;
-        _examLoadError = 'Erro ao carregar exames: $e';
-      });
+      if (_exams.isEmpty) {
+        setState(() {
+          _loadingExams = false;
+          _examLoadError = 'Erro ao carregar exames: $e';
+        });
+      }
     }
   }
 
@@ -128,6 +170,7 @@ class _ExamProcessFlowScreenState extends State<ExamProcessFlowScreen> {
     setState(() {
       _selectedCaseId = newCaseId;
       _exams = const [];
+      _loadingExams = true;
     });
     _loadExams(newCaseId);
   }
@@ -1159,6 +1202,15 @@ class _ExamProcessFlowScreenState extends State<ExamProcessFlowScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
+            selectedItemBuilder: (ctx) {
+              return _cases.map((c) {
+                return Text(
+                  '${c.title} (${c.statusWireName})',
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                );
+              }).toList();
+            },
             items: _cases.map((c) {
               return DropdownMenuItem(
                 value: c.caseId,

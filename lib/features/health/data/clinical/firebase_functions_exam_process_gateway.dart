@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:canil_gcm/features/health/domain/clinical_consultation_gateway.dart';
 import 'package:canil_gcm/features/health/domain/exam_process.dart';
@@ -63,7 +64,8 @@ final class FirebaseFunctionsExamProcessGateway implements ExamProcessGateway {
           .collection('dogs')
           .doc(dogId)
           .collection('clinical_cases')
-          .get(const GetOptions(source: Source.server));
+          .get(const GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 4));
     } catch (_) {
       snapshot = await _db
           .collection('dogs')
@@ -119,7 +121,8 @@ final class FirebaseFunctionsExamProcessGateway implements ExamProcessGateway {
           .collection('clinical_cases')
           .doc(caseId)
           .collection('exams')
-          .get(const GetOptions(source: Source.server));
+          .get(const GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 4));
     } catch (_) {
       snapshot = await _db
           .collection('dogs')
@@ -135,13 +138,48 @@ final class FirebaseFunctionsExamProcessGateway implements ExamProcessGateway {
       try {
         final exam = ExamProcess.fromMap(doc.data(), documentId: doc.id);
         exams.add(exam);
-      } catch (_) {
-        // Ignora documentos corrompidos fail-safe
+      } catch (e, st) {
+        assert(() {
+          debugPrint('[ExamGateway] Erro ao parsear exame ${doc.id}: $e\n$st');
+          return true;
+        }());
       }
     }
 
     exams.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return exams;
+  }
+
+  @override
+  Stream<List<ExamProcess>> watchCaseExams({
+    required String dogId,
+    required String caseId,
+  }) {
+    return _db
+        .collection('dogs')
+        .doc(dogId)
+        .collection('clinical_cases')
+        .doc(caseId)
+        .collection('exams')
+        .snapshots()
+        .map((snapshot) {
+      final exams = <ExamProcess>[];
+      for (final doc in snapshot.docs) {
+        try {
+          final exam = ExamProcess.fromMap(doc.data(), documentId: doc.id);
+          exams.add(exam);
+        } catch (e, st) {
+          assert(() {
+            debugPrint(
+              '[ExamGateway] Erro ao parsear exame no stream ${doc.id}: $e\n$st',
+            );
+            return true;
+          }());
+        }
+      }
+      exams.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return exams;
+    });
   }
 
   @override
@@ -318,7 +356,8 @@ final class FirebaseFunctionsExamProcessGateway implements ExamProcessGateway {
           .doc(caseId)
           .collection('exams')
           .doc(examId)
-          .get(const GetOptions(source: Source.server));
+          .get(const GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 4));
     } catch (_) {
       doc = await _db
           .collection('dogs')
