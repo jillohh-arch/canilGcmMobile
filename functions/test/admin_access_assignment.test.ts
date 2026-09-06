@@ -20,7 +20,9 @@ type JsonMap = Record<string, unknown>;
 
 interface AssignmentHarnessOptions {
   userData?: JsonMap;
+  personnelExists?: boolean;
   profileData?: JsonMap;
+  profileExists?: boolean;
   authUserByUid?: {uid: string; customClaims?: JsonMap} | null;
   authUidError?: Error;
   authUserByEmail?: {uid: string; customClaims?: JsonMap} | null;
@@ -35,6 +37,7 @@ interface AssignmentRecorded {
   firestoreWrites: Array<{payload: JsonMap}>;
   compensationAttempts: Array<{uid: string; claims: JsonMap}>;
   authLookupsCount: number;
+  profileLookupsCount: number;
 }
 
 async function simulateAssignAccessProfile(
@@ -50,13 +53,32 @@ async function simulateAssignAccessProfile(
     firestoreWrites: [],
     compensationAttempts: [],
     authLookupsCount: 0,
+    profileLookupsCount: 0,
   };
 
-  // F10.ACCESS-CREDENTIALS.I2.R2: Rejeicao de perfil descontinuado ANTES de qualquer operacao
-  if (profileId === "instrutor_k9" || options.profileData?.deprecated === true) {
+  // F10.ACCESS-CREDENTIALS.H1.C1 / I2.R2: Rejeicao de perfil descontinuado ANTES de qualquer operacao ou lookup
+  const normalizedProfileId = profileId.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (normalizedProfileId === "instrutor_k9") {
     throw new HttpsError(
       "failed-precondition",
-      "O perfil 'instrutor_k9' foi descontinuado como perfil de acesso base.",
+      "O perfil 'instrutor_k9' foi descontinuado como perfil de acesso base e nao " +
+        "pode receber novas atribuicoes. Utilize a qualificacao funcional de Instrutor.",
+      { reason: "ACCESS_PROFILE_DEPRECATED" },
+    );
+  }
+
+  // Lookups de documentos para perfis nao-legados:
+  recorded.profileLookupsCount++;
+  if (options.personnelExists === false) {
+    throw new HttpsError("not-found", "Usuario nao encontrado.");
+  }
+  if (options.profileExists === false) {
+    throw new HttpsError("not-found", "Perfil de acesso nao encontrado.");
+  }
+  if (options.profileData?.deprecated === true) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Perfil de acesso descontinuado nao pode receber novas atribuicoes.",
       { reason: "ACCESS_PROFILE_DEPRECATED" },
     );
   }
@@ -326,11 +348,12 @@ test("Phase D.20 (Cenario 7b): Atribuicao de perfil PRESERVA is_k9_instructor=fa
   assert.equal(write.training_instructor, null);
 });
 
-test("Phase D.21 / I2.R2: Atribuicao de perfil legado instrutor_k9 e rejeitada com ACCESS_PROFILE_DEPRECATED antes de qualquer mutacao", async () => {
+test("Phase D.21 / I2.R2 / C1-01 Case A: instrutor_k9 com documento ausente no Firestore e rejeitado com ACCESS_PROFILE_DEPRECATED sem lookup ou mutacao", async () => {
   let caughtError: unknown = null;
   let recordedState: AssignmentRecorded | null = null;
   try {
     const { recorded } = await simulateAssignAccessProfile("9001", "instrutor_k9", {
+      profileExists: false,
       userData: {
         active: true,
         status: "Ativo",
@@ -348,4 +371,68 @@ test("Phase D.21 / I2.R2: Atribuicao de perfil legado instrutor_k9 e rejeitada c
   const details = (caughtError as HttpsError).details as JsonMap;
   assert.equal(details?.reason, "ACCESS_PROFILE_DEPRECATED");
   assert.equal(recordedState, null);
+});
+
+test("C1-01 Case B: instrutor_k9 com documento presente no Firestore e rejeitado com mesmo ACCESS_PROFILE_DEPRECATED antes de qualquer lookup", async () => {
+  let caughtError: unknown = null;
+  try {
+    await simulateAssignAccessProfile("9001", "instrutor_k9", {
+      profileExists: true,
+      profileData: { id: "instrutor_k9", name: "Instrutor Legado" },
+      userData: { active: true, status: "Ativo", email: "9001@gcm.com.br" },
+    });
+  } catch (err) {
+    caughtError = err;
+  }
+
+  assert.ok(caughtError instanceof HttpsError);
+  assert.equal((caughtError as HttpsError).code, "failed-precondition");
+  const details = (caughtError as HttpsError).details as JsonMap;
+  assert.equal(details?.reason, "ACCESS_PROFILE_DEPRECATED");
+});
+
+test("C1-01 Case C: Perfil moderno desconhecido com documento ausente no Firestore retorna normal not-found", async () => {
+  let caughtError: unknown = null;
+  try {
+    await simulateAssignAccessProfile("9001", "custom_profile_unknown", {
+      profileExists: false,
+      userData: { active: true, status: "Ativo", email: "9001@gcm.com.br" },
+    });
+  } catch (err) {
+    caughtError = err;
+  }
+
+  assert.ok(caughtError instanceof HttpsError);
+  assert.equal((caughtError as HttpsError).code, "not-found");
+  assert.match((caughtError as HttpsError).message, /Perfil de acesso nao encontrado/);
+});
+
+test("C1-01 Case D: Perfil moderno ativo tem atribuicao bem-sucedida sem regressao", async () => {
+  const { recorded, result } = await simulateAssignAccessProfile("9001", "gestor", {
+    profileExists: true,
+    profileData: { id: "gestor", name: "Gestor", scope: "global", status: "active" },
+    userData: { active: true, status: "Ativo", email: "9001@gcm.com.br" },
+  });
+
+  assert.equal(result?.profileId, "gestor");
+  assert.equal(recorded.profileLookupsCount, 1);
+  assert.equal(recorded.firestoreWrites.length, 1);
+});
+
+test("C1-01 Case E: Documento moderno explicitamente marcado como deprecated=true e rejeitado com ACCESS_PROFILE_DEPRECATED apos lookup", async () => {
+  let caughtError: unknown = null;
+  try {
+    await simulateAssignAccessProfile("9001", "perfil_legado_custom", {
+      profileExists: true,
+      profileData: { id: "perfil_legado_custom", name: "Perfil Custom", deprecated: true, status: "active" },
+      userData: { active: true, status: "Ativo", email: "9001@gcm.com.br" },
+    });
+  } catch (err) {
+    caughtError = err;
+  }
+
+  assert.ok(caughtError instanceof HttpsError);
+  assert.equal((caughtError as HttpsError).code, "failed-precondition");
+  const details = (caughtError as HttpsError).details as JsonMap;
+  assert.equal(details?.reason, "ACCESS_PROFILE_DEPRECATED");
 });
