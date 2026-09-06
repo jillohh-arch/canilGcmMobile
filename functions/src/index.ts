@@ -28,6 +28,10 @@ import {
   reactivateHuman,
 } from "./admin_human_lifecycle";
 import {
+  defaultGenerateTemporaryPassword,
+  resetHumanPasswordLogic,
+} from "./admin_reset_human_password";
+import {
   buildAdminGetAccessHomologationSnapshotHandler,
   createAdminAccessHomologationSnapshotDeps,
 } from "./admin_access_homologation_snapshot";
@@ -2132,6 +2136,61 @@ export const adminGetAccessHomologationSnapshot = onCall(
   {region},
   async (request) => runAdminGetAccessHomologationSnapshot(request),
 );
+
+/**
+ * FRONT10.ACCESS-CREDENTIALS — RECUPERACAO DE PARIDADE DE SOURCE (Phase C / C1-02).
+ *
+ * `adminResetHumanPassword` existe em producao (canil-gcm) e e chamada pelo
+ * Web client (`callAdminResetHumanPassword`).
+ * Reconstruida com contrato estrito:
+ * - autorizacao administrativa (access.edit ou humans.edit);
+ * - busca fail-closed da identidade Auth;
+ * - integrante sem Auth -> NOT_FOUND com AUTH_IDENTITY_NOT_FOUND (NUNCA cria conta);
+ * - gera senha temporaria forte em memoria;
+ * - NUNCA persiste a senha no Firestore, NUNCA coloca em log e NUNCA em auditoria;
+ * - auditoria canonica de sucesso registrada no Firestore (users/{ra});
+ * - sincroniza ambos os espelhos (updated_at e updatedAt);
+ * - identidade Auth disabled permanece disabled.
+ */
+export const adminResetHumanPassword = onCall({region}, async (request) => {
+  return resetHumanPasswordLogic({auth: request.auth, data: request.data}, {
+    authorize: async (auth) => {
+      const typedAuth = auth as
+        | {uid: string; token: admin.auth.DecodedIdToken}
+        | undefined;
+      try {
+        return await requireAccessPermission(typedAuth, "access", "edit");
+      } catch {
+        return await requireAccessPermission(typedAuth, "humans", "edit");
+      }
+    },
+    generateTemporaryPassword: defaultGenerateTemporaryPassword,
+    getPersonnel: async (ra) => {
+      const snap = await db.collection("users").doc(ra).get();
+      return {exists: snap.exists, data: (snap.data() ?? {}) as JsonMap};
+    },
+    lookupAuthByUid: async (uid) => {
+      const user = await lookupAuthUserByUid(uid);
+      if (!user) return null;
+      return {disabled: user.disabled, email: user.email, uid: user.uid};
+    },
+    lookupAuthByEmail: async (email) => {
+      const user = await lookupAuthUserByEmail(email);
+      if (!user) return null;
+      return {disabled: user.disabled, email: user.email, uid: user.uid};
+    },
+    serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+    updatePassword: async (uid, password) => {
+      await admin.auth().updateUser(uid, {password});
+    },
+    updatePersonnelAudit: async (ra, payload) => {
+      await db.collection("users").doc(ra).set({
+        ...payload,
+        audit_trail: admin.firestore.FieldValue.arrayUnion(payload.audit_trail),
+      }, {merge: true});
+    },
+  });
+});
 
 export const adminSeedAccessProfiles = onCall({region}, async (request) => {
   return runAdminSeedAccessProfiles(request, accessProfileWriterDeps);

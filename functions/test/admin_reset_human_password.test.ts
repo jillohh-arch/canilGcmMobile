@@ -324,3 +324,20 @@ test("17. defaultGenerateTemporaryPassword produz senha valida com maiuscula, mi
     assert.match(pwd, /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/);
   }
 });
+
+test("18. C1-02: entrypoint do Functions exporta adminResetHumanPassword", () => {
+  process.env.FIREBASE_CONFIG = JSON.stringify({ projectId: "test-k9-project" });
+  process.env.GCLOUD_PROJECT = "test-k9-project";
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const indexModule = require("../src/index");
+  assert.equal(typeof indexModule.adminResetHumanPassword, "function");
+});
+
+test("19. C1-02: entrypoint delega adminResetHumanPassword para resetHumanPasswordLogic", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const indexPath = path.resolve(__dirname, "../../../src/index.ts");
+  const content = fs.readFileSync(indexPath, "utf8");
+  assert.match(content, /export const adminResetHumanPassword = onCall\(/);
+  assert.match(content, /resetHumanPasswordLogic\(\{auth: request\.auth, data: request\.data\},/);
+});
