@@ -10,6 +10,24 @@ import {
   onRequest,
 } from "firebase-functions/v2/https";
 import {
+  K9IdentityTransaction,
+  patchK9Identity,
+} from "./admin_patch_k9_identity";
+import {
+  createHuman,
+  DocumentAlreadyExistsError,
+} from "./admin_create_human";
+import {
+  HumanPersonnelTransaction,
+  patchHumanPersonnel,
+} from "./admin_patch_human_personnel";
+import {
+  deactivateHuman,
+  HumanLifecycleTransaction,
+  reactivateHuman,
+} from "./admin_human_lifecycle";
+import {isAuthUserNotFound} from "./auth_error_classification";
+import {
   AccessScope,
   AccessScopeResolution,
   decideAccessScope,
@@ -60,9 +78,13 @@ import {
   ClinicalCaller,
   runHealthAmendClinicalEvent,
   runHealthAppendClinicalEvent,
+  runHealthCancelClinicalCase,
   runHealthCancelClinicalEvent,
+  runHealthDischargeClinicalCase,
   runHealthFinalizeClinicalEvent,
   runHealthOpenClinicalCase,
+  runHealthReopenClinicalCase,
+  runHealthTransitionClinicalCase,
   type ClinicalCaseCallableDeps,
 } from "./clinical_case_callables";
 import {
@@ -2406,6 +2428,58 @@ export const adminUpsertK9 = onCall({region}, async (request) => {
   return {id: dogId};
 });
 
+/**
+ * Patch administrativo seguro da identidade do K9.
+ *
+ * Substitui a edicao legada (adminUpsertK9 mode="edit"), que reescrevia o
+ * documento inteiro. A logica de contrato vive em admin_patch_k9_identity.ts;
+ * aqui apenas injetamos Firestore, autorizacao e convencoes de timestamp.
+ */
+export const adminPatchK9Identity = onCall({region}, async (request) => {
+  return patchK9Identity(
+    {
+      authorize: () => requireAccessPermission(request.auth, "k9", "edit"),
+      runTransaction: (handler) =>
+        db.runTransaction(async (transaction) => {
+          const tx: K9IdentityTransaction = {
+            getDog: async (dogId) =>
+              transaction.get(db.collection("dogs").doc(dogId)),
+            findRegistrationOwners: async (registrationNumber) => {
+              const [legacySnap, currentSnap] = await Promise.all([
+                transaction.get(
+                  db.collection("dogs").where("matricula", "==", registrationNumber),
+                ),
+                transaction.get(
+                  db
+                    .collection("dogs")
+                    .where("registrationNumber", "==", registrationNumber),
+                ),
+              ]);
+              return Array.from(
+                new Set(
+                  [...legacySnap.docs, ...currentSnap.docs].map(
+                    (docSnapshot) => docSnapshot.id,
+                  ),
+                ),
+              );
+            },
+            patchDog: (dogId, patch) => {
+              transaction.set(db.collection("dogs").doc(dogId), patch, {merge: true});
+            },
+            writeAuditLog: (entry) => {
+              transaction.set(db.collection("auditLogs").doc(), entry);
+            },
+          };
+          return handler(tx);
+        }),
+      serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+      auditEntry: (action, caller) => auditEntry(action, caller),
+      arrayUnion: (value) => admin.firestore.FieldValue.arrayUnion(value),
+    },
+    request.data,
+  );
+});
+
 export const adminArchiveK9 = onCall({region}, async (request) => {
   const caller = await requireAccessPermission(request.auth, "k9", "archive");
   const data = request.data as JsonMap;
@@ -2992,6 +3066,158 @@ export const adminUpsertHuman = onCall({region}, async (request) => {
     temporary_password: temporaryPassword,
     token_refresh_required: true,
   };
+});
+
+export const adminCreateHuman = onCall({region}, async (request) => {
+  return createHuman(
+    {
+      authorize: () => requireAccessPermission(request.auth, "humans", "create"),
+      createUserDoc: async (ra, payload) => {
+        try {
+          // create() e atomico e falha se o documento ja existir: nao ha
+          // janela TOCTOU nem risco de overwrite (nunca usa merge).
+          await db.collection("users").doc(ra).create(payload);
+        } catch (error) {
+          const code = (error as {code?: unknown}).code;
+          // Firestore ALREADY_EXISTS: gRPC code 6 (admin SDK) ou string.
+          if (code === 6 || code === "already-exists") {
+            throw new DocumentAlreadyExistsError();
+          }
+          throw error;
+        }
+      },
+      serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+      auditEntry: (action, caller) => auditEntry(action, caller),
+    },
+    request.data,
+  );
+});
+
+export const adminPatchHumanPersonnel = onCall({region}, async (request) => {
+  return patchHumanPersonnel(
+    {
+      authorize: () => requireAccessPermission(request.auth, "humans", "edit"),
+      runTransaction: (handler) =>
+        db.runTransaction(async (transaction) => {
+          const tx: HumanPersonnelTransaction = {
+            getUser: async (ra) => {
+              const snap = await transaction.get(
+                db.collection("users").doc(ra),
+              );
+              return {exists: snap.exists, data: snap.data() ?? null};
+            },
+            patchUser: (ra, patch) => {
+              // merge:true aplica atualizacoes e FieldValue.delete() sem
+              // reescrever o documento inteiro.
+              transaction.set(db.collection("users").doc(ra), patch, {
+                merge: true,
+              });
+            },
+          };
+          return handler(tx);
+        }),
+      serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+      auditEntry: (action, caller) => auditEntry(action, caller),
+      arrayUnion: (value) => admin.firestore.FieldValue.arrayUnion(value),
+      deleteField: () => admin.firestore.FieldValue.delete(),
+    },
+    request.data,
+  );
+});
+
+/**
+ * Wiring compartilhado das duas callables de Human Lifecycle V1.
+ *
+ * As chamadas de Auth ficam FORA do callback de runTransaction: transacoes
+ * podem sofrer retry e repetiriam o efeito colateral externo. A ordem e a
+ * compensacao vivem em admin_human_lifecycle.ts.
+ */
+function humanLifecycleDeps(request: CallableRequest<unknown>) {
+  const userRef = (ra: string) => db.collection("users").doc(ra);
+  const activeShiftRef = (ra: string) =>
+    db.collection("active_shifts").doc(ra);
+  return {
+    authorize: () =>
+      requireAccessPermission(request.auth, "humans", "archive"),
+    runTransaction: <T>(
+      handler: (tx: HumanLifecycleTransaction) => Promise<T>,
+    ) =>
+      db.runTransaction(async (transaction) => {
+        const tx: HumanLifecycleTransaction = {
+          getUser: async (ra) => {
+            const snap = await transaction.get(userRef(ra));
+            return {exists: snap.exists, data: snap.data() ?? null};
+          },
+          // Uma transacao do Firestore le documentos de colecoes diferentes; o
+          // guard de turno precisa ser revalidado no mesmo instante logico.
+          getActiveShift: async (ra) => {
+            const snap = await transaction.get(activeShiftRef(ra));
+            return {exists: snap.exists, data: snap.data() ?? null};
+          },
+          patchUser: (ra, patch) => {
+            transaction.set(userRef(ra), patch, {merge: true});
+          },
+        };
+        return handler(tx);
+      }),
+    getUser: async (ra: string) => {
+      const snap = await userRef(ra).get();
+      return {exists: snap.exists, data: snap.data() ?? null};
+    },
+    getActiveShift: async (ra: string) => {
+      const snap = await activeShiftRef(ra).get();
+      return {exists: snap.exists, data: snap.data() ?? null};
+    },
+    // `null` SOMENTE quando a conta nao existe: o modulo trata como DANGLING (o
+    // doc afirma um uid morto) e falha fechado antes de qualquer mutacao.
+    // Qualquer outro erro propaga: um `catch` nu transformaria falta de
+    // permissao num DANGLING falso (S2.A.D1).
+    getAuthAccount: async (uid: string) => {
+      try {
+        const record = await admin.auth().getUser(uid);
+        return {uid: record.uid, disabled: record.disabled === true};
+      } catch (error) {
+        if (isAuthUserNotFound(error)) return null;
+        throw error;
+      }
+    },
+    // Fallback CANONICO, identico ao de adminAssignAccessProfile/
+    // adminUpsertHuman/setK9InstructorRole. `null` => Personnel sem conta.
+    // Só a inexistencia real vira `null`: engolir um PERMISSION_DENIED aqui
+    // devolveria `not_provisioned` com a conta ainda habilitada (S2.A.D1).
+    findAuthAccountByEmail: async (email: string) => {
+      try {
+        const record = await admin.auth().getUserByEmail(email);
+        return {uid: record.uid, disabled: record.disabled === true};
+      } catch (error) {
+        if (isAuthUserNotFound(error)) return null;
+        throw error;
+      }
+    },
+    // Mesma expressao provada no repo. `institutional_email` NUNCA participa.
+    canonicalAuthEmail: (user: JsonMap, ra: string) =>
+      stringValue(user.email) ?? emailForRa(ra),
+    setAuthDisabled: async (uid: string, disabled: boolean) => {
+      await admin.auth().updateUser(uid, {disabled});
+    },
+    serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+    auditEntry: (
+      action: string,
+      caller: CallerIdentity,
+      reason?: string,
+    ) => auditEntry(action, caller, reason),
+    arrayUnion: (value: unknown) =>
+      admin.firestore.FieldValue.arrayUnion(value),
+    deleteField: () => admin.firestore.FieldValue.delete(),
+  };
+}
+
+export const adminDeactivateHuman = onCall({region}, async (request) => {
+  return deactivateHuman(humanLifecycleDeps(request), request.data);
+});
+
+export const adminReactivateHuman = onCall({region}, async (request) => {
+  return reactivateHuman(humanLifecycleDeps(request), request.data);
 });
 
 export const adminArchiveHuman = onCall({region}, async (request) => {
@@ -8392,6 +8618,16 @@ const clinicalCaseDeps: ClinicalCaseCallableDeps = {
   ) => toClinicalCaller(
     await requireClinicalCapability(auth, "amend_clinical"),
   ),
+  requireManageClinicalCase: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toClinicalCaller(
+    await requireClinicalCapability(auth, "manage_clinical_case"),
+  ),
+  requireReopenClinicalCase: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toClinicalCaller(
+    await requireClinicalCapability(auth, "reopen_clinical_case"),
+  ),
   requireDogAccess: async (
     auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
     caller: ClinicalCaller,
@@ -8455,6 +8691,34 @@ export const healthCancelClinicalEvent = onCall({region}, async (request) => {
  */
 export const healthAmendClinicalEvent = onCall({region}, async (request) => {
   return runHealthAmendClinicalEvent(request, clinicalCaseDeps);
+});
+
+/**
+ * Transiciona o status de um ClinicalCase ativo (health.manage_clinical_case + dog access).
+ */
+export const healthTransitionClinicalCase = onCall({region}, async (request) => {
+  return runHealthTransitionClinicalCase(request, clinicalCaseDeps);
+});
+
+/**
+ * Concede alta a um ClinicalCase ativo (health.manage_clinical_case + dog access).
+ */
+export const healthDischargeClinicalCase = onCall({region}, async (request) => {
+  return runHealthDischargeClinicalCase(request, clinicalCaseDeps);
+});
+
+/**
+ * Cancela um ClinicalCase ativo (health.manage_clinical_case + dog access).
+ */
+export const healthCancelClinicalCase = onCall({region}, async (request) => {
+  return runHealthCancelClinicalCase(request, clinicalCaseDeps);
+});
+
+/**
+ * Reabre um ClinicalCase encerrado (health.reopen_clinical_case + dog access).
+ */
+export const healthReopenClinicalCase = onCall({region}, async (request) => {
+  return runHealthReopenClinicalCase(request, clinicalCaseDeps);
 });
 
 function toExamCaller(caller: CallerIdentity): ExamCaller {

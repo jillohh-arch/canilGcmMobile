@@ -203,6 +203,7 @@ void main() {
         const RequestExamCommand(
           dogId: 'dog-1',
           caseId: 'case-1',
+          expectedCaseRevision: 3,
           title: 'Hemograma',
           examType: ExamType.bloodWork,
           operationId: 'op-1',
@@ -217,6 +218,8 @@ void main() {
       expect(calls.length, 1);
       expect(calls.first['fn'], ExamProcessCallableNames.requestExam);
       expect(calls.first['data']['title'], 'Hemograma');
+      // A precondição OCC do caso precisa chegar ao backend, sem default.
+      expect(calls.first['data']['expectedCaseRevision'], 3);
     });
 
     test('mapeia erro do backend para ExamProcessFailure', () async {
@@ -239,6 +242,7 @@ void main() {
         const RequestExamCommand(
           dogId: 'dog-1',
           caseId: 'case-1',
+          expectedCaseRevision: 1,
           title: 'Hemograma',
           examType: ExamType.bloodWork,
           operationId: 'op-err',

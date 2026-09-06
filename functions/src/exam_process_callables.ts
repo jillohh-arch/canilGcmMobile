@@ -12,12 +12,25 @@ import {FieldValue, Timestamp} from "firebase-admin/firestore";
 import {CallableRequest, HttpsError} from "firebase-functions/v2/https";
 
 import {
+  ClinicalDomainError,
   isTerminalCaseStatus,
   parseClinicalCaseStatus,
 } from "./clinical_domain";
 import {
+  applyClinicalCaseTransition,
+  assertClinicalCasePrecondition,
+  assertClinicalReceiptShape,
+  assertStoredCaseIntegrity,
+  mapClinicalError,
+  matchClinicalReceipt,
+  parseExpectedRevision,
+  receiptPayload,
+  rejectServerManagedInjection,
+} from "./clinical_case_callables";
+import {
   JsonMap,
   assertDogId,
+  logicError,
   normalizeOperationId,
   recordedByPayload,
   stableStringify,
@@ -25,6 +38,16 @@ import {
 } from "./health_document_logic";
 
 export const EXAM_SCHEMA_VERSION = 1;
+
+/**
+ * Canonical receipt discriminators for the Exam request operation
+ * (CLINICAL-BE.MERGE-I1 §14). Exam receipts now share the frozen Clinical receipt
+ * shape, so `assertClinicalReceiptShape` + `matchClinicalReceipt` can enforce
+ * actor_uid AND operation_type AND fingerprint instead of a bare fingerprint
+ * compare, which could not tell a replay from a foreign operation.
+ */
+export const EXAM_REQUEST_KIND = "exam_request_v1";
+export const EXAM_REQUEST_OPERATION = "request_exam";
 
 export interface ExamCaller {
   uid: string;
@@ -145,30 +168,22 @@ export function auditDocId(
  * - `event_count`: incrementado em 1 via FieldValue.increment(1)
  * - `last_event_at`: avançado para nowTs (Timestamp canônico de gravação do evento)
  * - `updated_at`: avançado para nowTs
- * - `revision`: avançado em 1 step estrito
- * - Se `transitionOpenToUnderInvestigation` for true e `caseStatus === "open"`, atualiza `clinical_status` para `"under_investigation"`.
+ * - `revision`: avançado em 1 step estrito via autoridade de integridade do caso
  */
 export function applyCaseEventProjection(
   tx: FirebaseFirestore.Transaction,
   cRef: FirebaseFirestore.DocumentReference,
   caseData: JsonMap,
   nowTs: Timestamp,
-  options?: { transitionOpenToUnderInvestigation?: boolean },
 ): void {
-  const caseRev = typeof caseData["revision"] === "number" ? caseData["revision"] : 1;
-  const rawStatus = stringValue(caseData["clinical_status"]);
-  const caseStatus = rawStatus ? parseClinicalCaseStatus(rawStatus) : null;
+  const {revision: storedRevision} = assertStoredCaseIntegrity(caseData);
 
   const patch: JsonMap = {
     event_count: FieldValue.increment(1),
     last_event_at: nowTs,
     updated_at: nowTs,
-    revision: caseRev + 1,
+    revision: storedRevision + 1,
   };
-
-  if (options?.transitionOpenToUnderInvestigation && caseStatus === "open") {
-    patch["clinical_status"] = "under_investigation";
-  }
 
   tx.set(cRef, patch, {merge: true});
 }
@@ -192,6 +207,29 @@ function parseRequiredString(data: JsonMap, field: string): string {
   return val;
 }
 
+/**
+ * The caller's MANDATORY optimistic-concurrency precondition on the PARENT
+ * ClinicalCase (CLINICAL-BE.MERGE-I1 §14.1, Control Tower override).
+ *
+ * Requesting an exam can transition the case, so the caller must declare which
+ * case revision it believes it is acting on. Absence is `invalid-argument`, never
+ * an implicit "whatever is stored" — and there is deliberately NO fallback to 1:
+ * a stored case without a revision is corruption (F1.C1), and Firestore's
+ * transaction retry is not a substitute for explicit caller intent.
+ *
+ * Only the "field is missing" message is owned here; the integer rule itself
+ * stays single-sourced in `parseExpectedRevision`.
+ */
+function parseExpectedCaseRevision(raw: unknown): number {
+  if (raw === undefined || raw === null) {
+    throw logicError(
+      "validation",
+      "expectedCaseRevision é obrigatório para solicitar um exame.",
+    );
+  }
+  return parseExpectedRevision(raw);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. REQUEST EXAM
 // ─────────────────────────────────────────────────────────────────────────────
@@ -213,8 +251,37 @@ export async function runHealthRequestExam(
   request: CallableRequest,
   deps: ExamProcessCallableDeps,
 ): Promise<JsonMap> {
+  try {
+    return await requestExamInternal(request, deps);
+  } catch (err) {
+    // Only the reused Clinical core communicates through `appCode` /
+    // ClinicalDomainError; map those to the frozen client contract
+    // (validation → invalid-argument, conflict/integrity/idempotency-conflict →
+    // failed-precondition). Everything else — HttpsError raised by the
+    // capability/dog-access layer, or an infrastructure failure — must propagate
+    // untouched, so this wrapper never reclassifies an error it does not own.
+    if (
+      err instanceof ClinicalDomainError ||
+      (err !== null && typeof err === "object" && "appCode" in err)
+    ) {
+      mapClinicalError(err);
+    }
+    throw err;
+  }
+}
+
+async function requestExamInternal(
+  request: CallableRequest,
+  deps: ExamProcessCallableDeps,
+): Promise<JsonMap> {
   const caller = await deps.requireRequestExam(request.auth);
   const data = (request.data ?? {}) as JsonMap;
+
+  // Server-managed field protection (§14.7): a client may not smuggle
+  // clinical_status, revision, closure/reopen metadata or actor fields. `dog_id`
+  // is allow-listed because this callable has always accepted it as the
+  // snake_case alias of `dogId` — it is caller identity, not server state.
+  rejectServerManagedInjection(data, ["dog_id"]);
 
   const dogId = assertDogId(data["dogId"] ?? data["dog_id"]);
   const caseId = parseRequiredString(data, "caseId");
@@ -231,6 +298,9 @@ export async function runHealthRequestExam(
   const requestReason = stringValue(data["requestReason"] ?? data["request_reason"]) ?? null;
   const professionalRaw = data["professional"] as JsonMap | undefined;
   const operationId = normalizeOperationId(data["operationId"] ?? data["operation_id"]);
+  const expectedCaseRevision = parseExpectedCaseRevision(
+    data["expectedCaseRevision"] ?? data["expected_case_revision"],
+  );
 
   const dog = await loadDog(deps.db, dogId);
   await deps.requireDogAccess(request.auth, caller, dogId, dog);
@@ -256,6 +326,9 @@ export async function runHealthRequestExam(
   const nowDate = (deps.now ?? (() => new Date()))();
   const nowTs = Timestamp.fromDate(nowDate);
 
+  // INTENT fingerprint. `expectedCaseRevision` is deliberately EXCLUDED (§14.5):
+  // it is a precondition, not intent, so a legitimate replay after a case bump
+  // must still be recognised as the same operation.
   const fingerprint = sha256Hex(
     stableStringify({
       action: "request_exam",
@@ -271,16 +344,32 @@ export async function runHealthRequestExam(
   );
 
   return await deps.db.runTransaction(async (tx) => {
+    // REPLAY BEFORE STALE (§14.4): the receipt is resolved before the case is
+    // read at all, so a winner replaying with a now-stale token still no-ops.
     const opSnap = await tx.get(opRef);
     if (opSnap.exists) {
-      const receipt = opSnap.data() as JsonMap;
-      if (receipt["fingerprint"] === fingerprint) {
-        return (receipt["result"] ?? {}) as JsonMap;
+      const stored = (opSnap.data() ?? {}) as JsonMap;
+      assertClinicalReceiptShape(stored, EXAM_REQUEST_KIND, EXAM_REQUEST_OPERATION);
+      const match = matchClinicalReceipt({
+        receiptExists: true,
+        storedActorUid: stringValue(stored["actor_uid"]),
+        storedOperationType: stringValue(stored["operation_type"]),
+        storedFingerprint: stringValue(stored["fingerprint"]),
+        expectedOperationType: EXAM_REQUEST_OPERATION,
+        actorUid: caller.uid,
+        fingerprint,
+      });
+      if (match === "idempotency-conflict") {
+        // Reused operationId with a different actor, operation type or intent
+        // (§14.9, §14.10) — a caller bug, never a race.
+        throw logicError(
+          "idempotency-conflict",
+          `Conflito de idempotência: operationId ${operationId} já utilizado com intent diferente.`,
+        );
       }
-      throw new HttpsError(
-        "failed-precondition",
-        `Conflito de idempotência: operationId ${operationId} já utilizado com intent diferente.`,
-      );
+      if (match === "replay") {
+        return (stored["result"] ?? {}) as JsonMap;
+      }
     }
 
     const caseSnap = await tx.get(cRef);
@@ -288,12 +377,19 @@ export async function runHealthRequestExam(
       throw new HttpsError("not-found", `ClinicalCase ${caseId} não encontrado.`);
     }
     const caseData = caseSnap.data() as JsonMap;
-    const rawStatus = stringValue(caseData["clinical_status"]);
-    const caseStatus = rawStatus ? parseClinicalCaseStatus(rawStatus) : null;
-    if (caseStatus && isTerminalCaseStatus(caseStatus)) {
+
+    // Stored integrity BEFORE stale, then the MANDATORY OCC precondition.
+    // A stored case without a valid `revision` fails closed here as corruption
+    // (§14.2) — the old `typeof revision === "number" ? revision : 1` default is
+    // gone. A mismatch is a stale/OCC rejection (§14.3).
+    const casePrecondition = assertClinicalCasePrecondition(
+      caseData,
+      expectedCaseRevision,
+    );
+    if (isTerminalCaseStatus(casePrecondition.status)) {
       throw new HttpsError(
         "failed-precondition",
-        `Caso ${caseId} está em estado terminal (${caseStatus}) e não aceita novos exames.`,
+        `Caso ${caseId} está em estado terminal (${casePrecondition.status}) e não aceita novos exames.`,
       );
     }
 
@@ -345,10 +441,31 @@ export async function runHealthRequestExam(
     };
     if (professionalRaw) eventDoc["professional"] = professionalRaw;
 
-    // Atualiza projeção derivada do ClinicalCase (event_count, last_event_at, revision, clinical_status)
-    applyCaseEventProjection(tx, cRef, caseData, nowTs, {
-      transitionOpenToUnderInvestigation: true,
-    });
+    // CASE TRANSITION — Option A (§13). `clinical_status` is owned SOLELY by the
+    // ClinicalCase lifecycle authority; this writer delegates to that core inside
+    // its OWN transaction, so the Exam write and the transition stay atomic and no
+    // second transition implementation exists. Not a callable-to-callable call.
+    if (casePrecondition.status === "open") {
+      applyClinicalCaseTransition({
+        tx,
+        caseDocRef: cRef,
+        storedCase: caseData,
+        destination: "under_investigation",
+        expectedRevision: expectedCaseRevision,
+        nowTimestamp: nowTs,
+      });
+      // Projeta a adição do evento clínico no ClinicalCase sem duplo incremento de revision
+      tx.set(
+        cRef,
+        {
+          event_count: FieldValue.increment(1),
+          last_event_at: nowTs,
+        },
+        {merge: true},
+      );
+    } else {
+      applyCaseEventProjection(tx, cRef, caseData, nowTs);
+    }
 
     // HealthScheduleItem
     const scheduleDoc: JsonMap = {
@@ -379,12 +496,20 @@ export async function runHealthRequestExam(
       stage: "requested",
     };
 
-    tx.set(opRef, {
-      operation_id: operationId,
-      fingerprint,
-      result,
-      created_at: nowTs,
-    });
+    // Canonical Clinical receipt shape (§14.8): kind + operation_id +
+    // operation_type + actor_uid + fingerprint + result, so a later read can
+    // distinguish a replay from a foreign operation on the same operationId.
+    tx.set(
+      opRef,
+      receiptPayload({
+        kind: EXAM_REQUEST_KIND,
+        operationType: EXAM_REQUEST_OPERATION,
+        operationId,
+        actorUid: caller.uid,
+        fingerprint,
+        result,
+      }),
+    );
 
     tx.set(auditRef, {
       action: "health.request_exam",

@@ -12,21 +12,26 @@ import * as assert from "assert";
 import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
-import {Timestamp} from "firebase-admin/firestore";
+import {FieldValue, Timestamp} from "firebase-admin/firestore";
 
 import {
   ClinicalCaller,
   ClinicalCaseCallableDeps,
+  canonicalCasePath,
   caseIdentityMaterial,
   deterministicCaseId,
-  eventIdentityMaterial,
   deterministicEventId,
+  eventIdentityMaterial,
   openingEventIdFor,
   runHealthAmendClinicalEvent,
   runHealthAppendClinicalEvent,
+  runHealthCancelClinicalCase,
   runHealthCancelClinicalEvent,
+  runHealthDischargeClinicalCase,
   runHealthFinalizeClinicalEvent,
   runHealthOpenClinicalCase,
+  runHealthReopenClinicalCase,
+  runHealthTransitionClinicalCase,
 } from "./clinical_case_callables";
 import {
   isAdminToken,
@@ -85,6 +90,16 @@ function eventIdFor(dogId: string, caseId: string, operationId: string): string 
 
 // ── Fake Firestore ───────────────────────────────────────────────────────────
 
+function isDeleteSentinel(val: unknown): boolean {
+  if (!val || typeof val !== "object") return false;
+  if (typeof (val as {isEqual?: unknown}).isEqual === "function") {
+    try {
+      if ((val as {isEqual: (other: unknown) => boolean}).isEqual(FieldValue.delete())) return true;
+    } catch (_) {}
+  }
+  return false;
+}
+
 /**
  * Fake com concorrência otimista real: rastreia versões dos paths lidos e
  * reexecuta a transação se algum mudar antes do commit. `set` suporta a opção
@@ -133,6 +148,7 @@ function createFakeDb(initial: Record<string, JsonMap> = {}) {
           data: JsonMap,
           options?: {merge?: boolean},
         ) => void;
+        update: (ref: {path: string}, data: JsonMap) => void;
       }) => Promise<T>,
     ): Promise<T> {
       const maxAttempts = 5;
@@ -159,7 +175,28 @@ function createFakeDb(initial: Record<string, JsonMap> = {}) {
             const prev = options?.merge
               ? pending.get(ref.path) ?? store.get(ref.path) ?? {}
               : {};
-            pending.set(ref.path, {...prev, ...data});
+            const next = {...prev};
+            for (const [k, v] of Object.entries(data)) {
+              if (isDeleteSentinel(v) || v === undefined) {
+                delete next[k];
+              } else {
+                next[k] = v;
+              }
+            }
+            pending.set(ref.path, next);
+          },
+          update(ref: {path: string}, data: JsonMap) {
+            const prev = pending.get(ref.path) ?? store.get(ref.path);
+            if (!prev) throw new Error(`Document not found for update: ${ref.path}`);
+            const next = {...prev};
+            for (const [k, v] of Object.entries(data)) {
+              if (isDeleteSentinel(v) || v === undefined) {
+                delete next[k];
+              } else {
+                next[k] = v;
+              }
+            }
+            pending.set(ref.path, next);
           },
         };
         const result = await fn(tx);
@@ -211,6 +248,8 @@ function depsFor(options: {
   allowRecord?: boolean;
   allowFinalize?: boolean;
   allowAmend?: boolean;
+  allowManageCase?: boolean;
+  allowReopenCase?: boolean;
   dogAccess?: boolean;
   admin?: boolean;
   caller?: ClinicalCaller;
@@ -236,6 +275,8 @@ function depsFor(options: {
     requireRecordClinical: gate(options.allowRecord, "record_clinical"),
     requireFinalizeClinical: gate(options.allowFinalize, "finalize_clinical"),
     requireAmendClinical: gate(options.allowAmend, "amend_clinical"),
+    requireManageClinicalCase: gate(options.allowManageCase, "manage_clinical_case"),
+    requireReopenClinicalCase: gate(options.allowReopenCase, "reopen_clinical_case"),
     requireDogAccess: async () => {
       if (options.dogAccess === false) {
         throw new HttpsError("permission-denied", "sem acesso ao K9", {
@@ -270,6 +311,7 @@ async function expectReject(
   fn: () => Promise<unknown>,
   code: string,
   label: string,
+  expectedMessage?: string | RegExp,
 ) {
   try {
     await fn();
@@ -280,6 +322,22 @@ async function expectReject(
       code,
       `${label}: code ${details?.code} != ${code}`,
     );
+    if (expectedMessage !== undefined) {
+      const msg = (err as Error)?.message ?? "";
+      if (typeof expectedMessage === "string") {
+        assert.strictEqual(
+          msg,
+          expectedMessage,
+          `${label}: message '${msg}' != '${expectedMessage}'`,
+        );
+      } else {
+        assert.match(
+          msg,
+          expectedMessage,
+          `${label}: message '${msg}' does not match ${expectedMessage}`,
+        );
+      }
+    }
     return;
   }
   assert.fail(`${label}: esperava rejeição ${code}`);
@@ -1536,8 +1594,42 @@ const mutationCmd = (
 const eventOf = (db: {_store: Map<string, JsonMap>}, p: string): JsonMap =>
   db._store.get(p) as JsonMap;
 
+const caseOf = (db: {_store: Map<string, JsonMap>}, p: string): JsonMap =>
+  db._store.get(p) as JsonMap;
+
 const auditKeys = (db: {_store: Map<string, JsonMap>}): string[] =>
   [...db._store.keys()].filter((k) => k.startsWith("auditLogs/"));
+
+/**
+ * The audit record of ONE lifecycle command, located by its persisted
+ * `metadata.operation_id`.
+ *
+ * Deliberately NOT located by `action`: keying the lookup on the very field
+ * under test is circular — a corrupted action would simply not be found, and
+ * the assertion would report a missing document instead of the wrong value.
+ *
+ * Deliberately NOT located by audit document id either: `caseAuditDocId` hashes
+ * the `CLINICAL_CASE_*_OPERATION` constant, which is a SEPARATE value from the
+ * persisted `action`. The id — and therefore the audit count — stays correct
+ * even when `action` names the wrong command, so neither can serve as proof of
+ * action semantics.
+ */
+const lifecycleAuditOf = (
+  db: {_store: Map<string, JsonMap>},
+  operationId: string,
+): JsonMap => {
+  const found = auditKeys(db)
+    .map((k) => db._store.get(k) as JsonMap)
+    .filter(
+      (a) => ((a.metadata ?? {}) as JsonMap).operation_id === operationId,
+    );
+  assert.strictEqual(
+    found.length,
+    1,
+    `exatamente 1 audit de ciclo de vida para ${operationId}`,
+  );
+  return found[0];
+};
 
 const opKeys = (
   db: {_store: Map<string, JsonMap>},
@@ -3704,6 +3796,1241 @@ async function testRevisionConcurrencyAuthority() {
   );
 }
 
+/**
+ * Persistence-boundary actor hygiene (CLIN-WRITER-1.W6.P0.K1).
+ *
+ * Two things must hold at once: the canonical server-derived actor still passes
+ * strict validation, AND the writer no longer manufactures a role when one is
+ * missing. The old `?? "condutor"` fallback would have defeated any downstream
+ * validator, so its absence is asserted against the source text — a behavioural
+ * test alone cannot prove a fallback is gone when the happy path never needs it.
+ */
+async function testPersistedActorBoundary() {
+  // A — canonical server-derived actor (condutor) survives the strict adapter.
+  const d = await seedDraftEvent();
+  await runHealthCancelClinicalEvent(
+    mockRequest(mutationCmd(d.caseId, d.eventId, "op-k1-can", 1, {
+      cancelReason: "registro duplicado",
+    })),
+    depsFor({db: d.db, now: T1}),
+  );
+  const dAfter = eventOf(d.db, d.eventPath);
+  assert.strictEqual(dAfter.status, "cancelled", "A: cancelamento falhou");
+  assert.deepStrictEqual(
+    dAfter.cancelled_by,
+    {uid: actor.uid, name: actor.name, internal_role: "condutor"},
+    "A: cancelled_by persistido deve manter o shape snake_case canônico",
+  );
+
+  // B — the admin branch of recordedByPayload also passes: proves the adapter
+  // READS internal_role instead of defaulting it. Under the old fallback an
+  // unread key still produced "condutor", so "admin" would have been lost.
+  const a = await seedDraftEvent({admin: true});
+  await runHealthCancelClinicalEvent(
+    mockRequest(mutationCmd(a.caseId, a.eventId, "op-k1-adm", 1, {
+      cancelReason: "registro duplicado",
+    })),
+    depsFor({db: a.db, now: T1, admin: true}),
+  );
+  assert.strictEqual(
+    ((eventOf(a.db, a.eventPath).cancelled_by as JsonMap).internal_role),
+    "admin",
+    "B: papel admin foi perdido/sobrescrito pela adaptação",
+  );
+
+  // C — the dangerous precedent is gone and the strict adapter is in its place.
+  const src = stripComments(readSource("clinical_case_callables.ts"));
+  assert.strictEqual(
+    src.includes("?? \"condutor\""),
+    false,
+    "C: fallback `?? \"condutor\"` reintroduzido — mascara ator corrompido",
+  );
+  assert.strictEqual(
+    /internalRole:\s*stringValue\(/.test(src),
+    false,
+    "C: adaptação manual de ator reintroduzida fora da fronteira estrita",
+  );
+  const cancelBody = src.slice(
+    src.indexOf("export async function runHealthCancelClinicalEvent"),
+  );
+  assert.ok(
+    cancelBody.includes("actorFromPersistedShape("),
+    "C: CANCEL deve adaptar o ator pela fronteira estrita",
+  );
+
+  // D — the boundary is the ONLY place snake_case meets the domain: pure domain
+  // must never learn the persisted key.
+  const domainSrc = stripComments(readSource("clinical_domain.ts"));
+  assert.strictEqual(
+    domainSrc.includes("internal_role:"),
+    false,
+    "D: clinical_domain.ts não pode ler a chave persistida internal_role",
+  );
+  assert.ok(
+    domainSrc.includes("export function assertClinicalActor("),
+    "D: validador canônico de ator deve viver no domínio puro",
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// W6 Lifecycle Writers Integration Tests
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function testLifecycleTransitionActiveMatrix(): Promise<void> {
+  const db = dbWithDog();
+  const openRes = (await runHealthOpenClinicalCase(
+    mockRequest(validOpen),
+    depsFor({db, now: FIXED_NOW}),
+  )) as JsonMap;
+  assert.ok(openRes);
+  const caseId = openRes.case_id as string;
+
+  // Active-to-active valid transitions sequence (covers multiple pairs)
+  // open(rev 1) -> under_investigation(rev 2)
+  const t1 = await runHealthTransitionClinicalCase(
+    mockRequest({
+      dogId: "dog-1",
+      caseId,
+      operationId: "op-t1",
+      expectedRevision: 1,
+      destination: "under_investigation",
+    }),
+    depsFor({db, now: T1}),
+  );
+  assert.deepStrictEqual(t1, {
+    dogId: "dog-1",
+    caseId,
+    clinicalStatus: "under_investigation",
+    revision: 2,
+    wasNoOp: false,
+  });
+
+  const casePath = canonicalCasePath("dog-1", caseId);
+  const caseAfterT1 = {...caseOf(db, casePath)};
+  const opsAfterT1 = opKeys(db, casePath).length;
+  const auditsAfterT1 = auditKeys(db).length;
+
+  // A transição bem-sucedida deve registrar EXATAMENTE a ação da transição.
+  assert.strictEqual(
+    lifecycleAuditOf(db, "op-t1").action,
+    "clinical_case_transitioned",
+    "TRANSITION: audit.action deve ser clinical_case_transitioned",
+  );
+
+  // Replay t1 com expectedRevision alterado/stale (prova que expectedRevision não contamina fingerprint semântico)
+  const t1Replay = await runHealthTransitionClinicalCase(
+    mockRequest({
+      dogId: "dog-1",
+      caseId,
+      operationId: "op-t1",
+      expectedRevision: 99,
+      destination: "under_investigation",
+    }),
+    depsFor({db, now: T1}),
+  );
+  assert.deepStrictEqual(t1Replay, {
+    dogId: "dog-1",
+    caseId,
+    clinicalStatus: "under_investigation",
+    revision: 2,
+    wasNoOp: true,
+  });
+  assert.deepStrictEqual(caseOf(db, casePath), caseAfterT1);
+  assert.strictEqual(opKeys(db, casePath).length, opsAfterT1);
+  assert.strictEqual(auditKeys(db).length, auditsAfterT1);
+
+  // Idempotency conflict on op-t1
+  await expectReject(
+    () => runHealthTransitionClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-t1",
+        expectedRevision: 1,
+        destination: "monitoring",
+      }),
+      depsFor({db, now: T1}),
+    ),
+    "idempotency-conflict",
+    "transição com idempotência divergente",
+  );
+
+  // under_investigation(rev 2) -> under_treatment(rev 3)
+  const t2 = await runHealthTransitionClinicalCase(
+    mockRequest({
+      dogId: "dog-1",
+      caseId,
+      operationId: "op-t2",
+      expectedRevision: 2,
+      destination: "under_treatment",
+    }),
+    depsFor({db, now: T1}),
+  );
+  assert.strictEqual(t2?.revision, 3);
+  assert.strictEqual(t2?.clinicalStatus, "under_treatment");
+
+  // under_treatment(rev 3) -> monitoring(rev 4)
+  const t3 = await runHealthTransitionClinicalCase(
+    mockRequest({
+      dogId: "dog-1",
+      caseId,
+      operationId: "op-t3",
+      expectedRevision: 3,
+      destination: "monitoring",
+    }),
+    depsFor({db, now: T1}),
+  );
+  assert.strictEqual(t3?.revision, 4);
+  assert.strictEqual(t3?.clinicalStatus, "monitoring");
+
+  // monitoring(rev 4) -> under_investigation(rev 5)
+  const t4 = await runHealthTransitionClinicalCase(
+    mockRequest({
+      dogId: "dog-1",
+      caseId,
+      operationId: "op-t4",
+      expectedRevision: 4,
+      destination: "under_investigation",
+    }),
+    depsFor({db, now: T1}),
+  );
+  assert.strictEqual(t4?.revision, 5);
+  assert.strictEqual(t4?.clinicalStatus, "under_investigation");
+
+  // under_investigation(rev 5) -> open(rev 6)
+  const t5 = await runHealthTransitionClinicalCase(
+    mockRequest({
+      dogId: "dog-1",
+      caseId,
+      operationId: "op-t5",
+      expectedRevision: 5,
+      destination: "open",
+    }),
+    depsFor({db, now: T1}),
+  );
+  assert.strictEqual(t5?.revision, 6);
+  assert.strictEqual(t5?.clinicalStatus, "open");
+
+  // Same status transition rejected (open -> open)
+  await expectReject(
+    () => runHealthTransitionClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-same-status",
+        expectedRevision: 6,
+        destination: "open",
+      }),
+      depsFor({db, now: T1}),
+    ),
+    "conflict",
+    "transição para mesmo status",
+  );
+
+  // Terminal status destination rejected in generic transition
+  await expectReject(
+    () => runHealthTransitionClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-term-dest",
+        expectedRevision: 6,
+        destination: "discharged",
+      }),
+      depsFor({db, now: T1}),
+    ),
+    "conflict",
+    "transição para status terminal",
+  );
+
+  // Stale expectedRevision rejected
+  await expectReject(
+    () => runHealthTransitionClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-stale-trans",
+        expectedRevision: 4,
+        destination: "under_investigation",
+      }),
+      depsFor({db, now: T1}),
+    ),
+    "conflict",
+    "transição com expectedRevision desatualizado",
+  );
+
+  // Dual-invalid: Stale expectedRevision (4 != 6) combined with ineligible transition destination (open -> open).
+  // OCC freshness MUST precede transition eligibility checking (M28 killer).
+  const caseBeforeDual = {...caseOf(db, canonicalCasePath("dog-1", caseId))};
+  const opsBeforeDual = opKeys(db, canonicalCasePath("dog-1", caseId)).length;
+  const auditsBeforeDual = auditKeys(db).length;
+
+  await expectReject(
+    () => runHealthTransitionClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-dual-invalid-trans",
+        expectedRevision: 4,
+        destination: "open",
+      }),
+      depsFor({db, now: T1}),
+    ),
+    "conflict",
+    "transição com expectedRevision desatualizado e destino inelegível (OCC precede elegibilidade)",
+    "Registro clínico alterado por outra operação. Recarregue antes de mutar.",
+  );
+  assert.deepStrictEqual(caseOf(db, canonicalCasePath("dog-1", caseId)), caseBeforeDual);
+  assert.strictEqual(opKeys(db, canonicalCasePath("dog-1", caseId)).length, opsBeforeDual);
+  assert.strictEqual(auditKeys(db).length, auditsBeforeDual);
+}
+
+async function testLifecycleDischarge(): Promise<void> {
+  const db = dbWithDog();
+  const openRes = (await runHealthOpenClinicalCase(
+    mockRequest(validOpen),
+    depsFor({db, now: FIXED_NOW}),
+  )) as JsonMap;
+  assert.ok(openRes);
+  const caseId = openRes.case_id as string;
+
+  // Discharge active case
+  const dRes = await runHealthDischargeClinicalCase(
+    mockRequest({
+      dogId: "dog-1",
+      caseId,
+      operationId: "op-dc-1",
+      expectedRevision: 1,
+      closureReason: "  Paciente 100% recuperado do quadro clínico  ",
+    }),
+    depsFor({db, now: T1}),
+  );
+  assert.deepStrictEqual(dRes, {
+    dogId: "dog-1",
+    caseId,
+    clinicalStatus: "discharged",
+    revision: 2,
+    wasNoOp: false,
+  });
+
+  const casePath = canonicalCasePath("dog-1", caseId);
+  const cDoc = caseOf(db, casePath);
+  assert.strictEqual(cDoc.clinical_status, "discharged");
+  assert.strictEqual(cDoc.closure_type, "discharge");
+  assert.strictEqual(cDoc.closure_reason, "Paciente 100% recuperado do quadro clínico");
+  assert.strictEqual(cDoc.revision, 2);
+  assert.ok(cDoc.closed_at);
+  assert.deepStrictEqual(cDoc.closed_by, {
+    uid: actor.uid,
+    name: actor.name,
+    internal_role: "condutor",
+  });
+
+  const caseAfterDischarge = {...caseOf(db, casePath)};
+  const opsAfterDischarge = opKeys(db, casePath).length;
+  const auditsAfterDischarge = auditKeys(db).length;
+
+  // A alta bem-sucedida deve registrar EXATAMENTE a ação de alta.
+  assert.strictEqual(
+    lifecycleAuditOf(db, "op-dc-1").action,
+    "clinical_case_discharged",
+    "DISCHARGE: audit.action deve ser clinical_case_discharged",
+  );
+
+  // Replay com expectedRevision alterado/stale (prova que expectedRevision não contamina fingerprint semântico)
+  const dReplay = await runHealthDischargeClinicalCase(
+    mockRequest({
+      dogId: "dog-1",
+      caseId,
+      operationId: "op-dc-1",
+      expectedRevision: 99,
+      closureReason: "Paciente 100% recuperado do quadro clínico",
+    }),
+    depsFor({db, now: T1}),
+  );
+  assert.deepStrictEqual(dReplay, {
+    dogId: "dog-1",
+    caseId,
+    clinicalStatus: "discharged",
+    revision: 2,
+    wasNoOp: true,
+  });
+  assert.deepStrictEqual(caseOf(db, casePath), caseAfterDischarge);
+  assert.strictEqual(opKeys(db, casePath).length, opsAfterDischarge);
+  assert.strictEqual(auditKeys(db).length, auditsAfterDischarge);
+
+  // Idempotency conflict
+  await expectReject(
+    () => runHealthDischargeClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-dc-1",
+        expectedRevision: 1,
+        closureReason: "Outro motivo de alta",
+      }),
+      depsFor({db, now: T1}),
+    ),
+    "idempotency-conflict",
+    "alta com motivo divergente",
+  );
+
+  // Discharging an already discharged case fails
+  await expectReject(
+    () => runHealthDischargeClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-dc-2",
+        expectedRevision: 2,
+      }),
+      depsFor({db, now: T1}),
+    ),
+    "conflict",
+    "alta em caso já discharged",
+  );
+}
+
+async function testLifecycleCancelCase(): Promise<void> {
+  const db = dbWithDog();
+  const openRes = (await runHealthOpenClinicalCase(
+    mockRequest(validOpen),
+    depsFor({db, now: FIXED_NOW}),
+  )) as JsonMap;
+  assert.ok(openRes);
+  const caseId = openRes.case_id as string;
+
+  // Missing reason rejected
+  await expectReject(
+    () => runHealthCancelClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-cc-no-reason",
+        expectedRevision: 1,
+      }),
+      depsFor({db, now: T1}),
+    ),
+    "validation",
+    "cancelamento sem motivo",
+  );
+
+  // Cancel active case
+  const cRes = await runHealthCancelClinicalCase(
+    mockRequest({
+      dogId: "dog-1",
+      caseId,
+      operationId: "op-cc-1",
+      expectedRevision: 1,
+      closureReason: "  Abertura realizada em duplicidade pelo condutor  ",
+    }),
+    depsFor({db, now: T1, admin: true}),
+  );
+  assert.deepStrictEqual(cRes, {
+    dogId: "dog-1",
+    caseId,
+    clinicalStatus: "cancelled",
+    revision: 2,
+    wasNoOp: false,
+  });
+
+  const casePath = canonicalCasePath("dog-1", caseId);
+  const cDoc = caseOf(db, casePath);
+  assert.strictEqual(cDoc.clinical_status, "cancelled");
+  assert.strictEqual(cDoc.closure_type, "cancelled");
+  assert.strictEqual(cDoc.closure_reason, "Abertura realizada em duplicidade pelo condutor");
+  assert.strictEqual(cDoc.revision, 2);
+  assert.deepStrictEqual(cDoc.closed_by, {
+    uid: actor.uid,
+    name: actor.name,
+    internal_role: "admin",
+  });
+
+  const caseAfterCancel = {...caseOf(db, casePath)};
+  const opsAfterCancel = opKeys(db, casePath).length;
+  const auditsAfterCancel = auditKeys(db).length;
+
+  // O cancelamento bem-sucedido deve registrar EXATAMENTE a ação de cancelamento.
+  assert.strictEqual(
+    lifecycleAuditOf(db, "op-cc-1").action,
+    "clinical_case_cancelled",
+    "CANCEL: audit.action deve ser clinical_case_cancelled",
+  );
+
+  // Replay com expectedRevision alterado/stale (prova que expectedRevision não contamina fingerprint semântico)
+  const cReplay = await runHealthCancelClinicalCase(
+    mockRequest({
+      dogId: "dog-1",
+      caseId,
+      operationId: "op-cc-1",
+      expectedRevision: 99,
+      closureReason: "Abertura realizada em duplicidade pelo condutor",
+    }),
+    depsFor({db, now: T1, admin: true}),
+  );
+  assert.deepStrictEqual(cReplay, {
+    dogId: "dog-1",
+    caseId,
+    clinicalStatus: "cancelled",
+    revision: 2,
+    wasNoOp: true,
+  });
+  assert.deepStrictEqual(caseOf(db, casePath), caseAfterCancel);
+  assert.strictEqual(opKeys(db, casePath).length, opsAfterCancel);
+  assert.strictEqual(auditKeys(db).length, auditsAfterCancel);
+
+  // Idempotency conflict on op-cc-1 (motivo divergente)
+  await expectReject(
+    () => runHealthCancelClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-cc-1",
+        expectedRevision: 1,
+        closureReason: "Outro motivo divergente de cancelamento",
+      }),
+      depsFor({db, now: T1, admin: true}),
+    ),
+    "idempotency-conflict",
+    "cancelamento com motivo divergente",
+  );
+
+  // Cancelled case cannot be transitioned or cancelled again
+  await expectReject(
+    () => runHealthTransitionClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-trans-cancelled",
+        expectedRevision: 2,
+        destination: "open",
+      }),
+      depsFor({db, now: T1}),
+    ),
+    "conflict",
+    "transição de caso cancelado",
+  );
+  await expectReject(
+    () => runHealthCancelClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-cc-2",
+        expectedRevision: 2,
+        closureReason: "Tentativa de cancelamento duplo",
+      }),
+      depsFor({db, now: T1}),
+    ),
+    "conflict",
+    "cancelamento de caso cancelado",
+  );
+}
+
+async function testLifecycleReopen(): Promise<void> {
+  const db = dbWithDog();
+  const openRes = (await runHealthOpenClinicalCase(
+    mockRequest(validOpen),
+    depsFor({db, now: FIXED_NOW}),
+  )) as JsonMap;
+  assert.ok(openRes);
+  const caseId = openRes.case_id as string;
+
+  // Discharge case (rev 1 -> rev 2)
+  await runHealthDischargeClinicalCase(
+    mockRequest({
+      dogId: "dog-1",
+      caseId,
+      operationId: "op-dc-before-reopen",
+      expectedRevision: 1,
+      closureReason: "Alta provisória",
+    }),
+    depsFor({db, now: T1}),
+  );
+
+  // Reopen requires an explicit destination: all three accepted input forms
+  // are deliberately absent, and validation must fail without mutating the case.
+  const casePath = canonicalCasePath("dog-1", caseId);
+  const dischargedBeforeMissingDestination = {...caseOf(db, casePath)};
+  await expectReject(
+    () => runHealthReopenClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-reopen-missing-destination",
+        expectedRevision: 2,
+        reopenReason: "Recidiva que exige destino explícito",
+      }),
+      depsFor({db, now: T2}),
+    ),
+    "validation",
+    "reabertura sem destination/targetStatus/target_status",
+  );
+  assert.deepStrictEqual(caseOf(db, casePath), dischargedBeforeMissingDestination);
+  assert.strictEqual(
+    db._store.get(`${casePath}/operations/op-reopen-missing-destination`),
+    undefined,
+  );
+
+  // Reopen discharged case (rev 2 -> rev 3, reopened_count: 1)
+  const rRes = await runHealthReopenClinicalCase(
+    mockRequest({
+      dogId: "dog-1",
+      caseId,
+      operationId: "op-reopen-1",
+      expectedRevision: 2,
+      destination: "under_investigation",
+      reopenReason: "  Recidiva dos sintomas observada em patrulhamento  ",
+    }),
+    depsFor({db, now: T2}),
+  );
+  assert.deepStrictEqual(rRes, {
+    dogId: "dog-1",
+    caseId,
+    clinicalStatus: "under_investigation",
+    revision: 3,
+    wasNoOp: false,
+  });
+
+  const cDoc = caseOf(db, canonicalCasePath("dog-1", caseId));
+  assert.strictEqual(cDoc.clinical_status, "under_investigation");
+  assert.strictEqual(cDoc.previous_status, "discharged");
+  assert.strictEqual(cDoc.reopen_reason, "Recidiva dos sintomas observada em patrulhamento");
+  assert.strictEqual(cDoc.reopened_count, 1);
+  assert.strictEqual(cDoc.revision, 3);
+  assert.ok(cDoc.reopened_at);
+  assert.deepStrictEqual(cDoc.reopened_by, {
+    uid: actor.uid,
+    name: actor.name,
+    internal_role: "condutor",
+  });
+
+  // Verify all 4 closure fields were deleted
+  assert.strictEqual(cDoc.closed_at, undefined);
+  assert.strictEqual(cDoc.closed_by, undefined);
+  assert.strictEqual(cDoc.closure_type, undefined);
+  assert.strictEqual(cDoc.closure_reason, undefined);
+
+  const caseAfterReopen = {...caseOf(db, casePath)};
+  const opsAfterReopen = opKeys(db, casePath).length;
+  const auditsAfterReopen = auditKeys(db).length;
+
+  // A reabertura bem-sucedida deve registrar EXATAMENTE a ação de reabertura.
+  assert.strictEqual(
+    lifecycleAuditOf(db, "op-reopen-1").action,
+    "clinical_case_reopened",
+    "REOPEN: audit.action deve ser clinical_case_reopened",
+  );
+
+  // Replay com expectedRevision alterado/stale (prova que expectedRevision não contamina fingerprint semântico)
+  const rReplay = await runHealthReopenClinicalCase(
+    mockRequest({
+      dogId: "dog-1",
+      caseId,
+      operationId: "op-reopen-1",
+      expectedRevision: 99,
+      destination: "under_investigation",
+      reopenReason: "Recidiva dos sintomas observada em patrulhamento",
+    }),
+    depsFor({db, now: T2}),
+  );
+  assert.deepStrictEqual(rReplay, {
+    dogId: "dog-1",
+    caseId,
+    clinicalStatus: "under_investigation",
+    revision: 3,
+    wasNoOp: true,
+  });
+  assert.deepStrictEqual(caseOf(db, casePath), caseAfterReopen);
+  assert.strictEqual(opKeys(db, casePath).length, opsAfterReopen);
+  assert.strictEqual(auditKeys(db).length, auditsAfterReopen);
+
+  // Idempotency conflict on op-reopen-1 (destino divergente)
+  await expectReject(
+    () => runHealthReopenClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-reopen-1",
+        expectedRevision: 2,
+        destination: "open",
+        reopenReason: "Recidiva dos sintomas observada em patrulhamento",
+      }),
+      depsFor({db, now: T2}),
+    ),
+    "idempotency-conflict",
+    "reabertura com destino divergente",
+  );
+
+  // Idempotency conflict on op-reopen-1 (motivo divergente)
+  await expectReject(
+    () => runHealthReopenClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-reopen-1",
+        expectedRevision: 2,
+        destination: "under_investigation",
+        reopenReason: "Outro motivo de reabertura divergente",
+      }),
+      depsFor({db, now: T2}),
+    ),
+    "idempotency-conflict",
+    "reabertura com motivo divergente",
+  );
+
+  // Second cycle: Discharge again (rev 3 -> rev 4)
+  await runHealthDischargeClinicalCase(
+    mockRequest({
+      dogId: "dog-1",
+      caseId,
+      operationId: "op-dc-second",
+      expectedRevision: 3,
+      closureReason: "Segunda alta após tratamento",
+    }),
+    depsFor({db, now: T2}),
+  );
+
+  // Reopen again with a distinct actor (rev 4 -> rev 5, reopened_count: 2)
+  const r2Res = await runHealthReopenClinicalCase(
+    mockRequest({
+      dogId: "dog-1",
+      caseId,
+      operationId: "op-reopen-2",
+      expectedRevision: 4,
+      destination: "monitoring",
+      reopenReason: "Reabertura para monitoramento pós-alta",
+    }, {uid: actorB.uid, token: {}}),
+    depsFor({db, now: T2, caller: actorB}),
+  );
+  assert.strictEqual(r2Res?.revision, 5);
+  assert.strictEqual(r2Res?.clinicalStatus, "monitoring");
+
+  const cDoc2 = caseOf(db, canonicalCasePath("dog-1", caseId));
+  assert.strictEqual(cDoc2.reopened_count, 2);
+  assert.deepStrictEqual(cDoc2.reopened_by, {
+    uid: actorB.uid,
+    name: actorB.name,
+    internal_role: "condutor",
+  });
+  assert.notDeepStrictEqual(cDoc2.reopened_by, cDoc.reopened_by);
+  assert.strictEqual(cDoc2.closed_at, undefined);
+
+  // Reopening active case rejected
+  await expectReject(
+    () => runHealthReopenClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-reopen-active",
+        expectedRevision: 5,
+        destination: "open",
+        reopenReason: "Motivo qualquer",
+      }),
+      depsFor({db, now: T2}),
+    ),
+    "conflict",
+    "reabertura de caso ativo",
+  );
+}
+
+async function testLifecycleStoredIntegrityFailClosed(): Promise<void> {
+  const casePath = "dogs/dog-1/clinical_cases/cc-corrupt";
+
+  // 1. Corrupt clinical_status
+  const db1 = createFakeDb({
+    "dogs/dog-1": {name: "Bono"},
+    [casePath]: {
+      case_id: "cc-corrupt",
+      dog_id: "dog-1",
+      clinical_status: "unknown_corrupt_status",
+      revision: 1,
+    },
+  });
+  await expectReject(
+    () => runHealthTransitionClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId: "cc-corrupt",
+        operationId: "op-corrupt-1",
+        expectedRevision: 1,
+        destination: "open",
+      }),
+      depsFor({db: db1, now: T1}),
+    ),
+    "integrity",
+    "caso com status corrompido",
+  );
+
+  // 2. Corrupt revision (< 1 or non-integer)
+  const db2 = createFakeDb({
+    "dogs/dog-1": {name: "Bono"},
+    [casePath]: {
+      case_id: "cc-corrupt",
+      dog_id: "dog-1",
+      clinical_status: "open",
+      revision: 0,
+    },
+  });
+  await expectReject(
+    () => runHealthDischargeClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId: "cc-corrupt",
+        operationId: "op-corrupt-2",
+        expectedRevision: 1,
+      }),
+      depsFor({db: db2, now: T1}),
+    ),
+    "integrity",
+    "caso com revision 0",
+  );
+
+  // 3. Active case with corrupt closure metadata (unexpected_closure_metadata)
+  const db3 = createFakeDb({
+    "dogs/dog-1": {name: "Bono"},
+    [casePath]: {
+      case_id: "cc-corrupt",
+      dog_id: "dog-1",
+      clinical_status: "open",
+      revision: 1,
+      closed_at: Timestamp.fromDate(FIXED_NOW),
+      closure_type: "discharge",
+    },
+  });
+  // Integrity check runs BEFORE expectedRevision OCC check:
+  // even if expectedRevision is wrong (999), it must fail on integrity, not conflict.
+  await expectReject(
+    () => runHealthTransitionClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId: "cc-corrupt",
+        operationId: "op-corrupt-3",
+        expectedRevision: 999,
+        destination: "under_investigation",
+      }),
+      depsFor({db: db3, now: T1}),
+    ),
+    "integrity",
+    "caso ativo com metadados de fechamento",
+  );
+
+  // 4. Discharged case with malformed closed_by actor
+  const db4 = createFakeDb({
+    "dogs/dog-1": {name: "Bono"},
+    [casePath]: {
+      case_id: "cc-corrupt",
+      dog_id: "dog-1",
+      clinical_status: "discharged",
+      revision: 2,
+      closed_at: Timestamp.fromDate(FIXED_NOW),
+      closed_by: {uid: "", name: "Dr Vet", internal_role: "veterinario"},
+      closure_type: "discharge",
+    },
+  });
+  await expectReject(
+    () => runHealthReopenClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId: "cc-corrupt",
+        operationId: "op-corrupt-4",
+        expectedRevision: 2,
+        destination: "open",
+        reopenReason: "Tentativa de reabrir caso com ator corrompido",
+      }),
+      depsFor({db: db4, now: T1}),
+    ),
+    "integrity",
+    "caso discharged com ator malformado",
+  );
+
+  // 5. Complete coherent reopen history with malformed persisted reopened_by.
+  // Integrity must win over stale OCC, and the rejected command must be side-effect free.
+  const db5 = createFakeDb({
+    "dogs/dog-1": {name: "Bono"},
+    [casePath]: {
+      case_id: "cc-corrupt",
+      dog_id: "dog-1",
+      clinical_status: "open",
+      revision: 5,
+      reopened_at: Timestamp.fromDate(T1),
+      reopened_by: {uid: "", name: "Dr Vet", internal_role: "veterinario"},
+      previous_status: "discharged",
+      reopen_reason: "Recidiva confirmada",
+      reopened_count: 1,
+    },
+  });
+  const beforeMalformedReopenedBy = {...caseOf(db5, casePath)};
+  const opsBeforeMalformedReopenedBy = opKeys(db5, casePath).length;
+  const auditsBeforeMalformedReopenedBy = auditKeys(db5).length;
+  await expectReject(
+    () => runHealthTransitionClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId: "cc-corrupt",
+        operationId: "op-corrupt-5",
+        expectedRevision: 999,
+        destination: "under_investigation",
+      }),
+      depsFor({db: db5, now: T2}),
+    ),
+    "integrity",
+    "caso com reopened_by persistido malformado antes de OCC",
+  );
+  assert.deepStrictEqual(caseOf(db5, casePath), beforeMalformedReopenedBy);
+  assert.strictEqual(opKeys(db5, casePath).length, opsBeforeMalformedReopenedBy);
+  assert.strictEqual(
+    db5._store.get(`${casePath}/operations/op-corrupt-5`),
+    undefined,
+  );
+  assert.strictEqual(
+    auditKeys(db5).length,
+    auditsBeforeMalformedReopenedBy,
+  );
+}
+
+async function testLifecycleGuardsAndAuthorization(): Promise<void> {
+  const db = dbWithDog();
+  const openRes = (await runHealthOpenClinicalCase(
+    mockRequest(validOpen),
+    depsFor({db, now: FIXED_NOW}),
+  )) as JsonMap;
+  assert.ok(openRes);
+  const caseId = openRes.case_id as string;
+
+  // 1. Transition denied without manage_clinical_case
+  await expectReject(
+    () => runHealthTransitionClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-guard-1",
+        expectedRevision: 1,
+        destination: "under_investigation",
+      }),
+      depsFor({db, now: T1, allowManageCase: false}),
+    ),
+    "permission-denied",
+    "transição sem manage_clinical_case",
+  );
+
+  // 2. Discharge denied without manage_clinical_case
+  await expectReject(
+    () => runHealthDischargeClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-guard-2",
+        expectedRevision: 1,
+      }),
+      depsFor({db, now: T1, allowManageCase: false}),
+    ),
+    "permission-denied",
+    "alta sem manage_clinical_case",
+  );
+
+  // 3. Cancel denied without manage_clinical_case
+  await expectReject(
+    () => runHealthCancelClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-guard-3",
+        expectedRevision: 1,
+        closureReason: "Motivo valido",
+      }),
+      depsFor({db, now: T1, allowManageCase: false}),
+    ),
+    "permission-denied",
+    "cancelamento sem manage_clinical_case",
+  );
+
+  // 4. Reopen denied without reopen_clinical_case (even with manage_clinical_case)
+  await expectReject(
+    () => runHealthReopenClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-guard-4",
+        expectedRevision: 1,
+        destination: "open",
+        reopenReason: "Motivo valido",
+      }),
+      depsFor({db, now: T1, allowManageCase: true, allowReopenCase: false}),
+    ),
+    "permission-denied",
+    "reabertura sem reopen_clinical_case",
+  );
+
+  // 5. Server-managed injection rejected
+  await expectReject(
+    () => runHealthTransitionClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-inject-1",
+        expectedRevision: 1,
+        destination: "under_investigation",
+        closed_at: "2026-08-28T00:00:00Z",
+      }),
+      depsFor({db, now: T1}),
+    ),
+    "validation",
+    "injeção de campo server-managed",
+  );
+
+  // 6. Unknown mutation keys rejected
+  await expectReject(
+    () => runHealthDischargeClinicalCase(
+      mockRequest({
+        dogId: "dog-1",
+        caseId,
+        operationId: "op-unknown-key",
+        expectedRevision: 1,
+        content: {diagnosis: "forged"},
+      }),
+      depsFor({db, now: T1}),
+    ),
+    "validation",
+    "chave desconhecida rejeitada",
+  );
+}
+
+async function testLifecycleCaseOnlyInvariants(): Promise<void> {
+  const initialSummary: JsonMap = {
+    readiness_status: "in_training",
+    updated_at: "2026-08-01T00:00:00Z",
+  };
+  const summaryPath = "dogs/dog-1/health_summary/current";
+  const initialTimelineEntry: JsonMap = {
+    timeline_type: "vaccine",
+    title: "Initial vaccine",
+    created_at: "2026-08-01T00:00:00Z",
+  };
+  const timelinePath = "dogs/dog-1/health_timeline/existing-sentinel";
+  const db = dbWithDog({
+    [summaryPath]: initialSummary,
+    [timelinePath]: initialTimelineEntry,
+  });
+
+  const getTimelineDocs = (): Record<string, unknown> => {
+    const entries: Record<string, unknown> = {};
+    for (const [k, v] of db._store.entries()) {
+      if (k.startsWith("dogs/dog-1/health_timeline/")) {
+        entries[k] = JSON.parse(JSON.stringify(v));
+      }
+    }
+    return entries;
+  };
+
+  const openRes = (await runHealthOpenClinicalCase(
+    mockRequest(validOpen),
+    depsFor({db, now: FIXED_NOW}),
+  )) as JsonMap;
+  assert.ok(openRes);
+  const caseId = openRes.case_id as string;
+  const initialCase = caseOf(db, canonicalCasePath("dog-1", caseId));
+  const initialEventCount = initialCase.event_count;
+  const initialLastEventAt = initialCase.last_event_at;
+  const initialOpeningEventId = initialCase.opening_event_id;
+
+  const beforeTimeline = getTimelineDocs();
+
+  // Run transition
+  const transRes = await runHealthTransitionClinicalCase(
+    mockRequest({
+      dogId: "dog-1",
+      caseId,
+      operationId: "op-case-only-1",
+      expectedRevision: 1,
+      destination: "under_investigation",
+    }),
+    depsFor({db, now: T1}),
+  );
+  assert.ok(transRes);
+
+  const afterTransitionTimeline = getTimelineDocs();
+  assert.deepStrictEqual(
+    afterTransitionTimeline,
+    beforeTimeline,
+    "Projeção de timeline (health_timeline) não pode ser mutada por transição de caso clínico",
+  );
+
+  // Run discharge
+  await runHealthDischargeClinicalCase(
+    mockRequest({
+      dogId: "dog-1",
+      caseId,
+      operationId: "op-case-only-2",
+      expectedRevision: 2,
+      closureReason: "Alta",
+    }),
+    depsFor({db, now: T1}),
+  );
+
+  // Run reopen
+  await runHealthReopenClinicalCase(
+    mockRequest({
+      dogId: "dog-1",
+      caseId,
+      operationId: "op-case-only-3",
+      expectedRevision: 3,
+      destination: "open",
+      reopenReason: "Reabertura",
+    }),
+    depsFor({db, now: T2}),
+  );
+
+  // Verify case aggregate invariant fields never changed
+  const finalCase = caseOf(db, canonicalCasePath("dog-1", caseId));
+  assert.strictEqual(finalCase.event_count, initialEventCount);
+  assert.deepStrictEqual(finalCase.last_event_at, initialLastEventAt);
+  assert.strictEqual(finalCase.opening_event_id, initialOpeningEventId);
+
+  // Verify only 1 clinical_event document exists in the entire subcollection (the opening event)
+  const eventDocs = [...db._store.keys()].filter((k) =>
+    k.startsWith(`dogs/dog-1/clinical_cases/${caseId}/clinical_events/`),
+  );
+  assert.strictEqual(
+    eventDocs.length,
+    1,
+    "Nenhum novo ClinicalEvent deve ter sido criado pelas operações de ciclo de vida",
+  );
+
+  // Verify readiness summary was NOT mutated/overwritten/merged by lifecycle writers
+  const finalSummary = db._store.get(summaryPath);
+  assert.deepStrictEqual(
+    finalSummary,
+    initialSummary,
+    "Resumo de prontidão (health_summary/current) não pode ser mutado por operações de ciclo de vida do caso clínico",
+  );
+
+  // Verify health timeline was NOT mutated/created across all lifecycle operations
+  const finalTimeline = getTimelineDocs();
+  assert.deepStrictEqual(
+    finalTimeline,
+    beforeTimeline,
+    "Projeção de timeline (health_timeline) não pode ser mutada por operações de ciclo de vida do caso clínico",
+  );
+}
+
+/**
+ * CLINICAL-BE.MERGE-I1 §22.11 — the main-only administrative callables must
+ * survive the Clinical convergence merge.
+ *
+ * A two-tip diff between the two Front 20 heads rendered these five as
+ * "deletions", because they were added on main after the merge base and never
+ * existed on the canonical branch. Reading that diff literally — or resolving the
+ * merge from the canonical side — would silently drop five callables, one of which
+ * (adminPatchHumanPersonnel) is deployed in production. Source-level proof,
+ * because a behavioural test in this suite would never exercise them.
+ */
+async function testAdminCallablesSurviveMerge() {
+  const index = readSource("index.ts");
+  const expected = [
+    "adminCreateHuman",
+    "adminDeactivateHuman",
+    "adminReactivateHuman",
+    "adminPatchHumanPersonnel",
+    "adminPatchK9Identity",
+  ];
+  for (const name of expected) {
+    assert.ok(
+      new RegExp(`^export const ${name} = onCall`, "m").test(index),
+      `callable administrativo ${name} deve permanecer exportado após o merge`,
+    );
+  }
+  // Os módulos que os implementam também devem existir.
+  for (const mod of [
+    "admin_create_human.ts",
+    "admin_human_lifecycle.ts",
+    "admin_patch_human_personnel.ts",
+    "admin_patch_k9_identity.ts",
+    "auth_error_classification.ts",
+  ]) {
+    assert.ok(readSource(mod).length > 0, `módulo ${mod} deve sobreviver ao merge`);
+  }
+
+  // E o conjunto clínico + exame precisa coexistir com eles.
+  for (const name of [
+    "healthOpenClinicalCase", "healthAppendClinicalEvent", "healthFinalizeClinicalEvent",
+    "healthCancelClinicalEvent", "healthAmendClinicalEvent", "healthTransitionClinicalCase",
+    "healthDischargeClinicalCase", "healthCancelClinicalCase", "healthReopenClinicalCase",
+    "healthRequestExam", "healthRecordExamCollection", "healthRecordExamResult",
+    "healthRecordExamInterpretation", "healthAssessExamImpact", "healthCancelExam",
+  ]) {
+    assert.ok(
+      new RegExp(`^export const ${name} = onCall`, "m").test(index),
+      `callable ${name} deve estar exportado no head único`,
+    );
+  }
+}
+
+/**
+ * CLINICAL-BE.MERGE-I1 §22.12 — the Front 30 Web reader contract.
+ *
+ * `/health/clinical` parses `dogs/{dogId}/clinical_cases/{caseId}` and marks a
+ * case `partial` unless all EIGHT required fields are present and well formed,
+ * with the actor as `{uid, name, internal_role}`. Front 30 is frozen and must not
+ * be changed, so this asserts the WRITER keeps its side of that contract: a case
+ * opened here must parse as `complete` on the Web.
+ */
+async function testFront30RequiredCaseShape() {
+  const db = dbWithDog();
+  const res = (await runHealthOpenClinicalCase(
+    mockRequest(validOpen),
+    depsFor({db}),
+  )) as JsonMap;
+
+  const caseDoc = db._store.get(
+    `dogs/dog-1/clinical_cases/${res.case_id as string}`,
+  ) as JsonMap;
+  assert.ok(caseDoc, "caso persistido");
+
+  // 1..8 — obrigatórios para o parser da Front 30.
+  const required = [
+    "clinical_status",
+    "title",
+    "opened_at",
+    "opened_by",
+    "recorded_by",
+    "opening_event_id",
+    "opening_type",
+    "schema_version",
+  ];
+  for (const field of required) {
+    assert.ok(
+      caseDoc[field] !== undefined && caseDoc[field] !== null && caseDoc[field] !== "",
+      `campo requerido pela Front 30 ausente: ${field}`,
+    );
+  }
+
+  // Vocabulários que a Front 30 reconhece (fora deles ela degrada para partial).
+  assert.ok(
+    ["open", "under_investigation", "under_treatment", "monitoring", "discharged", "cancelled"]
+      .includes(caseDoc.clinical_status as string),
+    "clinical_status precisa estar no vocabulário da Front 30",
+  );
+  assert.ok(
+    ["incident", "consultation", "preventive", "administrative"]
+      .includes(caseDoc.opening_type as string),
+    "opening_type precisa estar no vocabulário da Front 30",
+  );
+  assert.strictEqual(typeof caseDoc.schema_version, "number", "schema_version numérico");
+
+  // Envelope de ator: uid/name/internal_role, os três preenchidos — qualquer
+  // subcampo ausente vira `incomplete_actor` na Front 30.
+  for (const actorField of ["opened_by", "recorded_by"]) {
+    const actor = caseDoc[actorField] as JsonMap;
+    assert.strictEqual(typeof actor, "object", `${actorField} deve ser objeto`);
+    for (const sub of ["uid", "name", "internal_role"]) {
+      assert.ok(
+        typeof actor[sub] === "string" && (actor[sub] as string).trim().length > 0,
+        `${actorField}.${sub} deve ser string não vazia`,
+      );
+    }
+  }
+}
+
 const tests: Array<[string, () => Promise<void>]> = [
   ["OPEN sucesso e shape canônico", testOpenSuccess],
   ["OPEN replay sem duplicação", testOpenReplayNoDuplicate],
@@ -3756,6 +5083,16 @@ const tests: Array<[string, () => Promise<void>]> = [
   ["REVISION é a autoridade única de concorrência (relógio fixo)",
     testRevisionConcurrencyAuthority],
   ["ARQ emenda não tem caminho para o conteúdo do pai", testAmendWriterHasNoParentContentPath],
+  ["ATOR fronteira de persistência estrita sem default", testPersistedActorBoundary],
+  ["LIFECYCLE transição ativa e matriz de estados", testLifecycleTransitionActiveMatrix],
+  ["LIFECYCLE alta (discharge) e snapshot de fechamento", testLifecycleDischarge],
+  ["LIFECYCLE cancelamento de caso e motivo obrigatório", testLifecycleCancelCase],
+  ["LIFECYCLE reabertura e deleção de metadados de fechamento", testLifecycleReopen],
+  ["LIFECYCLE integridade armazenada falha fechada antes de OCC", testLifecycleStoredIntegrityFailClosed],
+  ["LIFECYCLE matriz de autorização, capabilities e guards", testLifecycleGuardsAndAuthorization],
+  ["LIFECYCLE invariantes case-only (sem eventos extras)", testLifecycleCaseOnlyInvariants],
+  ["MERGE callables administrativos da main sobrevivem", testAdminCallablesSurviveMerge],
+  ["MERGE contrato de leitura da Front 30 preservado", testFront30RequiredCaseShape],
 ];
 
 (async () => {

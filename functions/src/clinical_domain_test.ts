@@ -13,6 +13,7 @@
 
 import * as assert from "assert";
 import {
+  CLINICAL_CASE_CLOSURE_TYPES,
   CLINICAL_CASE_OPENING_TYPES,
   CLINICAL_CASE_STATUSES,
   CLINICAL_EVENT_STATUSES,
@@ -21,15 +22,19 @@ import {
   ClinicalDomainError,
   ClinicalEventStatus,
   allowedCaseTransitions,
+  assertCaseClosureConsistency,
   assertCaseReopen,
   assertCaseReopenConsistency,
   assertCaseTransition,
+  assertClinicalActor,
+  assertClinicalCaseClosureType,
   assertEventCancellationConsistency,
   assertEventTransition,
   caseReopenDestinations,
   canTransitionCase,
   canTransitionEvent,
   isCaseReopenDestination,
+  isClinicalCaseClosureType,
   isEventContentEditable,
   isEventContentImmutable,
   isTerminalCaseStatus,
@@ -727,6 +732,505 @@ function main(): void {
         {destination, reason: "Erro de alta"},
       );
     }
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // ClinicalActor runtime validity (CLIN-WRITER-1.W6.P0.K1)
+  //
+  // Transcribed from the Dart `RecordedBy` constructor + `_required`, NOT from
+  // the TS module's own logic, so this stays a real cross-check.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  test("actor: valid actor accepted and trimmed like Dart _required", () => {
+    assert.deepStrictEqual(
+      assertClinicalActor({
+        uid: "  u1 ",
+        name: "  Nome ",
+        internalRole: "  condutor ",
+      }),
+      {uid: "u1", name: "Nome", internalRole: "condutor"},
+    );
+    // Already-clean input is returned unchanged.
+    assert.deepStrictEqual(assertClinicalActor(ACTOR), ACTOR);
+  });
+
+  test("actor: internalRole is NOT an enum — unknown non-empty role accepted", () => {
+    // Dart accepts any non-blank string here; adding an enum would be FALSE
+    // strictness and a parity break in the opposite direction.
+    for (const role of ["xyz-nao-canonico", "admin", "condutor", "veterinario", "x"]) {
+      assert.strictEqual(
+        assertClinicalActor({uid: "u", name: "N", internalRole: role}).internalRole,
+        role,
+      );
+    }
+  });
+
+  test("actor: unknown extra keys are tolerated (required-field contract)", () => {
+    assert.deepStrictEqual(
+      assertClinicalActor({
+        uid: "u", name: "N", internalRole: "condutor",
+        rogue: 1, internal_role: "ignored", extra: {deep: true},
+      }),
+      {uid: "u", name: "N", internalRole: "condutor"},
+    );
+  });
+
+  test("actor: each blank/absent/mistyped field maps to its Dart code", () => {
+    const bad: Array<[string, unknown]> = [
+      ["missing", undefined],
+      ["null", null],
+      ["blank", ""],
+      ["whitespace", "   "],
+      ["tab/newline", "\t\n"],
+      ["number", 123],
+      ["boolean", true],
+      ["object", {}],
+      ["array", []],
+    ];
+    for (const [label, value] of bad) {
+      expectDomainError(
+        () => assertClinicalActor({...ACTOR, uid: value}),
+        "missing_uid", "invalid_value",
+      );
+      expectDomainError(
+        () => assertClinicalActor({...ACTOR, name: value}),
+        "missing_name", "invalid_value",
+      );
+      expectDomainError(
+        () => assertClinicalActor({...ACTOR, internalRole: value}),
+        "missing_internal_role", "invalid_value",
+      );
+      assert.ok(label.length > 0);
+    }
+  });
+
+  test("actor: a non-object actor fails closed through the same codes", () => {
+    // Dart cannot even CONSTRUCT RecordedBy from these, so there is no Dart code
+    // to mirror; inventing `invalid_actor` would create authority Dart lacks.
+    for (const notAnActor of [null, undefined, "actor", 7, true, [], [ACTOR]]) {
+      expectDomainError(
+        () => assertClinicalActor(notAnActor),
+        "missing_uid", "invalid_value",
+      );
+    }
+    // An ARRAY carrying actor-shaped properties is the ONLY input that tells the
+    // `Array.isArray` guard apart from a bare `value ?? {}`: a plain `[]` has no
+    // `uid` and would reject either way. Without this fixture, dropping the
+    // array check is an undetectable mutation.
+    const arrayWithActorProps: unknown[] & Record<string, unknown> =
+      [] as never;
+    arrayWithActorProps.uid = "u";
+    arrayWithActorProps.name = "N";
+    arrayWithActorProps.internalRole = "condutor";
+    expectDomainError(
+      () => assertClinicalActor(arrayWithActorProps),
+      "missing_uid", "invalid_value",
+    );
+  });
+
+  test("actor: multi-fault fixtures fail closed (order NOT frozen)", () => {
+    // Deliberately asserts only that these REJECT, never which field wins:
+    // no consumer branches on actor error order, so freezing it would be
+    // gold-plating (contrast D1.C1, where ordering WAS the audited property).
+    for (const broken of [
+      {uid: "", name: "", internalRole: ""},
+      {uid: "", name: "N", internalRole: ""},
+      {uid: 1, name: 2, internalRole: 3},
+      {},
+    ]) {
+      assert.throws(
+        () => assertClinicalActor(broken),
+        (error: unknown) => error instanceof ClinicalDomainError,
+        `multi-fault actor should reject: ${JSON.stringify(broken)}`,
+      );
+    }
+  });
+
+  test("actor: reopen history validates reopenedBy without disturbing D1 order", () => {
+    const base = {
+      reopenedAt: new Date("2026-02-01T00:00:00.000Z"),
+      previousStatus: "discharged" as ClinicalCaseStatus,
+      reopenReason: "Alta prematura",
+      reopenedCount: 1,
+    };
+    // Valid actor: accepted AND normalized on the way out.
+    assert.deepStrictEqual(
+      assertCaseReopenConsistency({
+        ...base,
+        reopenedBy: {uid: " u ", name: " N ", internalRole: " condutor "},
+      })!.reopenedBy,
+      {uid: "u", name: "N", internalRole: "condutor"},
+    );
+    // Malformed persisted actor in an otherwise COMPLETE, COHERENT tuple:
+    // this is the exact W6 read path, and it must fail closed.
+    for (const [value, code] of [
+      [{uid: "", name: "N", internalRole: "condutor"}, "missing_uid"],
+      [{uid: "u", name: "  ", internalRole: "condutor"}, "missing_name"],
+      [{uid: "u", name: "N", internalRole: ""}, "missing_internal_role"],
+      [{}, "missing_uid"],
+      // The PERSISTED shape must NOT satisfy the domain directly: the boundary
+      // adapter is responsible for snake -> camel translation.
+      [{uid: "u", name: "N", internal_role: "condutor"}, "missing_internal_role"],
+    ] as Array<[unknown, string]>) {
+      expectDomainError(
+        () => assertCaseReopenConsistency({...base, reopenedBy: value as never}),
+        code, "invalid_value",
+      );
+    }
+    // FROZEN D1 ORDER GUARD: a tuple that is incomplete or incoherent must still
+    // report its D1 code, never an actor code, even with a broken actor.
+    expectDomainError(
+      () => assertCaseReopenConsistency({
+        reopenedAt: base.reopenedAt, reopenedBy: {} as never, reopenedCount: 1,
+      }),
+      "incomplete_reopen_metadata", "invalid_value",
+    );
+    expectDomainError(
+      () => assertCaseReopenConsistency({...base, reopenedBy: {} as never, reopenedCount: 0}),
+      "inconsistent_reopen_metadata", "invalid_value",
+    );
+    expectDomainError(
+      () => assertCaseReopenConsistency({
+        ...base, reopenedBy: {} as never, previousStatus: "open",
+      }),
+      "inconsistent_reopen_metadata", "invalid_value",
+    );
+    expectDomainError(
+      () => assertCaseReopenConsistency({
+        ...base, reopenedBy: {} as never, reopenReason: "   ",
+      }),
+      "missing_reopen_reason", "invalid_value",
+    );
+    expectDomainError(
+      () => assertCaseReopenConsistency({...base, reopenedBy: {} as never, reopenedCount: -1}),
+      "invalid_reopened_count", "invalid_value",
+    );
+  });
+
+  test("actor: event cancellation validates cancelledBy on both seams", () => {
+    const at = new Date("2026-02-01T00:00:00.000Z");
+    // Transition seam: valid actor normalized into the returned cancellation.
+    assert.deepStrictEqual(
+      assertEventTransition("final", "cancelled", {
+        cancelReason: " Duplicado ",
+        cancelledAt: at,
+        cancelledBy: {uid: " u ", name: " N ", internalRole: " admin "},
+      }).cancellation!.cancelledBy,
+      {uid: "u", name: "N", internalRole: "admin"},
+    );
+    for (const [value, code] of [
+      [{uid: "", name: "N", internalRole: "condutor"}, "missing_uid"],
+      [{uid: "u", name: "", internalRole: "condutor"}, "missing_name"],
+      [{uid: "u", name: "N", internalRole: " "}, "missing_internal_role"],
+      [{uid: "u", name: "N", internal_role: "condutor"}, "missing_internal_role"],
+    ] as Array<[unknown, string]>) {
+      expectDomainError(
+        () => assertEventTransition("final", "cancelled", {
+          cancelReason: "Duplicado", cancelledAt: at, cancelledBy: value as never,
+        }),
+        code, "invalid_value",
+      );
+      // At-rest seam: a stored cancelled event with a corrupt actor fails closed.
+      expectDomainError(
+        () => assertEventCancellationConsistency("cancelled", {
+          cancelReason: "Duplicado", cancelledAt: at, cancelledBy: value as never,
+        }),
+        code, "invalid_value",
+      );
+    }
+    // FROZEN ORDER GUARD: incompleteness and reason still outrank actor validity.
+    expectDomainError(
+      () => assertEventTransition("final", "cancelled", {
+        cancelReason: "Duplicado", cancelledBy: {} as never,
+      }),
+      "missing_cancellation_metadata", "invalid_value",
+    );
+    expectDomainError(
+      () => assertEventTransition("final", "cancelled", {
+        cancelReason: "  ", cancelledAt: at, cancelledBy: {} as never,
+      }),
+      "missing_cancel_reason", "invalid_value",
+    );
+    expectDomainError(
+      () => assertEventCancellationConsistency("cancelled", {
+        cancelReason: "  ", cancelledAt: at, cancelledBy: {} as never,
+      }),
+      "missing_cancel_reason", "invalid_value",
+    );
+    // A non-cancelled event carrying metadata is still the unexpected-metadata
+    // fault, not an actor fault.
+    expectDomainError(
+      () => assertEventCancellationConsistency("final", {
+        cancelReason: "x", cancelledAt: at, cancelledBy: {} as never,
+      }),
+      "unexpected_cancellation_metadata", "invalid_value",
+    );
+  });
+
+  test("case closure: assertClinicalCaseClosureType parses known types and rejects unknown", () => {
+    assert.deepStrictEqual(CLINICAL_CASE_CLOSURE_TYPES, ["discharge", "cancelled"]);
+    assert.strictEqual(assertClinicalCaseClosureType("discharge"), "discharge");
+    assert.strictEqual(assertClinicalCaseClosureType("cancelled"), "cancelled");
+    assert.strictEqual(isClinicalCaseClosureType("discharge"), true);
+    assert.strictEqual(isClinicalCaseClosureType("cancelled"), true);
+    assert.strictEqual(isClinicalCaseClosureType("administrative"), false);
+    assert.strictEqual(isClinicalCaseClosureType("unknown"), false);
+    expectDomainError(
+      () => assertClinicalCaseClosureType("administrative"),
+      "unknown_closure_type",
+      "invalid_value",
+    );
+    expectDomainError(
+      () => assertClinicalCaseClosureType("xyz"),
+      "unknown_closure_type",
+      "invalid_value",
+    );
+  });
+
+  test("case closure: active cases must have NO closure metadata (unexpected_closure_metadata)", () => {
+    const activeStatuses: ClinicalCaseStatus[] = [
+      "open",
+      "under_investigation",
+      "under_treatment",
+      "monitoring",
+    ];
+    const validActor = {uid: "u1", name: "Dr. Vet", internalRole: "veterinario"};
+    const now = new Date("2026-08-28T00:00:00Z");
+
+    for (const status of activeStatuses) {
+      // Clean active case has null closure result
+      assert.strictEqual(assertCaseClosureConsistency(status, {}), null);
+      assert.strictEqual(
+        assertCaseClosureConsistency(status, {
+          closedAt: null,
+          closedBy: null,
+          closureType: null,
+          closureReason: null,
+        }),
+        null,
+      );
+
+      // Any present field throws unexpected_closure_metadata
+      expectDomainError(
+        () => assertCaseClosureConsistency(status, {closedAt: now}),
+        "unexpected_closure_metadata",
+        "invalid_value",
+      );
+      expectDomainError(
+        () => assertCaseClosureConsistency(status, {closedBy: validActor}),
+        "unexpected_closure_metadata",
+        "invalid_value",
+      );
+      expectDomainError(
+        () => assertCaseClosureConsistency(status, {closureType: "discharge"}),
+        "unexpected_closure_metadata",
+        "invalid_value",
+      );
+      expectDomainError(
+        () => assertCaseClosureConsistency(status, {closureReason: "Motivo"}),
+        "unexpected_closure_metadata",
+        "invalid_value",
+      );
+    }
+  });
+
+  test("case closure: discharged case requires valid closedAt, closedBy, and closureType=discharge", () => {
+    const validActor = {uid: "u1", name: "Dr. Vet", internalRole: "veterinario"};
+    const now = new Date("2026-08-28T00:00:00Z");
+
+    // Valid without reason
+    const result1 = assertCaseClosureConsistency("discharged", {
+      closedAt: now,
+      closedBy: validActor,
+      closureType: "discharge",
+    });
+    assert.deepStrictEqual(result1, {
+      closedAt: now,
+      closedBy: {uid: "u1", name: "Dr. Vet", internalRole: "veterinario"},
+      closureType: "discharge",
+    });
+
+    // Valid with trimmed reason
+    const result2 = assertCaseClosureConsistency("discharged", {
+      closedAt: now,
+      closedBy: validActor,
+      closureType: "discharge",
+      closureReason: "  Paciente recuperado integralmente  ",
+    });
+    assert.deepStrictEqual(result2, {
+      closedAt: now,
+      closedBy: {uid: "u1", name: "Dr. Vet", internalRole: "veterinario"},
+      closureType: "discharge",
+      closureReason: "Paciente recuperado integralmente",
+    });
+
+    // Missing closedAt
+    expectDomainError(
+      () => assertCaseClosureConsistency("discharged", {
+        closedBy: validActor,
+        closureType: "discharge",
+      }),
+      "incomplete_closure_metadata",
+      "invalid_value",
+    );
+
+    // Missing closedBy
+    expectDomainError(
+      () => assertCaseClosureConsistency("discharged", {
+        closedAt: now,
+        closureType: "discharge",
+      }),
+      "incomplete_closure_metadata",
+      "invalid_value",
+    );
+
+    // Missing closureType
+    expectDomainError(
+      () => assertCaseClosureConsistency("discharged", {
+        closedAt: now,
+        closedBy: validActor,
+      }),
+      "incomplete_closure_metadata",
+      "invalid_value",
+    );
+
+    // Wrong closureType ("cancelled")
+    expectDomainError(
+      () => assertCaseClosureConsistency("discharged", {
+        closedAt: now,
+        closedBy: validActor,
+        closureType: "cancelled",
+      }),
+      "inconsistent_closure_metadata",
+      "invalid_value",
+    );
+
+    // Unsupported closureType ("administrative")
+    expectDomainError(
+      () => assertCaseClosureConsistency("discharged", {
+        closedAt: now,
+        closedBy: validActor,
+        closureType: "administrative" as never,
+      }),
+      "inconsistent_closure_metadata",
+      "invalid_value",
+    );
+
+    // Whitespace-only reason fails when provided
+    expectDomainError(
+      () => assertCaseClosureConsistency("discharged", {
+        closedAt: now,
+        closedBy: validActor,
+        closureType: "discharge",
+        closureReason: "   ",
+      }),
+      "missing_closure_reason",
+      "invalid_value",
+    );
+  });
+
+  test("case closure: cancelled case requires valid closedAt, closedBy, closureType=cancelled, and non-empty closureReason", () => {
+    const validActor = {uid: "u2", name: "Admin GCM", internalRole: "admin"};
+    const now = new Date("2026-08-28T00:00:00Z");
+
+    // Valid cancelled closure
+    const result = assertCaseClosureConsistency("cancelled", {
+      closedAt: now,
+      closedBy: validActor,
+      closureType: "cancelled",
+      closureReason: "  Caso aberto em duplicidade  ",
+    });
+    assert.deepStrictEqual(result, {
+      closedAt: now,
+      closedBy: {uid: "u2", name: "Admin GCM", internalRole: "admin"},
+      closureType: "cancelled",
+      closureReason: "Caso aberto em duplicidade",
+    });
+
+    // Missing closureReason
+    expectDomainError(
+      () => assertCaseClosureConsistency("cancelled", {
+        closedAt: now,
+        closedBy: validActor,
+        closureType: "cancelled",
+      }),
+      "missing_closure_reason",
+      "invalid_value",
+    );
+
+    // Whitespace-only closureReason
+    expectDomainError(
+      () => assertCaseClosureConsistency("cancelled", {
+        closedAt: now,
+        closedBy: validActor,
+        closureType: "cancelled",
+        closureReason: "   ",
+      }),
+      "missing_closure_reason",
+      "invalid_value",
+    );
+
+    // Wrong closureType ("discharge")
+    expectDomainError(
+      () => assertCaseClosureConsistency("cancelled", {
+        closedAt: now,
+        closedBy: validActor,
+        closureType: "discharge",
+        closureReason: "Duplicado",
+      }),
+      "inconsistent_closure_metadata",
+      "invalid_value",
+    );
+
+    // Incomplete tuple (missing closedAt)
+    expectDomainError(
+      () => assertCaseClosureConsistency("cancelled", {
+        closedBy: validActor,
+        closureType: "cancelled",
+        closureReason: "Duplicado",
+      }),
+      "incomplete_closure_metadata",
+      "invalid_value",
+    );
+  });
+
+  test("case closure: actor validation in closure tuple fails closed on malformed actors", () => {
+    const now = new Date("2026-08-28T00:00:00Z");
+
+    // Missing UID in discharged closure actor
+    expectDomainError(
+      () => assertCaseClosureConsistency("discharged", {
+        closedAt: now,
+        closedBy: {uid: "", name: "Dr Vet", internalRole: "veterinario"} as never,
+        closureType: "discharge",
+      }),
+      "missing_uid",
+      "invalid_value",
+    );
+
+    // Missing name in cancelled closure actor
+    expectDomainError(
+      () => assertCaseClosureConsistency("cancelled", {
+        closedAt: now,
+        closedBy: {uid: "u1", name: "  ", internalRole: "admin"} as never,
+        closureType: "cancelled",
+        closureReason: "Motivo valido",
+      }),
+      "missing_name",
+      "invalid_value",
+    );
+
+    // Missing role in cancelled closure actor
+    expectDomainError(
+      () => assertCaseClosureConsistency("cancelled", {
+        closedAt: now,
+        closedBy: {uid: "u1", name: "Admin", internalRole: ""} as never,
+        closureType: "cancelled",
+        closureReason: "Motivo valido",
+      }),
+      "missing_internal_role",
+      "invalid_value",
+    );
   });
 
   if (failed > 0) {

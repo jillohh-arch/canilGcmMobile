@@ -385,9 +385,24 @@ class _ExamProcessFlowScreenState extends State<ExamProcessFlowScreen> {
     );
 
     if (confirmed == true) {
+      if (!mounted) return;
+      // Precondição OCC obrigatória: a revisão REAL do caso selecionado, lida do
+      // read model (ClinicalCaseOption.revision). Nunca sintetizar um valor —
+      // sem o caso carregado não há intenção de concorrência a declarar.
+      final selected = _cases.where((c) => c.caseId == _selectedCaseId);
+      if (selected.isEmpty) {
+        AppFeedback.error(
+          context,
+          'Caso clínico não carregado. Recarregue o prontuário antes de solicitar o exame.',
+        );
+        return;
+      }
+      final selectedCase = selected.first;
+
       final cmd = RequestExamCommand(
         dogId: _dogId,
-        caseId: _selectedCaseId!,
+        caseId: selectedCase.caseId,
+        expectedCaseRevision: selectedCase.revision,
         title: titleController.text.trim(),
         examType: selectedType,
         urgency: selectedUrgency,

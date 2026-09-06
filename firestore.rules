@@ -302,8 +302,9 @@ service cloud.firestore {
     //
     // Capability é resolvida via mapa dinâmico (activeProfileGrants faz
     // `permissions.get('health',{}).get('read',false)`): nenhum enum novo é
-    // exigido e a capability FALHA FECHADA para todo perfil ainda não migrado
-    // — produção hoje não concede health.read, o que é o estado esperado.
+    // exigido e a capability FALHA FECHADA para todo perfil ainda não migrado.
+    // Perfis migrados (SEED-4/5) já concedem health.read em produção; qualquer
+    // perfil não migrado continua negado.
     //
     // NÃO adiciona acessos a documento novos além dos que canAccessDogRecord()
     // já faz: users/{ra} e access_profiles/{id} são os mesmos documentos que
@@ -2270,12 +2271,14 @@ service cloud.firestore {
       // consultado em nenhuma destas regras, logo um payload forjado não
       // amplia acesso nem alcança K9 alheio.
       //
-      // WRITES: TODOS negados, inclusive Amendment. O contrato futuro prevê
-      // Amendment append-only e lifecycle server-orchestrated, mas nenhum
-      // writer existe ainda — nem callable, nem capability. Permitir create
-      // agora criaria prontuário sem autoria, sem evidência e sem auditoria.
-      // Mutação é decisão dos gates de writer (health.record_incident,
-      // health.amend_record, health.discharge_case, ...), todos AUSENTES.
+      // WRITES: TODOS negados ao cliente, inclusive Amendment. Toda mutação do
+      // prontuário é server-orchestrated via callables Admin SDK (abertura,
+      // append/finalize/cancel/amend de evento, ciclo de vida do caso e Exame),
+      // cada uma exigindo capability clínica própria (health.record_clinical,
+      // health.finalize_clinical, health.amend_clinical,
+      // health.manage_clinical_case, health.reopen_clinical_case). Permitir
+      // create aqui criaria prontuário sem autoria, sem evidência e sem
+      // auditoria, contornando receipt, OCC e audit log.
       //
       // SEM collection-group nesta fundação: listar ClinicalCase cross-dog
       // exigiria uma regra recursiva cuja identidade disponível seria
@@ -2330,6 +2333,18 @@ service cloud.firestore {
             && canAccessDogRecord(dogId);
           allow create, update, delete: if false;
         }
+      }
+
+      // Receipts operacionais internos de idempotência/fingerprint do prontuário
+      // (open/append/finalize/cancel/amend, ciclo de vida do caso e Exame).
+      // Nunca expostos ao app cliente — nem get/list nem write.
+      //
+      // O deny já era o comportamento efetivo por ausência de regra; torná-lo
+      // EXPLÍCITO alinha com nutrition_operations e sobrevive à eventual adição
+      // de um wildcard recursivo sob clinical_cases, onde o deny implícito não
+      // sobreviveria (CLINICAL-BE.MERGE-I1 §16).
+      match /clinical_cases/{caseId}/operations/{operationId} {
+        allow read, create, update, delete: if false;
       }
     }
 

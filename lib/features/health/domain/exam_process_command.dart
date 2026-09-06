@@ -10,6 +10,7 @@ final class RequestExamCommand {
   const RequestExamCommand({
     required this.dogId,
     required this.caseId,
+    required this.expectedCaseRevision,
     required this.title,
     required this.examType,
     this.urgency = ExamUrgency.routine,
@@ -21,6 +22,20 @@ final class RequestExamCommand {
 
   final String dogId;
   final String caseId;
+
+  /// Precondição de concorrência OBRIGATÓRIA do ClinicalCase pai.
+  ///
+  /// Solicitar um exame pode transicionar o caso (`open → under_investigation`),
+  /// e essa transição é executada pela autoridade de ciclo de vida do
+  /// ClinicalCase. O chamador precisa declarar em qual revisão do caso acredita
+  /// estar operando: o backend rejeita ausência com `invalid-argument` e
+  /// divergência com `failed-precondition`.
+  ///
+  /// Deve vir da leitura real do caso. Nunca sintetize `1`, nunca reenvie com um
+  /// valor atualizado após uma falha de OCC — uma rejeição de stale precisa
+  /// chegar à interface para que o operador recarregue o prontuário.
+  final int expectedCaseRevision;
+
   final String title;
   final ExamType examType;
   final ExamUrgency urgency;

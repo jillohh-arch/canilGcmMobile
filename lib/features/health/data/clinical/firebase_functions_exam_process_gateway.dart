@@ -188,6 +188,8 @@ final class FirebaseFunctionsExamProcessGateway implements ExamProcessGateway {
       final payload = <String, dynamic>{
         'dogId': command.dogId,
         'caseId': command.caseId,
+        // Precondição OCC obrigatória do ClinicalCase pai — sem fallback.
+        'expectedCaseRevision': command.expectedCaseRevision,
         'title': command.title,
         'examType': command.examType.wireName,
         'urgency': command.urgency.wireName,

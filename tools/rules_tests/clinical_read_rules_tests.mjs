@@ -1026,6 +1026,33 @@ test('EXAM-07 regra de exams não amplia acesso a outros nós clínicos ou K9 al
   await assertFails(getDoc(examRef(dbFor(OUTSIDER_RA))));
 });
 
+test('OPS-01 receipts de operação são negados a TODO cliente (deny explícito)', async () => {
+  await clearAll();
+  await seedClinicalWorld();
+
+  // Receipts são infraestrutura interna de idempotência. O deny já era efetivo
+  // por ausência de regra; CLINICAL-BE.MERGE-I1 §16 o tornou EXPLÍCITO, e este
+  // teste é o que impede um wildcard recursivo futuro de reabri-lo por acidente.
+  const opsRef = (db, dogId = DOG_A) =>
+    doc(db, 'dogs', dogId, 'clinical_cases', CASE_A, 'operations', 'op-1');
+
+  // Nem o condutor com vínculo e health.read pode ler o receipt.
+  await assertFails(getDoc(opsRef(dbFor(PRIMARY_RA))));
+  await assertFails(getDoc(opsRef(dbFor(DOG_B_RA), DOG_B)));
+  await assertFails(getDoc(opsRef(dbFor(OUTSIDER_RA))));
+  // Nem administração técnica: receipts não são dado clínico legível.
+  await assertFails(getDoc(opsRef(dbForTechAdmin())));
+
+  // Escrita de cliente também negada, em qualquer identidade.
+  await assertFails(setDoc(opsRef(dbFor(PRIMARY_RA)), {kind: 'forjado'}));
+  await assertFails(setDoc(opsRef(dbFor(OUTSIDER_RA)), {kind: 'forjado'}));
+
+  // E listar a coleção de receipts não é caminho alternativo.
+  await assertFails(
+    getDocs(collection(dbFor(PRIMARY_RA), 'dogs', DOG_A, 'clinical_cases', CASE_A, 'operations')),
+  );
+});
+
 // ═════════════════════════════════════════════════════════════════════════════
 // TREATMENT PROTOCOLS & DOSES — TREAT-01..TREAT-07 (F20.TREATMENT-V1)
 // ═════════════════════════════════════════════════════════════════════════════

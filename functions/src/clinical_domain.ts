@@ -61,6 +61,17 @@ export const CLINICAL_DOMAIN_ERROR_CODES = [
   "unknown_event_status",
   "unknown_event_type",
   "unknown_case_opening_type",
+  // Actor value validity (CLIN-WRITER-1.W6.P0.K1). Names are taken verbatim from
+  // the Dart `_required(value, field)` codes so parity can be checked by name.
+  "missing_uid",
+  "missing_name",
+  "missing_internal_role",
+  // Case closure at-rest validity (CLIN-WRITER-1.W6.I1)
+  "missing_closure_reason",
+  "incomplete_closure_metadata",
+  "inconsistent_closure_metadata",
+  "unexpected_closure_metadata",
+  "unknown_closure_type",
 ] as const;
 
 export type ClinicalDomainErrorCode = typeof CLINICAL_DOMAIN_ERROR_CODES[number];
@@ -439,13 +450,193 @@ export function assertCaseReopenConsistency(
   }
 
   if (!hasAll) return null;
+  // Actor validity is checked LAST on purpose. Every frozen D1 check above must
+  // keep firing first, so existing reopen-history fixtures still report exactly
+  // the codes they reported before K1. Only a tuple that is otherwise complete
+  // AND coherent can now fail on a malformed `reopened_by` — which is precisely
+  // the W6 read path this debt exists to protect.
   return {
     reopenedAt: reopenedAt as Date,
-    reopenedBy: reopenedBy as ClinicalActor,
+    reopenedBy: assertClinicalActor(reopenedBy),
     previousStatus: previousStatus as ClinicalCaseStatus,
     reopenReason: normalizedReason as string,
     reopenedCount: count,
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ClinicalCase closure at-rest consistency (CLIN-WRITER-1.W6.I1)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const CLINICAL_CASE_CLOSURE_TYPES = [
+  "discharge",
+  "cancelled",
+] as const;
+
+export type ClinicalCaseClosureType =
+  typeof CLINICAL_CASE_CLOSURE_TYPES[number];
+
+export function isClinicalCaseClosureType(
+  value: unknown,
+): value is ClinicalCaseClosureType {
+  return (
+    typeof value === "string" &&
+    (CLINICAL_CASE_CLOSURE_TYPES as readonly string[]).includes(value)
+  );
+}
+
+export function assertClinicalCaseClosureType(
+  value: unknown,
+): ClinicalCaseClosureType {
+  if (!isClinicalCaseClosureType(value)) {
+    throw invalidValue(
+      "unknown_closure_type",
+      `closure_type inválido: ${JSON.stringify(value)}. Valores aceitos: ${CLINICAL_CASE_CLOSURE_TYPES.join(", ")}`,
+    );
+  }
+  return value;
+}
+
+export interface ClinicalCaseClosureInput {
+  readonly closedAt?: Date | null;
+  readonly closedBy?: ClinicalActor | null;
+  readonly closureType?: ClinicalCaseClosureType | string | null;
+  readonly closureReason?: string | null;
+}
+
+export interface ClinicalCaseClosure {
+  readonly closedAt: Date;
+  readonly closedBy: ClinicalActor;
+  readonly closureType: ClinicalCaseClosureType;
+  readonly closureReason?: string;
+}
+
+/**
+ * Enforces ClinicalCase closure at-rest invariants across all case statuses.
+ *
+ * Rules:
+ * - ACTIVE cases (open, under_investigation, under_treatment, monitoring):
+ *   all closure fields must be absent. Any present field throws `unexpected_closure_metadata`.
+ * - DISCHARGED cases:
+ *   `closed_at`, `closed_by` (valid ClinicalActor), and `closure_type == "discharge"` are required.
+ *   `closure_reason` is optional; if present, it must be a non-empty trimmed string.
+ * - CANCELLED cases:
+ *   `closed_at`, `closed_by` (valid ClinicalActor), `closure_type == "cancelled"`, and `closure_reason`
+ *   (mandatory non-empty trimmed string) are required.
+ * - Partial or inconsistent closure tuples fail closed (`incomplete_closure_metadata` / `inconsistent_closure_metadata`).
+ */
+export function assertCaseClosureConsistency(
+  status: ClinicalCaseStatus,
+  closure: ClinicalCaseClosureInput = {},
+): ClinicalCaseClosure | null {
+  parseClinicalCaseStatus(status);
+
+  const {closedAt, closedBy, closureType, closureReason} = closure;
+  const isPresent = (v: unknown) => v !== undefined && v !== null;
+
+  const hasAny =
+    isPresent(closedAt) ||
+    isPresent(closedBy) ||
+    isPresent(closureType) ||
+    isPresent(closureReason);
+
+  if (!isTerminalCaseStatus(status)) {
+    if (hasAny) {
+      throw invalidValue(
+        "unexpected_closure_metadata",
+        `Caso em status ativo (${status}) não pode conter metadados de fechamento`,
+      );
+    }
+    return null;
+  }
+
+  if (status === "discharged") {
+    if (!isPresent(closedAt) || !isPresent(closedBy) || !isPresent(closureType)) {
+      throw invalidValue(
+        "incomplete_closure_metadata",
+        "Caso discharged exige closed_at, closed_by e closure_type",
+      );
+    }
+    if (!(closedAt instanceof Date) || isNaN(closedAt.getTime())) {
+      throw invalidValue(
+        "incomplete_closure_metadata",
+        "closed_at deve ser uma data válida",
+      );
+    }
+    if (closureType !== "discharge") {
+      throw invalidValue(
+        "inconsistent_closure_metadata",
+        `Caso discharged exige closure_type "discharge", encontrado: ${JSON.stringify(closureType)}`,
+      );
+    }
+    const validatedActor = assertClinicalActor(closedBy);
+    let normalizedReason: string | undefined;
+    if (isPresent(closureReason)) {
+      if (typeof closureReason !== "string") {
+        throw invalidValue(
+          "invalid_case_transition",
+          "closure_reason deve ser uma string",
+        );
+      }
+      const trimmed = closureReason.trim();
+      if (trimmed.length === 0) {
+        throw invalidValue(
+          "missing_closure_reason",
+          "closure_reason não pode ser apenas espaços em branco quando fornecido",
+        );
+      }
+      normalizedReason = trimmed;
+    }
+    return {
+      closedAt,
+      closedBy: validatedActor,
+      closureType: "discharge",
+      ...(normalizedReason !== undefined ? {closureReason: normalizedReason} : {}),
+    };
+  }
+
+  if (status === "cancelled") {
+    if (!isPresent(closedAt) || !isPresent(closedBy) || !isPresent(closureType)) {
+      throw invalidValue(
+        "incomplete_closure_metadata",
+        "Caso cancelled exige closed_at, closed_by e closure_type",
+      );
+    }
+    if (!(closedAt instanceof Date) || isNaN(closedAt.getTime())) {
+      throw invalidValue(
+        "incomplete_closure_metadata",
+        "closed_at deve ser uma data válida",
+      );
+    }
+    if (closureType !== "cancelled") {
+      throw invalidValue(
+        "inconsistent_closure_metadata",
+        `Caso cancelled exige closure_type "cancelled", encontrado: ${JSON.stringify(closureType)}`,
+      );
+    }
+    const validatedActor = assertClinicalActor(closedBy);
+    if (!isPresent(closureReason) || typeof closureReason !== "string") {
+      throw invalidValue(
+        "missing_closure_reason",
+        "Caso cancelled exige closure_reason",
+      );
+    }
+    const trimmed = closureReason.trim();
+    if (trimmed.length === 0) {
+      throw invalidValue(
+        "missing_closure_reason",
+        "closure_reason é obrigatório para caso cancelado",
+      );
+    }
+    return {
+      closedAt,
+      closedBy: validatedActor,
+      closureType: "cancelled",
+      closureReason: trimmed,
+    };
+  }
+
+  return null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -499,13 +690,67 @@ export function isEventContentEditable(status: ClinicalEventStatus): boolean {
 }
 
 /**
- * Authorship/instant of a cancellation. Structural only — a future writer is
- * responsible for deriving `uid` from `request.auth`, never from the payload.
+ * Authorship of a clinical fact. A writer is responsible for deriving `uid` from
+ * `request.auth`, never from the payload.
+ *
+ * The DOMAIN representation is camelCase. The PERSISTED representation is
+ * `{uid, name, internal_role}` — translation belongs to the persistence
+ * boundary, never here, so this module stays free of storage vocabulary.
  */
 export interface ClinicalActor {
   readonly uid: string;
   readonly name: string;
   readonly internalRole: string;
+}
+
+/**
+ * Runtime validity of a ClinicalActor (CLIN-WRITER-1.W6.P0.K1).
+ *
+ * Mirrors the Dart `RecordedBy` constructor, which validates in its initializer
+ * list and therefore CANNOT hold an invalid actor. TypeScript had only a
+ * structural interface, so every malformed runtime value — `{}`, `null`, a bare
+ * string, a numeric `uid`, a blank field — was accepted. W6 will be the first
+ * writer to read a PERSISTED actor (`reopened_by`), so the read path needs this
+ * before it exists rather than retrofitted after.
+ *
+ * Parity decisions, all matching Dart rather than improving on it:
+ *  - three REQUIRED fields, each a non-blank string, trimmed like `_required`;
+ *  - `internalRole` is NOT an enum — an unknown non-empty role is ACCEPTED,
+ *    because Dart accepts it too;
+ *  - unknown extra keys are ignored: this is a required-field contract, not a
+ *    closed-shape one;
+ *  - a non-object actor fails through the same three codes rather than a new
+ *    `invalid_actor` family, because Dart has no such code (it cannot even
+ *    construct the value).
+ */
+export function assertClinicalActor(value: unknown): ClinicalActor {
+  // A non-object (or array) has no readable fields at all, so the first
+  // required field is the one that reports missing. No new code invented.
+  const source: Record<string, unknown> =
+    typeof value === "object" && value !== null && !Array.isArray(value) ?
+      (value as Record<string, unknown>) :
+      {};
+  return {
+    uid: requiredActorField(source.uid, "uid"),
+    name: requiredActorField(source.name, "name"),
+    internalRole: requiredActorField(source.internalRole, "internal_role"),
+  };
+}
+
+/**
+ * One required actor field. The error code carries the PERSISTED field name
+ * (`internal_role`), exactly as Dart's `_required(internalRole, 'internal_role')`
+ * does, so the two sides report the same string for the same fault.
+ */
+function requiredActorField(raw: unknown, field: string): string {
+  const trimmed = typeof raw === "string" ? raw.trim() : "";
+  if (trimmed.length === 0) {
+    throw invalidValue(
+      `missing_${field}` as ClinicalDomainErrorCode,
+      `${field} é obrigatório`,
+    );
+  }
+  return trimmed;
 }
 
 /** Cancellation metadata as supplied by a caller (all optional at the boundary). */
@@ -578,7 +823,9 @@ export function assertEventTransition(
       cancellation: {
         cancelReason: (cancelReason as string).trim(),
         cancelledAt: cancelledAt as Date,
-        cancelledBy: cancelledBy as ClinicalActor,
+        // Same placement rule as reopen history: every frozen completeness check
+        // above fires first, so actor validity is the last thing that can fail.
+        cancelledBy: assertClinicalActor(cancelledBy),
       },
     };
   }
@@ -629,5 +876,11 @@ export function assertEventCancellationConsistency(
   }
   if (hasAll && (cancelReason as string).trim().length === 0) {
     throw invalidValue("missing_cancel_reason", "cancel_reason é obrigatório");
+  }
+  // Actor validity LAST, after every frozen completeness/reason check, so no
+  // pre-K1 fixture changes its reported code. A cancelled event at rest whose
+  // `cancelled_by` is corrupt now fails closed instead of being trusted.
+  if (hasAll) {
+    assertClinicalActor(cancelledBy);
   }
 }

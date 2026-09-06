@@ -100,6 +100,57 @@ clínica: `health.read` + `canAccessDogRecord(dogId)` estrutural do path, **sem
 bypass admin**. Este gate não altera nenhuma semântica de autorização de
 leitura.
 
+### 1.3 `RecordedBy` — forma canônica do ator (CONGELADO — CLIN-WRITER-1.W6.P0.K1)
+
+Todo campo tipado `RecordedBy` neste schema (`recorded_by`, `opened_by`,
+`finalized_by`, `cancelled_by`, `reopened_by`, `closed_by`, `deleted_by`, …) usa
+**uma única forma persistida**:
+
+| Campo persistido | Tipo | Obrigatório | Regra |
+|---|---|---|---|
+| `uid` | string | ✅ | `trim()` aplicado; **não pode ser vazio** |
+| `name` | string | ✅ | `trim()` aplicado; **não pode ser vazio** |
+| `internal_role` | string | ✅ | `trim()` aplicado; **não pode ser vazio** |
+
+**Duas representações, uma autoridade.** A chave persistida é `internal_role`
+(snake_case); o domínio puro usa `internalRole` (camelCase). A tradução acontece
+**exclusivamente** na fronteira de persistência
+(`clinical_case_callables.ts`), nunca dentro do domínio puro
+(`clinical_domain.ts`), que jamais deve conhecer nomes de armazenamento.
+
+```
+Firestore            { uid, name, internal_role }
+                              ↓  adaptação estrita (sem default)
+domínio puro         { uid, name, internalRole }
+                              ↓
+                     assertClinicalActor(...)
+```
+
+**Propriedades normativas:**
+- **SERVER-derived**: o ator vem sempre do chamador autenticado. O cliente
+  **não pode** injetá-lo — todas as chaves de ator estão na blocklist de payload
+  do writer e são rejeitadas antes de qualquer leitura.
+- **`internal_role` NÃO é enum.** Qualquer string não vazia é válida no V1, em
+  paridade factual com o `RecordedBy` do Dart. Valores desconhecidos não são
+  proibidos por esta autoridade.
+- **Contrato de campos obrigatórios, não de objeto fechado**: chaves extras
+  desconhecidas são ignoradas, não rejeitadas.
+- **Zero defaulting na LEITURA.** Um `internal_role` ausente em documento
+  persistido **nunca** pode ser preenchido com `"condutor"` (ou qualquer outro
+  valor). A ausência é corrupção, não um valor a inferir.
+- **Ator armazenado malformado falha fechado** como `integrity` /
+  `failed-precondition` — nunca é normalizado em trânsito. Códigos de domínio:
+  `missing_uid`, `missing_name`, `missing_internal_role`, idênticos aos do Dart.
+- **Identidade de erro por campo é autoridade**; a ordem entre múltiplas falhas
+  simultâneas **não** é contrato externo.
+
+Paridade com o Dart: `RecordedBy` em
+`lib/features/health/domain/health_v1_models.dart` valida na lista de
+inicialização, portanto **não consegue existir** em estado inválido. O validador
+do servidor existe para dar a mesma garantia ao ler dados persistidos — caminho
+que o writer de lifecycle (W6) será o primeiro a exercer ao consumir
+`reopened_by`.
+
 ---
 
 ## 2. Coleções — fontes canônicas
@@ -253,6 +304,47 @@ fail-open gratuito. Não "harmonizar" com Schedule.
 - **não** é monotônico;
 - **não** implica ordem de commit;
 - **não** participa da decisão fresco/obsoleto.
+
+#### 2.1.3 Writers canônicos de ciclo de vida do ClinicalCase (CONGELADO — CLIN-WRITER-1.W6.I1)
+
+Quatro callables dedicados executam mutações de ciclo de vida do `ClinicalCase`.
+Todas as operações de ciclo de vida são **CASE-ONLY** (não geram `ClinicalEvent`
+automático; `event_count`, `last_event_at` e `opening_event_id` permanecem intactos).
+
+| Comando | Callable | Capability requerida | Origem válida | Destino válido |
+|---|---|---|---|---|
+| **TRANSITION** | `healthTransitionClinicalCase` | `health.manage_clinical_case` | Ativo (`open`, `under_investigation`, `under_treatment`, `monitoring`) | Ativo (10 pares canônicos) |
+| **DISCHARGE** | `healthDischargeClinicalCase` | `health.manage_clinical_case` | Ativo (`open`, `under_investigation`, `under_treatment`, `monitoring`) | `discharged` |
+| **CANCEL** | `healthCancelClinicalCase` | `health.manage_clinical_case` | Ativo (`open`, `under_investigation`, `under_treatment`, `monitoring`) | `cancelled` |
+| **REOPEN** | `healthReopenClinicalCase` | `health.reopen_clinical_case` | `discharged` apenas | Ativo (`open`, `under_investigation`, `under_treatment`, `monitoring`) |
+
+**Matriz de Transições Canônica:**
+- **Ativo → Ativo (10 pares):**
+  - `open` → `under_investigation`, `under_treatment`, `monitoring`
+  - `under_investigation` → `open`, `under_treatment`, `monitoring`
+  - `under_treatment` → `under_investigation`, `monitoring`
+  - `monitoring` → `under_investigation`, `under_treatment`
+- **Ativo → Fechado (Discharge / Cancel):**
+  - `open`, `under_investigation`, `under_treatment`, `monitoring` → `discharged` (via `healthDischargeClinicalCase`)
+  - `open`, `under_investigation`, `under_treatment`, `monitoring` → `cancelled` (via `healthCancelClinicalCase`)
+- **Fechado → Ativo (Reopen):**
+  - `discharged` → `open`, `under_investigation`, `under_treatment`, `monitoring` (via `healthReopenClinicalCase`)
+- **Terminal (Cancelled):**
+  - `cancelled` possui 0 saídas. Nenhuma transição permitida.
+
+**Propriedades Normativas de Execução:**
+- **Integridade antes do stale:** Toda mutação valida a integridade do agregado
+  armazenado (`assertStoredCaseIntegrity`: status, revision, closure, reopen
+  history, atores) ANTES de validar a precondição de concorrência `expectedRevision`.
+- **Replay antes do stale:** Receipts idempotentes armazenados sob
+  `dogs/{dogId}/clinical_cases/{caseId}/operations/{operationId}` são avaliados
+  antes da frescura do token OCC.
+- **Deleção na Reabertura:** `healthReopenClinicalCase` deleta atomicamente todos
+  os 4 campos de fechamento (`closed_at`, `closed_by`, `closure_type`,
+  `closure_reason`) via `FieldValue.delete()`.
+- **Audit Logs:** Cada comando grava deterministicamente uma entrada em
+  `auditLogs` (`clinical_case_transitioned`, `clinical_case_discharged`,
+  `clinical_case_cancelled`, `clinical_case_reopened`).
 
 ---
 
