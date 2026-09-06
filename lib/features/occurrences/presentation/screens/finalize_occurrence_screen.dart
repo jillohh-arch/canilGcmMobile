@@ -19,7 +19,9 @@ import 'package:canil_gcm/features/occurrences/data/occurrence_repository.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
-import 'package:canil_gcm/features/occurrences/domain/upload_progress_aggregator.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_media_uploader.dart';
+import 'package:canil_gcm/features/occurrences/domain/upload_cancellation_token.dart';
+import 'package:canil_gcm/features/occurrences/domain/upload_orphan_tracker.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_confirmation_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/occurrence_team_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
@@ -58,7 +60,9 @@ class FinalizeOccurrenceScreen extends StatefulWidget {
       final pct = (fraction * 100).floor().clamp(0, 100);
       return '$prefix $fileNumber/$totalFiles · $pct%';
     }
-    return totalFiles == 1 ? '$prefix...' : '$prefix $fileNumber/$totalFiles...';
+    return totalFiles == 1
+        ? '$prefix...'
+        : '$prefix $fileNumber/$totalFiles...';
   }
 
   @visibleForTesting
@@ -122,6 +126,12 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
   final _mediaService = const MediaProcessingService();
   final _storageService = StorageService();
 
+  UploadCancellationToken? _finalizeCancelToken;
+  late final OccurrenceMediaUploader _mediaUploader = OccurrenceMediaUploader(
+    storageService: _storageService,
+  );
+  final Map<String, UploadResult> _completedFinalizeUploads = {};
+
   static const _drugTypes = [
     'Maconha',
     'Cocaína',
@@ -140,6 +150,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
 
   @override
   void dispose() {
+    _finalizeCancelToken?.cancel();
     _draftDebounce?.cancel();
     _pageController.dispose();
     _reportController.dispose();
@@ -590,6 +601,7 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
   }
 
   Future<void> _finalize() async {
+    if (_isFinalizing) return;
     _draftDebounce?.cancel();
     final missing = _missingDetailMessage();
     if (missing != null) {
@@ -658,6 +670,8 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                 );
               },
             );
+
+        UploadOrphanTracker().commit(widget.occurrenceId);
 
         if (!mounted) return;
 
@@ -736,6 +750,8 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
             },
           );
 
+      UploadOrphanTracker().commit(widget.occurrenceId);
+
       debugPrint('[Finalize] Finalização concluída com sucesso!');
       final sealedOccurrence = await vm.getById(widget.occurrenceId);
       final confirmedHash =
@@ -763,6 +779,8 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
           ),
         );
       }
+    } on UploadCancelledException {
+      // Cancelamento cooperativo: nenhuma mensagem de erro gritante
     } on TimeoutException catch (e) {
       if (mounted) {
         AppFeedback.error(context, e.message ?? 'Tempo limite excedido');
@@ -1196,7 +1214,8 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
                 height: 3,
                 width: double.infinity,
                 child: LinearProgressIndicator(
-                  value: (_currentFinalizeUploadIndex == 0 &&
+                  value:
+                      (_currentFinalizeUploadIndex == 0 &&
                           !_hasActiveFinalizeProgress)
                       ? null
                       : _finalizeFraction,
@@ -1867,68 +1886,53 @@ class _FinalizeOccurrenceScreenState extends State<FinalizeOccurrenceScreen> {
           candidates,
         );
 
-    // Fase 3: Medição dos tamanhos efetivos finais para o denominador
-    final fileSizes = <int>[];
-    for (final file in effectiveFiles) {
-      try {
-        fileSizes.add(await file.length());
-      } catch (_) {
-        fileSizes.add(0);
-      }
-    }
+    _finalizeCancelToken = UploadCancellationToken();
 
-    final aggregator = UploadProgressAggregator(fileSizes);
-    final results = <UploadResult>[];
-    final folder = 'occurrences/${widget.occurrenceId}/finalization';
-
-    // Fase 4: Upload sequencial com progresso agregado real em bytes
-    for (var i = 0; i < effectiveFiles.length; i++) {
-      final file = effectiveFiles[i];
-      final startSnap = aggregator.startFile(i);
-      if (mounted) {
+    final batchResult = await _mediaUploader.uploadBatch(
+      files: effectiveFiles,
+      folder: 'occurrences/${widget.occurrenceId}/finalization',
+      occurrenceId: widget.occurrenceId,
+      cancelToken: _finalizeCancelToken,
+      alreadyCompleted: _completedFinalizeUploads,
+      onProgress: (fileIndex, totalFiles, snapshot) {
+        if (!mounted) return;
         setState(() {
-          _currentFinalizeUploadIndex = i;
-          _hasActiveFinalizeProgress = false;
-          _finalizeFraction = startSnap.fraction;
+          _currentFinalizeUploadIndex = fileIndex;
+          _hasActiveFinalizeProgress = snapshot.hasActiveFileProgress;
+          _finalizeFraction = snapshot.fraction;
           _finalizeStatus = FinalizeOccurrenceScreen.formatUploadStatus(
-            currentFileIndex: i,
-            totalFiles: effectiveFiles.length,
-            fraction: startSnap.fraction,
-            hasActiveProgress: false,
+            currentFileIndex: fileIndex,
+            totalFiles: totalFiles,
+            fraction: snapshot.fraction,
+            hasActiveProgress: snapshot.hasActiveFileProgress,
           );
         });
-      }
+      },
+      onStatusChanged: (fileIndex, totalFiles, message) {
+        if (!mounted) return;
+        setState(() {
+          _finalizeStatus = message;
+        });
+      },
+    );
 
-      final result = await _storageService.uploadImageWithHash(
-        file,
-        folder,
-        onProgress: (transferred, total) {
-          if (!mounted) return;
-          final snapshot = aggregator.updateFileProgress(i, transferred);
-          setState(() {
-            _currentFinalizeUploadIndex = i;
-            _hasActiveFinalizeProgress = snapshot.hasActiveFileProgress;
-            _finalizeFraction = snapshot.fraction;
-            _finalizeStatus = FinalizeOccurrenceScreen.formatUploadStatus(
-              currentFileIndex: i,
-              totalFiles: effectiveFiles.length,
-              fraction: snapshot.fraction,
-              hasActiveProgress: snapshot.hasActiveFileProgress,
-            );
-          });
-        },
-      );
-
-      if (result != null) {
-        aggregator.completeFile(i);
-        _hasActiveFinalizeProgress = false;
-        results.add(result);
-      } else {
-        break;
-      }
+    // Salvar mídias completadas para que retry não as reenvie
+    for (final r in batchResult.completedResults) {
+      _completedFinalizeUploads[r.sha256Hash] = r;
     }
 
-    return results;
+    if (batchResult.isCancelled) {
+      throw const UploadCancelledException();
+    }
+
+    if (!batchResult.isSuccess) {
+      throw batchResult.firstError ??
+          Exception(
+            batchResult.friendlyErrorMessage ?? 'Falha no envio de fotos.',
+          );
+    }
+
+    return batchResult.completedResults;
   }
 
   Widget _buildDetailSection(OccurrenceResult result) {

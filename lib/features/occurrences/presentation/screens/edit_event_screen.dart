@@ -17,7 +17,9 @@ import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.dart';
-import 'package:canil_gcm/features/occurrences/domain/upload_progress_aggregator.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_media_uploader.dart';
+import 'package:canil_gcm/features/occurrences/domain/upload_cancellation_token.dart';
+import 'package:canil_gcm/features/occurrences/domain/upload_orphan_tracker.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/edit_event_location_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 
@@ -45,7 +47,9 @@ class EditEventScreen extends StatefulWidget {
       final pct = (fraction * 100).floor().clamp(0, 100);
       return '$prefix $fileNumber/$totalFiles · $pct%';
     }
-    return totalFiles == 1 ? '$prefix...' : '$prefix $fileNumber/$totalFiles...';
+    return totalFiles == 1
+        ? '$prefix...'
+        : '$prefix $fileNumber/$totalFiles...';
   }
 
   @override
@@ -58,6 +62,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
   final _locationService = const LocationResolutionService();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+
+  UploadCancellationToken? _uploadCancelToken;
+  late final OccurrenceMediaUploader _mediaUploader = OccurrenceMediaUploader(
+    storageService: _storageService,
+  );
+  final Map<String, UploadResult> _completedPhotoUploads = {};
 
   late OccurrenceEventCategory _selectedCategory;
   late DateTime _timestamp;
@@ -211,6 +221,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
   @override
   void dispose() {
+    _uploadCancelToken?.cancel();
     _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
@@ -243,10 +254,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
     );
 
     if (candidate.isAfter(DateTime.now())) {
-      AppFeedback.warning(
-        context,
-        'Horário não pode ser no futuro',
-      );
+      AppFeedback.warning(context, 'Horário não pode ser no futuro');
       return;
     }
 
@@ -466,7 +474,11 @@ class _EditEventScreenState extends State<EditEventScreen> {
         await _createEvent(allPhotoUrls);
       }
 
+      UploadOrphanTracker().commit(widget.occurrenceId);
+
       if (mounted) Navigator.of(context).pop('saved');
+    } on UploadCancelledException {
+      // Cancelamento cooperativo: nenhuma mensagem de erro gritante
     } catch (e) {
       if (mounted) {
         AppFeedback.error(
@@ -490,67 +502,55 @@ class _EditEventScreenState extends State<EditEventScreen> {
   }
 
   Future<List<UploadResult>> _uploadNewPhotos() async {
-    final fileSizes = <int>[];
-    for (final photo in _newPhotos) {
-      try {
-        fileSizes.add(await photo.length());
-      } catch (_) {
-        fileSizes.add(0);
-      }
-    }
-    final aggregator = UploadProgressAggregator(fileSizes);
-    final results = <UploadResult>[];
+    if (_newPhotos.isEmpty) return [];
 
-    for (var i = 0; i < _newPhotos.length; i++) {
-      final startSnap = aggregator.startFile(i);
-      if (mounted) {
+    _uploadCancelToken = UploadCancellationToken();
+
+    final batchResult = await _mediaUploader.uploadBatch(
+      files: _newPhotos,
+      folder: 'occurrences/${widget.occurrenceId}/events',
+      occurrenceId: widget.occurrenceId,
+      cancelToken: _uploadCancelToken,
+      alreadyCompleted: _completedPhotoUploads,
+      onProgress: (fileIndex, totalFiles, snapshot) {
+        if (!mounted) return;
         setState(() {
-          _currentUploadIndex = i;
-          _hasActiveUploadProgress = false;
-          _uploadFraction = startSnap.fraction;
+          _currentUploadIndex = fileIndex;
+          _hasActiveUploadProgress = snapshot.hasActiveFileProgress;
+          _uploadFraction = snapshot.fraction;
           _saveStatus = EditEventScreen.formatUploadStatus(
-            currentFileIndex: i,
-            totalFiles: _newPhotos.length,
-            fraction: startSnap.fraction,
-            hasActiveProgress: false,
+            currentFileIndex: fileIndex,
+            totalFiles: totalFiles,
+            fraction: snapshot.fraction,
+            hasActiveProgress: snapshot.hasActiveFileProgress,
           );
         });
-      }
+      },
+      onStatusChanged: (fileIndex, totalFiles, message) {
+        if (!mounted) return;
+        setState(() {
+          _saveStatus = message;
+        });
+      },
+    );
 
-      final result = await _storageService
-          .uploadImageWithHash(
-            _newPhotos[i],
-            'occurrences/${widget.occurrenceId}/events',
-            onProgress: (transferred, total) {
-              if (!mounted) return;
-              final snapshot = aggregator.updateFileProgress(i, transferred);
-              setState(() {
-                _currentUploadIndex = i;
-                _hasActiveUploadProgress = snapshot.hasActiveFileProgress;
-                _uploadFraction = snapshot.fraction;
-                _saveStatus = EditEventScreen.formatUploadStatus(
-                  currentFileIndex: i,
-                  totalFiles: _newPhotos.length,
-                  fraction: snapshot.fraction,
-                  hasActiveProgress: snapshot.hasActiveFileProgress,
-                );
-              });
-            },
-          )
-          .timeout(
-            const Duration(seconds: 90),
-            onTimeout: () => throw TimeoutException(
-              'Tempo excedido ao enviar a foto. Verifique o sinal e tente novamente.',
-            ),
-          );
-      if (result == null) {
-        throw StateError('A foto ${i + 1} não foi enviada. Tente novamente.');
-      }
-      aggregator.completeFile(i);
-      _hasActiveUploadProgress = false;
-      results.add(result);
+    // Salvar mídias completadas para que retry não as reenvie
+    for (final r in batchResult.completedResults) {
+      _completedPhotoUploads[r.sha256Hash] = r;
     }
-    return results;
+
+    if (batchResult.isCancelled) {
+      throw const UploadCancelledException();
+    }
+
+    if (!batchResult.isSuccess) {
+      throw batchResult.firstError ??
+          Exception(
+            batchResult.friendlyErrorMessage ?? 'Falha no envio de fotos.',
+          );
+    }
+
+    return batchResult.completedResults;
   }
 
   Future<void> _createEvent(List<String> photoUrls) async {
@@ -1287,7 +1287,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
                           height: 3,
                           width: 180,
                           child: LinearProgressIndicator(
-                            value: (_currentUploadIndex == 0 &&
+                            value:
+                                (_currentUploadIndex == 0 &&
                                     !_hasActiveUploadProgress)
                                 ? null
                                 : _uploadFraction,
