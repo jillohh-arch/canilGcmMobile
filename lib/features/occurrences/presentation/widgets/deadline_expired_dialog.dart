@@ -119,8 +119,8 @@ class _DeadlineExpiredDialogState extends State<DeadlineExpiredDialog> {
     await widget.viewModel.revertToDraft(
       onSuccess: (message) {
         if (!mounted) return;
-        Navigator.pop(context);
         _showSnack('Ocorrência revertida para draft: $message');
+        Navigator.pop(context);
       },
       onError: (error) {
         if (!mounted) return;
@@ -136,8 +136,8 @@ class _DeadlineExpiredDialogState extends State<DeadlineExpiredDialog> {
       extension: const Duration(hours: 48),
       onSuccess: (message) {
         if (!mounted) return;
-        Navigator.pop(context);
         _showSnack(message);
+        Navigator.pop(context);
       },
       onError: (error) {
         if (!mounted) return;
@@ -152,8 +152,8 @@ class _DeadlineExpiredDialogState extends State<DeadlineExpiredDialog> {
     await widget.viewModel.finalizeWithPending(
       onSuccess: (message) {
         if (!mounted) return;
-        Navigator.pop(context);
         _showSnack(message);
+        Navigator.pop(context);
       },
       onError: (error) {
         if (!mounted) return;

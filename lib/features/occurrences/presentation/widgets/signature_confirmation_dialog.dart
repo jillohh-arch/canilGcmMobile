@@ -209,15 +209,15 @@ class _SignatureConfirmationDialogState
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         icon: const Icon(Icons.check_circle, color: AppTheme.success),
         title: const Text('Assinatura realizada'),
         content: Text(message),
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.pop(context);
-              if (mounted) Navigator.of(this.context).pop();
+              Navigator.pop(dialogCtx);
+              if (mounted) Navigator.of(context).pop();
               widget.onSuccess();
             },
             child: const Text('OK'),

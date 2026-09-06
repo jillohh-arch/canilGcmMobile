@@ -142,7 +142,7 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => SignatureConfirmationDialog(
+      builder: (dialogContext) => SignatureConfirmationDialog(
         occurrence: occurrence,
         viewModel: _teamViewModel,
         onSuccess: () async {
@@ -181,7 +181,10 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
                 : () {
                     final reason = reasonController.text.trim();
                     if (reason.isEmpty) {
-                      AppFeedback.warning(context, 'Informe o motivo da devolução.');
+                      AppFeedback.warning(
+                        context,
+                        'Informe o motivo da devolução.',
+                      );
                       return;
                     }
                     Navigator.pop(dialogContext);
@@ -221,7 +224,10 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
                 : () {
                     final reason = reasonController.text.trim();
                     if (reason.isEmpty) {
-                      AppFeedback.warning(context, 'Informe o motivo da recusa.');
+                      AppFeedback.warning(
+                        context,
+                        'Informe o motivo da recusa.',
+                      );
                       return;
                     }
                     Navigator.pop(dialogContext);
@@ -241,13 +247,13 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
         occurrenceId: widget.occurrenceId,
       );
       if (!mounted) return;
+      AppFeedback.success(context, 'Participação confirmada.');
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) =>
               ActiveOccurrenceScreen(occurrenceId: widget.occurrenceId),
         ),
       );
-      AppFeedback.success(context, 'Participação confirmada.');
     } catch (error) {
       if (!mounted) return;
       AppFeedback.error(context, error);
@@ -282,13 +288,13 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
         reason: reason,
       );
       if (!mounted) return;
+      AppFeedback.success(context, 'Ocorrência devolvida para correção.');
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) =>
               ActiveOccurrenceScreen(occurrenceId: widget.occurrenceId),
         ),
       );
-      AppFeedback.success(context, 'Ocorrência devolvida para correção.');
     } catch (error) {
       if (!mounted) return;
       AppFeedback.error(context, error);

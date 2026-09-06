@@ -351,7 +351,7 @@ class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => SignatureConfirmationDialog(
+      builder: (dialogCtx) => SignatureConfirmationDialog(
         occurrence: occurrence,
         viewModel: _viewModel,
         onSuccess: _handleSignatureSuccess,
@@ -427,7 +427,7 @@ class _OccurrenceTeamScreenState extends State<OccurrenceTeamScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => DeadlineExpiredDialog(viewModel: _viewModel),
+      builder: (dialogCtx) => DeadlineExpiredDialog(viewModel: _viewModel),
     );
   }
 
