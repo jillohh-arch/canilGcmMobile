@@ -5,9 +5,10 @@ import 'health_v1_enums.dart';
 /// Ator interno responsável pelo registro ou mutação de um evento clínico.
 ///
 /// Reflete o envelope persistido `{uid, name, internal_role}`.
-/// `internalRole` representa a atribuição/perfil interno do usuário
-/// (ex: 'veterinario', 'operador', 'administrador'), NÃO uma identidade
-/// profissional externa.
+/// `internalRole` é uma string aberta (vocabulário aberto na leitura),
+/// representando atribuição/perfil interno do usuário no sistema K9
+/// (valores conhecidos emitidos pelo servidor incluem "admin" e "condutor").
+/// NUNCA interpretar esta dimensão como [ClinicalProfessionalReadModel] / veterinário.
 @immutable
 final class ClinicalActorReadModel {
   const ClinicalActorReadModel({
@@ -42,25 +43,31 @@ final class ClinicalActorReadModel {
       'ClinicalActorReadModel(uid: $uid, name: $name, internalRole: $internalRole)';
 }
 
-/// Identidade profissional externa (ex: Médico Veterinário responsável).
+/// Identidade profissional externa (ProfessionalIdentity).
 ///
-/// Dimensão estritamente distinta de [ClinicalActorReadModel].
+/// Chaves canônicas persistidas pelo writer clínico:
+/// - `name` (obrigatório quando o mapa existe no writer clínico);
+/// - `registration_type` (ex: CRMV-SP);
+/// - `registration_number` (ex: 12345);
+/// - `clinic` (ex: Hospital Veterinário Central).
+///
+/// Quaisquer chaves adicionais ou não normalizadas (ex: provenientes do ExamProcess)
+/// são preservadas com segurança em [rawMap].
+/// Dimensão estritamente externa, NUNCA mesclada com [ClinicalActorReadModel].
 @immutable
 final class ClinicalProfessionalReadModel {
   const ClinicalProfessionalReadModel({
-    this.id,
     this.name,
-    this.council,
     this.registrationType,
     this.registrationNumber,
+    this.clinic,
     this.rawMap = const <String, dynamic>{},
   });
 
-  final String? id;
   final String? name;
-  final String? council;
   final String? registrationType;
   final String? registrationNumber;
+  final String? clinic;
   final Map<String, dynamic> rawMap;
 
   String? get formattedRegistration {
@@ -77,15 +84,14 @@ final class ClinicalProfessionalReadModel {
       identical(this, other) ||
       other is ClinicalProfessionalReadModel &&
           runtimeType == other.runtimeType &&
-          id == other.id &&
           name == other.name &&
-          council == other.council &&
           registrationType == other.registrationType &&
-          registrationNumber == other.registrationNumber;
+          registrationNumber == other.registrationNumber &&
+          clinic == other.clinic;
 
   @override
   int get hashCode =>
-      Object.hash(id, name, council, registrationType, registrationNumber);
+      Object.hash(name, registrationType, registrationNumber, clinic);
 }
 
 /// Vocabulário congelado de emendas clínicas (schema §2.3, ADR-002).
@@ -202,7 +208,7 @@ final class ClinicalEventReadModel {
     this.schemaVersion,
     this.revision,
     required this.content,
-    this.attachmentRefs = const <String>[],
+    this.attachmentRefs,
     this.hasAmendments,
     this.amendmentCount,
     this.lastAmendedAt,
@@ -245,8 +251,11 @@ final class ClinicalEventReadModel {
   /// Conteúdo clínico estruturado do payload.
   final Map<String, dynamic> content;
 
-  /// Referências imutáveis de anexo (storage refs / tokens).
-  final List<String> attachmentRefs;
+  /// Referências imutáveis de anexo (HealthDocument IDs — nunca URLs).
+  /// - `null`: UNKNOWN / campo ausente no documento persistido;
+  /// - `[]`: explicitamente nenhum anexo associado;
+  /// - `[ids]`: lista de HealthDocument IDs associados.
+  final List<String>? attachmentRefs;
 
   /// Sinalizador de emendas. `null` se ausente no documento persistido (ex: Exam writer).
   final bool? hasAmendments;

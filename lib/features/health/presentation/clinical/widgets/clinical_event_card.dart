@@ -250,7 +250,8 @@ class _ClinicalEventCardState extends State<ClinicalEventCard> {
                     ),
                   ),
                 ],
-                if (event.attachmentRefs.isNotEmpty) ...[
+                if (event.attachmentRefs != null &&
+                    event.attachmentRefs!.isNotEmpty) ...[
                   const SizedBox(width: 8),
                   Icon(
                     Icons.attach_file,
@@ -259,7 +260,7 @@ class _ClinicalEventCardState extends State<ClinicalEventCard> {
                   ),
                   const SizedBox(width: 2),
                   Text(
-                    '${event.attachmentRefs.length}',
+                    '${event.attachmentRefs!.length}',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: Colors.blueGrey.shade700,
                       fontWeight: FontWeight.w600,
@@ -282,7 +283,8 @@ class _ClinicalEventCardState extends State<ClinicalEventCard> {
                   Expanded(
                     child: Text(
                       '${event.professional!.name ?? "Profissional"}'
-                      '${event.professional!.formattedRegistration != null ? " (${event.professional!.formattedRegistration})" : ""}',
+                      '${event.professional!.formattedRegistration != null ? " (${event.professional!.formattedRegistration})" : ""}'
+                      '${event.professional!.clinic != null && event.professional!.clinic!.isNotEmpty ? " • ${event.professional!.clinic}" : ""}',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: Colors.teal.shade800,
                         fontWeight: FontWeight.w500,

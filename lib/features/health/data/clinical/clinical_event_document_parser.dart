@@ -23,28 +23,32 @@ abstract final class ClinicalEventDocumentParser {
   }) {
     final issues = <String>[];
 
-    // Identidades contextuais: autoridade primária é o path do documento,
-    // com verificação de coerência se existirem redundâncias no snapshot.
-    final resolvedDogId = (data['dog_id'] as String?)?.trim().isNotEmpty == true
-        ? (data['dog_id'] as String).trim()
-        : dogId;
-    final resolvedCaseId =
-        (data['case_id'] as String?)?.trim().isNotEmpty == true
-        ? (data['case_id'] as String).trim()
-        : caseId;
-    final resolvedEventId =
-        (data['event_id'] as String?)?.trim().isNotEmpty == true
-        ? (data['event_id'] as String).trim()
-        : eventId;
-
-    if (resolvedDogId != dogId) {
-      issues.add('path_document_dog_id_mismatch');
+    // Identidades contextuais: autoridade primária e absoluta é o path do documento
+    // (DocumentSnapshot.id). Se o documento persistir campos redundantes e divergentes,
+    // registra inconformidade em dataQualityIssues, mas NUNCA substitui o ID de autoridade.
+    if (data.containsKey('dog_id')) {
+      final persistedDogId = data['dog_id']?.toString().trim();
+      if (persistedDogId != null &&
+          persistedDogId.isNotEmpty &&
+          persistedDogId != dogId) {
+        issues.add('path_document_dog_id_mismatch');
+      }
     }
-    if (resolvedCaseId != caseId) {
-      issues.add('path_document_case_id_mismatch');
+    if (data.containsKey('case_id')) {
+      final persistedCaseId = data['case_id']?.toString().trim();
+      if (persistedCaseId != null &&
+          persistedCaseId.isNotEmpty &&
+          persistedCaseId != caseId) {
+        issues.add('path_document_case_id_mismatch');
+      }
     }
-    if (resolvedEventId != eventId) {
-      issues.add('path_document_event_id_mismatch');
+    if (data.containsKey('event_id')) {
+      final persistedEventId = data['event_id']?.toString().trim();
+      if (persistedEventId != null &&
+          persistedEventId.isNotEmpty &&
+          persistedEventId != eventId) {
+        issues.add('persisted_event_id_mismatch');
+      }
     }
 
     // Tipo do evento
@@ -147,15 +151,21 @@ abstract final class ClinicalEventDocumentParser {
       content = const <String, dynamic>{};
     }
 
-    // Anexos
-    final rawAttachments = data['attachment_refs'] ?? data['attachmentRefs'];
-    final List<String> attachmentRefs;
-    if (rawAttachments is List) {
-      attachmentRefs = List<String>.unmodifiable(
-        rawAttachments.map((e) => e.toString()),
-      );
+    // Anexos (HealthDocument IDs — nunca URLs. Rule 7.1: ausência => null / UNKNOWN)
+    final List<String>? attachmentRefs;
+    if (data.containsKey('attachment_refs') ||
+        data.containsKey('attachmentRefs')) {
+      final rawAttachments = data['attachment_refs'] ?? data['attachmentRefs'];
+      if (rawAttachments is List) {
+        attachmentRefs = List<String>.unmodifiable(
+          rawAttachments.map((e) => e.toString()),
+        );
+      } else {
+        issues.add('malformed_attachment_refs');
+        attachmentRefs = null;
+      }
     } else {
-      attachmentRefs = const <String>[];
+      attachmentRefs = null;
     }
 
     // Metadados de emendas (Rule 7.1: Preservar null se ausente!)
@@ -212,7 +222,8 @@ abstract final class ClinicalEventDocumentParser {
     }
     final lastAmendedAt = lastAmendedAtResult.value;
 
-    // Metadados de finalização
+    // Metadados de finalização (opcional persistido: presente em finalização clínica,
+    // ausente em eventos final originados diretamente por ExamProcess)
     final finalizedAtResult = _parseInstant(
       data['finalized_at'] ?? data['finalizedAt'],
     );
@@ -249,14 +260,12 @@ abstract final class ClinicalEventDocumentParser {
       if (cancelledBy == null) issues.add('cancelled_event_missing_actor');
     }
 
-    // Identidade profissional externa
+    // Identidade profissional externa (ProfessionalIdentity)
     final rawProf = data['professional'];
     final ClinicalProfessionalReadModel? professional;
     if (rawProf is Map) {
       professional = ClinicalProfessionalReadModel(
-        id: rawProf['id']?.toString().trim(),
         name: rawProf['name']?.toString().trim(),
-        council: rawProf['council']?.toString().trim(),
         registrationType:
             (rawProf['registration_type'] ?? rawProf['registrationType'])
                 ?.toString()
@@ -265,6 +274,7 @@ abstract final class ClinicalEventDocumentParser {
             (rawProf['registration_number'] ?? rawProf['registrationNumber'])
                 ?.toString()
                 .trim(),
+        clinic: rawProf['clinic']?.toString().trim(),
         rawMap: Map<String, dynamic>.unmodifiable(
           rawProf.map((k, v) => MapEntry(k.toString(), v)),
         ),
@@ -277,9 +287,9 @@ abstract final class ClinicalEventDocumentParser {
     final examId = (data['exam_id'] ?? data['examId'])?.toString().trim();
 
     return ClinicalEventReadModel(
-      id: resolvedEventId,
-      caseId: resolvedCaseId,
-      dogId: resolvedDogId,
+      id: eventId,
+      caseId: caseId,
+      dogId: dogId,
       type: parsedType,
       status: parsedStatus,
       occurredAt: occurredAt,

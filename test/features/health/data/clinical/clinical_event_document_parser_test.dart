@@ -31,7 +31,7 @@ void main() {
           'schema_version': 1,
           'revision': 1,
           'content': {'reason': 'rotina', 'diagnosis': 'Saudável'},
-          'attachment_refs': ['gs://bucket/photo1.jpg'],
+          'attachment_refs': ['hdoc_1234567890abcdef'],
           'has_amendments': false,
           'amendment_count': 0,
         };
@@ -63,7 +63,7 @@ void main() {
         expect(event.hasAmendments, isFalse);
         expect(event.amendmentCount, 0);
         expect(event.knownHasAmendments, isFalse);
-        expect(event.attachmentRefs, ['gs://bucket/photo1.jpg']);
+        expect(event.attachmentRefs, ['hdoc_1234567890abcdef']);
         expect(event.content['diagnosis'], 'Saudável');
         expect(event.hasQualityIssues, isFalse);
       },
@@ -249,6 +249,7 @@ void main() {
             'name': 'Dr. Marcos Veterinário',
             'registration_type': 'CRMV-SP',
             'registration_number': '12345',
+            'clinic': 'Hospital Veterinário Central',
           },
           'payload_type': 'consultation_v1',
           'payload_version': 1,
@@ -268,7 +269,9 @@ void main() {
         expect(event.recordedBy?.internalRole, 'operador');
 
         expect(event.professional?.name, 'Dr. Marcos Veterinário');
+        expect(event.professional?.clinic, 'Hospital Veterinário Central');
         expect(event.professional?.formattedRegistration, 'CRMV-SP 12345');
+        expect(event.professional?.rawMap['id'], 'vet-ext-44');
         expect(event.hasQualityIssues, isFalse);
       },
     );
@@ -332,6 +335,299 @@ void main() {
         expect(event.dataQualityIssues, contains('missing_event_status'));
         expect(event.dataQualityIssues, contains('missing_occurred_at'));
         expect(event.dataQualityIssues, contains('missing_recorded_at'));
+      },
+    );
+
+    test(
+      '9. Wire factual: attachment_refs ausente permanece null (UNKNOWN); vazio vira []; IDs de HealthDocument preservados',
+      () {
+        final base = <String, dynamic>{
+          'event_type': 'consultation',
+          'status': 'final',
+          'occurred_at': '2026-09-01T10:00:00.000Z',
+          'recorded_at': '2026-09-01T10:00:00.000Z',
+          'recorded_by': {
+            'uid': 'u1',
+            'name': 'User',
+            'internal_role': 'admin',
+          },
+          'payload_type': 'consultation_v1',
+          'payload_version': 1,
+          'schema_version': 1,
+          'revision': 1,
+          'content': {},
+        };
+
+        // 9a. Ausente no documento persistido => null (UNKNOWN)
+        final eventNoAttachments = ClinicalEventDocumentParser.parseEvent(
+          dogId: 'dog-01',
+          caseId: 'case-01',
+          eventId: 'evt-none',
+          data: Map.from(base),
+        );
+        expect(eventNoAttachments.attachmentRefs, isNull);
+
+        // 9b. Explicitamente vazio => []
+        final eventEmptyAttachments = ClinicalEventDocumentParser.parseEvent(
+          dogId: 'dog-01',
+          caseId: 'case-01',
+          eventId: 'evt-empty',
+          data: Map.from(base)..['attachment_refs'] = <String>[],
+        );
+        expect(eventEmptyAttachments.attachmentRefs, isEmpty);
+        expect(eventEmptyAttachments.attachmentRefs, isNotNull);
+
+        // 9c. HealthDocument IDs
+        final eventWithHdocs = ClinicalEventDocumentParser.parseEvent(
+          dogId: 'dog-01',
+          caseId: 'case-01',
+          eventId: 'evt-hdocs',
+          data: Map.from(base)..['attachment_refs'] = ['hdoc_123', 'hdoc_456'],
+        );
+        expect(eventWithHdocs.attachmentRefs, ['hdoc_123', 'hdoc_456']);
+
+        // 9d. Malformado (não lista) => null com issue
+        final eventBadAttachments = ClinicalEventDocumentParser.parseEvent(
+          dogId: 'dog-01',
+          caseId: 'case-01',
+          eventId: 'evt-bad-att',
+          data: Map.from(base)..['attachment_refs'] = 'not-a-list',
+        );
+        expect(eventBadAttachments.attachmentRefs, isNull);
+        expect(
+          eventBadAttachments.dataQualityIssues,
+          contains('malformed_attachment_refs'),
+        );
+      },
+    );
+
+    test(
+      '10. Wire factual: recorded_by.internal_role aceita emissões do servidor (admin, condutor) sem degradação',
+      () {
+        Map<String, dynamic> makeRaw(String role) => <String, dynamic>{
+          'event_type': 'consultation',
+          'status': 'final',
+          'occurred_at': '2026-09-01T10:00:00.000Z',
+          'recorded_at': '2026-09-01T10:00:00.000Z',
+          'recorded_by': {
+            'uid': 'u1',
+            'name': 'Agente Silva',
+            'internal_role': role,
+          },
+          'payload_type': 'consultation_v1',
+          'payload_version': 1,
+          'schema_version': 1,
+          'revision': 1,
+          'content': {},
+        };
+
+        // admin
+        final evAdmin = ClinicalEventDocumentParser.parseEvent(
+          dogId: 'd',
+          caseId: 'c',
+          eventId: 'e1',
+          data: makeRaw('admin'),
+        );
+        expect(evAdmin.recordedBy?.internalRole, 'admin');
+        expect(evAdmin.recordedBy?.isDegraded, isFalse);
+        expect(evAdmin.hasQualityIssues, isFalse);
+
+        // condutor
+        final evCondutor = ClinicalEventDocumentParser.parseEvent(
+          dogId: 'd',
+          caseId: 'c',
+          eventId: 'e2',
+          data: makeRaw('condutor'),
+        );
+        expect(evCondutor.recordedBy?.internalRole, 'condutor');
+        expect(evCondutor.recordedBy?.isDegraded, isFalse);
+        expect(evCondutor.hasQualityIssues, isFalse);
+      },
+    );
+
+    test(
+      '11. Wire factual: professional suporta chaves do writer clínico e dados não normalizados em rawMap',
+      () {
+        final raw = <String, dynamic>{
+          'event_type': 'consultation',
+          'status': 'final',
+          'occurred_at': '2026-09-01T10:00:00.000Z',
+          'recorded_at': '2026-09-01T10:00:00.000Z',
+          'recorded_by': {
+            'uid': 'u1',
+            'name': 'User',
+            'internal_role': 'admin',
+          },
+          'professional': {
+            'name': 'Dra. Vanessa',
+            'registration_type': 'CRMV-RJ',
+            'registration_number': '98765',
+            'clinic': 'Clínica K9 Rio',
+            'legacy_id': 'legacy-999',
+            'specialty': 'Ortopedia',
+          },
+          'payload_type': 'consultation_v1',
+          'payload_version': 1,
+          'schema_version': 1,
+          'revision': 1,
+          'content': {},
+        };
+
+        final event = ClinicalEventDocumentParser.parseEvent(
+          dogId: 'd',
+          caseId: 'c',
+          eventId: 'e',
+          data: raw,
+        );
+
+        expect(event.professional?.name, 'Dra. Vanessa');
+        expect(event.professional?.registrationType, 'CRMV-RJ');
+        expect(event.professional?.registrationNumber, '98765');
+        expect(event.professional?.clinic, 'Clínica K9 Rio');
+        expect(event.professional?.formattedRegistration, 'CRMV-RJ 98765');
+        expect(event.professional?.rawMap['legacy_id'], 'legacy-999');
+        expect(event.professional?.rawMap['specialty'], 'Ortopedia');
+        expect(event.hasQualityIssues, isFalse);
+      },
+    );
+
+    test(
+      '12. Wire factual: content é mapa estruturado aberto preservando chaves arbitrárias sob payload_type fechado',
+      () {
+        final raw = <String, dynamic>{
+          'event_type': 'exam_result',
+          'status': 'final',
+          'occurred_at': '2026-09-01T10:00:00.000Z',
+          'recorded_at': '2026-09-01T10:00:00.000Z',
+          'recorded_by': {
+            'uid': 'u1',
+            'name': 'User',
+            'internal_role': 'admin',
+          },
+          'payload_type': 'exam_result_v1',
+          'payload_version': 1,
+          'schema_version': 1,
+          'revision': 1,
+          'content': {
+            'findings': 'Leucocitose moderada',
+            'numeric_parameters': {
+              'rbc': 6.8,
+              'wbc': 18500,
+              'platelets': 250000,
+            },
+            'abnormal_flags': ['wbc_high'],
+            'custom_metadata': {'lab': 'LabVet Alpha', 'batch': 42},
+          },
+        };
+
+        final event = ClinicalEventDocumentParser.parseEvent(
+          dogId: 'd',
+          caseId: 'c',
+          eventId: 'e',
+          data: raw,
+        );
+
+        expect(event.content['findings'], 'Leucocitose moderada');
+        expect((event.content['numeric_parameters'] as Map)['rbc'], 6.8);
+        expect(event.content['abnormal_flags'], ['wbc_high']);
+        expect(
+          (event.content['custom_metadata'] as Map)['lab'],
+          'LabVet Alpha',
+        );
+        expect(event.hasQualityIssues, isFalse);
+      },
+    );
+
+    test(
+      '13. Wire factual: autoridade primária de ID é DocumentSnapshot; event_id redundante validado',
+      () {
+        final base = <String, dynamic>{
+          'event_type': 'consultation',
+          'status': 'final',
+          'occurred_at': '2026-09-01T10:00:00.000Z',
+          'recorded_at': '2026-09-01T10:00:00.000Z',
+          'recorded_by': {
+            'uid': 'u1',
+            'name': 'User',
+            'internal_role': 'admin',
+          },
+          'payload_type': 'consultation_v1',
+          'payload_version': 1,
+          'schema_version': 1,
+          'revision': 1,
+          'content': {},
+        };
+
+        // 13a. Sem event_id no documento (comum no writer clínico genérico): id é DocumentSnapshot.id, 0 issues
+        final evNoDocId = ClinicalEventDocumentParser.parseEvent(
+          dogId: 'dog-01',
+          caseId: 'case-01',
+          eventId: 'snap-id-1',
+          data: Map.from(base),
+        );
+        expect(evNoDocId.id, 'snap-id-1');
+        expect(evNoDocId.hasQualityIssues, isFalse);
+
+        // 13b. Com event_id idêntico no documento (ExamProcess): 0 issues
+        final evMatchingId = ClinicalEventDocumentParser.parseEvent(
+          dogId: 'dog-01',
+          caseId: 'case-01',
+          eventId: 'snap-id-2',
+          data: Map.from(base)..['event_id'] = 'snap-id-2',
+        );
+        expect(evMatchingId.id, 'snap-id-2');
+        expect(evMatchingId.hasQualityIssues, isFalse);
+
+        // 13c. Com event_id divergente no documento: autoridade permanece DocumentSnapshot.id, issue registrada
+        final evMismatchId = ClinicalEventDocumentParser.parseEvent(
+          dogId: 'dog-01',
+          caseId: 'case-01',
+          eventId: 'snap-id-3',
+          data: Map.from(base)..['event_id'] = 'conflicting-id',
+        );
+        expect(evMismatchId.id, 'snap-id-3');
+        expect(evMismatchId.hasQualityIssues, isTrue);
+        expect(
+          evMismatchId.dataQualityIssues,
+          contains('persisted_event_id_mismatch'),
+        );
+      },
+    );
+
+    test(
+      '14. Wire factual: finalized_at é opcional persistido; ExamProcess status final sem finalized_at NÃO gera inconformidade',
+      () {
+        // Evento originado por ExamProcess (emite status: "final" diretamente, sem finalized_at)
+        final rawExamProcess = <String, dynamic>{
+          'event_type': 'exam_result',
+          'status': 'final',
+          'occurred_at': '2026-09-01T10:00:00.000Z',
+          'recorded_at': '2026-09-01T10:00:00.000Z',
+          'recorded_by': {
+            'uid': 'u1',
+            'name': 'User',
+            'internal_role': 'admin',
+          },
+          'payload_type': 'exam_result_v1',
+          'payload_version': 1,
+          'schema_version': 1,
+          'revision': 1,
+          'content': {'result': 'Negativo'},
+          // finalized_at deliberadamente ausente
+        };
+
+        final event = ClinicalEventDocumentParser.parseEvent(
+          dogId: 'dog-01',
+          caseId: 'case-01',
+          eventId: 'evt-exam-res',
+          data: rawExamProcess,
+        );
+
+        expect(event.status.value, ClinicalEventStatus.finalised);
+        expect(event.isFinal, isTrue);
+        expect(event.finalizedAt, isNull);
+        // Não deve ser considerado corrupto por não possuir finalized_at
+        expect(event.hasQualityIssues, isFalse);
       },
     );
   });
