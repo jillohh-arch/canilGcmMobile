@@ -36,6 +36,7 @@ import {
   createAdminAccessHomologationSnapshotDeps,
 } from "./admin_access_homologation_snapshot";
 import {isAuthUserNotFound} from "./auth_error_classification";
+import {unassignAccessProfileLogic} from "./admin_access_unassignment";
 import {composeEffectiveAccessClaims} from "./access_claims_composition";
 import {
   AccessScope,
@@ -2077,6 +2078,39 @@ export const adminAssignAccessProfile = onCall({region}, async (request) => {
     userRef,
   });
   return {ra, profileId, profileName};
+});
+
+export const adminUnassignAccessProfile = onCall({region}, async (request) => {
+  const caller = await requireAccessPermission(request.auth, "access", "edit");
+  return unassignAccessProfileLogic(
+    request.data,
+    {
+      authorize: async () => caller,
+      getUser: async (ra: string) => {
+        const snap = await db.collection("users").doc(ra).get();
+        return { exists: snap.exists, data: snap.data() ?? null };
+      },
+      getProfile: async (profileId: string) => {
+        const snap = await db.collection("access_profiles").doc(profileId).get();
+        return { exists: snap.exists, data: snap.data() ?? null };
+      },
+      lookupAuthUserByUid,
+      lookupAuthUserByEmail,
+      setCustomUserClaims: async (uid: string, claims: JsonMap) => {
+        await admin.auth().setCustomUserClaims(uid, claims);
+      },
+      updateUser: async (ra: string, payload: JsonMap) => {
+        await db.collection("users").doc(ra).set(payload, { merge: true });
+      },
+      serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+      deleteField: () => admin.firestore.FieldValue.delete(),
+      arrayUnion: (value: unknown) => admin.firestore.FieldValue.arrayUnion(value),
+      auditEntry: (action: string, c: CallerIdentity) => auditEntry(action, c),
+      canonicalAuthEmail: (user: JsonMap, ra: string) =>
+        stringValue(user.email) ?? emailForRa(ra),
+    },
+    request.auth,
+  );
 });
 
 /**
