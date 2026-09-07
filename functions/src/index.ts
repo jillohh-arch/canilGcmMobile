@@ -30,6 +30,7 @@ import {
 import {
   defaultGenerateTemporaryPassword,
   resetHumanPasswordLogic,
+  ResetPasswordDeps,
 } from "./admin_reset_human_password";
 import {
   buildAdminGetAccessHomologationSnapshotHandler,
@@ -2152,8 +2153,8 @@ export const adminGetAccessHomologationSnapshot = onCall(
  * - sincroniza ambos os espelhos (updated_at e updatedAt);
  * - identidade Auth disabled permanece disabled.
  */
-export const adminResetHumanPassword = onCall({region}, async (request) => {
-  return resetHumanPasswordLogic({auth: request.auth, data: request.data}, {
+export function buildAdminResetHumanPasswordDeps(): ResetPasswordDeps {
+  return {
     authorize: async (auth) => {
       const typedAuth = auth as
         | {uid: string; token: admin.auth.DecodedIdToken}
@@ -2179,7 +2180,7 @@ export const adminResetHumanPassword = onCall({region}, async (request) => {
       if (!user) return null;
       return {disabled: user.disabled, email: user.email, uid: user.uid};
     },
-    serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+    serverTimestamp: () => admin.firestore.Timestamp.now(),
     updatePassword: async (uid, password) => {
       await admin.auth().updateUser(uid, {password});
     },
@@ -2189,7 +2190,11 @@ export const adminResetHumanPassword = onCall({region}, async (request) => {
         audit_trail: admin.firestore.FieldValue.arrayUnion(payload.audit_trail),
       }, {merge: true});
     },
-  });
+  };
+}
+
+export const adminResetHumanPassword = onCall({region}, async (request) => {
+  return resetHumanPasswordLogic({auth: request.auth, data: request.data}, buildAdminResetHumanPasswordDeps());
 });
 
 export const adminSeedAccessProfiles = onCall({region}, async (request) => {

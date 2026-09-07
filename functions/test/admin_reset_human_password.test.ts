@@ -341,3 +341,138 @@ test("19. C1-02: entrypoint delega adminResetHumanPassword para resetHumanPasswo
   assert.match(content, /export const adminResetHumanPassword = onCall\(/);
   assert.match(content, /resetHumanPasswordLogic\(\{auth: request\.auth, data: request\.data\},/);
 });
+
+test("20. REGRESSAO (F10.1.FIX): serializer recusa FieldValue.serverTimestamp() dentro de array e aceita Timestamp concreto", async () => {
+  // Simula o guardiao de serializacao do Firestore SDK para arrays:
+  // "Element at index 0 is not a valid array element. FieldValue.serverTimestamp() cannot be used inside of an array"
+  const sentinelTimestamp = {
+    _isSentinel: true,
+    toString: () => "FieldValue.serverTimestamp()",
+  };
+
+  const simulateFirestoreArraySerializer = (element: unknown) => {
+    if (element && typeof element === "object") {
+      for (const [k, v] of Object.entries(element as Record<string, unknown>)) {
+        if (v && typeof v === "object" && (v as { _isSentinel?: boolean })._isSentinel) {
+          throw new Error(
+            `Element at index 0 is not a valid array element. FieldValue.serverTimestamp() cannot be used inside of an array (found in field "${k}").`,
+          );
+        }
+      }
+    }
+  };
+
+  // 1. Quando serverTimestamp retorna o sentinel transform (defeito fisico do staging):
+  const badHarness = harness();
+  badHarness.deps.serverTimestamp = () => sentinelTimestamp;
+  badHarness.deps.updatePersonnelAudit = async (_ra, payload) => {
+    simulateFirestoreArraySerializer(payload.audit_trail);
+  };
+
+  await assert.rejects(
+    () => resetHumanPasswordLogic({auth: {}, data: {ra: "9001"}}, badHarness.deps),
+    /FieldValue\.serverTimestamp\(\) cannot be used inside of an array \(found in field "at"\)/,
+  );
+
+  // 2. Quando serverTimestamp retorna um Timestamp concreto (correcao canonica):
+  const goodHarness = harness();
+  const concreteTimestamp = { seconds: 1788751852, nanoseconds: 0 };
+  let auditWritten = false;
+  goodHarness.deps.serverTimestamp = () => concreteTimestamp;
+  goodHarness.deps.updatePersonnelAudit = async (_ra, payload) => {
+    simulateFirestoreArraySerializer(payload.audit_trail);
+    auditWritten = true;
+  };
+
+  const result = await resetHumanPasswordLogic({auth: {}, data: {ra: "9001"}}, goodHarness.deps);
+  assert.ok(result.temporary_password);
+  assert.equal(auditWritten, true);
+});
+
+test("21. REGRESSAO (F10.1.FIX): Firestore SDK nativo offline rejeita serverTimestamp() e aceita Timestamp concreto em arrayUnion", () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const admin = require("firebase-admin");
+  if (!admin.apps.length) {
+    admin.initializeApp({ projectId: "test-k9-project" });
+  }
+
+  // Comprova que o Firestore SDK real rejeita serverTimestamp() dentro de arrayUnion sincronicamente
+  assert.throws(() => {
+    admin.firestore().collection("users").doc("dummy").set({
+      audit_trail: admin.firestore.FieldValue.arrayUnion({
+        action: "password_reset",
+        at: admin.firestore.FieldValue.serverTimestamp(),
+      }),
+    });
+  }, /FieldValue\.serverTimestamp\(\) cannot be used inside of an array \(found in field "at"\)/);
+
+  // Comprova que o Firestore SDK real aceita Timestamp.now() dentro de arrayUnion sincronicamente sem erro de serializacao
+  let serializerThrew = false;
+  try {
+    const promise = admin.firestore().collection("users").doc("dummy").set({
+      audit_trail: admin.firestore.FieldValue.arrayUnion({
+        action: "password_reset",
+        at: admin.firestore.Timestamp.now(),
+      }),
+    });
+    // Trata rejeicao de rede no ambiente offline de teste unitario
+    promise.catch(() => {});
+  } catch (err) {
+    serializerThrew = true;
+  }
+  assert.equal(serializerThrew, false, "Timestamp concreto nao deve disparar erro de serializacao");
+});
+
+test("22. REGRESSAO (F10.1.FIX): wiring de producao de adminResetHumanPassword fornece Timestamp concreto e nao sentinel", () => {
+  process.env.FIREBASE_CONFIG = JSON.stringify({ projectId: "test-k9-project" });
+  process.env.GCLOUD_PROJECT = "test-k9-project";
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const indexModule = require("../src/index");
+  assert.equal(typeof indexModule.buildAdminResetHumanPasswordDeps, "function");
+
+  const deps = indexModule.buildAdminResetHumanPasswordDeps();
+  const ts = deps.serverTimestamp();
+
+  // Verifica que e um valor concreto com seconds e nanoseconds
+  assert.ok(ts, "deps.serverTimestamp() deve retornar um objeto de timestamp");
+  assert.equal(typeof (ts as {seconds: number}).seconds, "number");
+  assert.equal(typeof (ts as {nanoseconds: number}).nanoseconds, "number");
+
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const admin = require("firebase-admin");
+  assert.equal(
+    ts instanceof admin.firestore.FieldValue,
+    false,
+    "deps.serverTimestamp() NUNCA deve ser FieldValue.serverTimestamp() sentinel",
+  );
+  assert.equal(
+    ts instanceof admin.firestore.Timestamp,
+    true,
+    "deps.serverTimestamp() deve ser instancia de admin.firestore.Timestamp",
+  );
+});
+
+test("23. REGRESSAO (F10.1.FIX): source de buildAdminResetHumanPasswordDeps fornece Timestamp.now() e rejeita FieldValue.serverTimestamp()", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const indexPath = path.resolve(__dirname, "../../../src/index.ts");
+  const content = fs.readFileSync(indexPath, "utf8");
+
+  const startIdx = content.indexOf("function buildAdminResetHumanPasswordDeps");
+  assert.ok(startIdx !== -1, "buildAdminResetHumanPasswordDeps deve existir em index.ts");
+  const block = content.slice(startIdx, startIdx + 1500);
+
+  // Garante que o wiring de adminResetHumanPassword nao utiliza FieldValue.serverTimestamp()
+  assert.doesNotMatch(
+    block,
+    /FieldValue\.serverTimestamp\(\)/,
+    "buildAdminResetHumanPasswordDeps nao deve referenciar FieldValue.serverTimestamp()",
+  );
+
+  // Garante que o wiring fornece admin.firestore.Timestamp.now()
+  assert.match(
+    block,
+    /serverTimestamp:\s*\(\)\s*=>\s*admin\.firestore\.Timestamp\.now\(\)/,
+    "buildAdminResetHumanPasswordDeps deve fornecer admin.firestore.Timestamp.now()",
+  );
+});
