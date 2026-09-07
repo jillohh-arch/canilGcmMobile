@@ -116,8 +116,16 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
     const _HealthActionCategory(
       id: 'incident',
       label: 'Intercorrência',
-      subtitle: 'Registrar ocorrência clínica ou sintoma',
+      subtitle: 'Registrar intercorrência clínica',
       icon: Icons.warning_amber_rounded,
+      color: AppTheme.error,
+      group: _HealthActionGroup.clinical,
+    ),
+    const _HealthActionCategory(
+      id: 'symptom',
+      label: 'Sintoma',
+      subtitle: 'Adicionar reação ou sintoma',
+      icon: Icons.warning_rounded,
       color: AppTheme.error,
       group: _HealthActionGroup.clinical,
     ),

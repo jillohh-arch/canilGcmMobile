@@ -74,7 +74,6 @@ void main() {
       expect(content['initial_conduct'], 'Curativo realizado');
       expect(content['conduct_actions'], ['first_aid_applied']);
       expect(content['has_operational_impact'], isTrue);
-      expect(content['operational_impact_flag'], isTrue);
     });
 
     test('append to existing case command preserves caseId', () {

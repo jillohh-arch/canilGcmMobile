@@ -209,6 +209,21 @@ export const INCIDENT_SEVERITIES = [
 export type IncidentSeverity = typeof INCIDENT_SEVERITIES[number];
 
 /**
+ * Vocabulário canônico de ações de conduta de intercorrência clínica (F20.INTERCORRENCIA-V1).
+ */
+export const INCIDENT_CONDUCT_ACTIONS = [
+  "first_aid_applied",
+  "veterinary_referral",
+  "isolation_rest",
+  "medication_given",
+  "monitoring",
+  "operational_pause",
+  "other",
+] as const;
+
+export type IncidentConductAction = typeof INCIDENT_CONDUCT_ACTIONS[number];
+
+/**
  * Validação de integridade semântica para payloads de intercorrência clínica (incident_v1).
  */
 export function validateIncidentContent(content: JsonMap): void {
@@ -235,6 +250,21 @@ export function validateIncidentContent(content: JsonMap): void {
     if (initialConduct.length > MAX_REASON_LEN) {
       throw logicError("validation", "Conduta inicial excede o tamanho máximo.");
     }
+  }
+  const conductActions = content.conduct_actions ?? content.conductActions;
+  if (conductActions !== undefined && conductActions !== null) {
+    if (!Array.isArray(conductActions)) {
+      throw logicError("validation", "Ações de conduta devem ser uma lista.");
+    }
+    for (const action of conductActions) {
+      if (typeof action !== "string" || !INCIDENT_CONDUCT_ACTIONS.includes(action as IncidentConductAction)) {
+        throw logicError("validation", `Ação de conduta inválida: ${action}`);
+      }
+    }
+  }
+  const hasImpact = content.has_operational_impact ?? content.hasOperationalImpact;
+  if (hasImpact !== undefined && hasImpact !== null && typeof hasImpact !== "boolean") {
+    throw logicError("validation", "has_operational_impact deve ser booleano.");
   }
 }
 

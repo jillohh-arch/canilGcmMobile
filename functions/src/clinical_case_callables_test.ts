@@ -5215,6 +5215,51 @@ async function testIncidentValidations() {
     "invalid initial conduct",
     /Conduta inicial deve ser um texto/,
   );
+
+  // Invalid conduct actions (not an array)
+  await expectReject(
+    () => runHealthOpenClinicalCase(
+      mockRequest({
+        ...base,
+        operationId: "op-val-act-type",
+        content: {...baseContent, conduct_actions: "invalid_not_array"},
+      }),
+      deps,
+    ),
+    "validation",
+    "invalid conduct actions type",
+    /Ações de conduta devem ser uma lista/,
+  );
+
+  // Invalid conduct action item
+  await expectReject(
+    () => runHealthOpenClinicalCase(
+      mockRequest({
+        ...base,
+        operationId: "op-val-act-item",
+        content: {...baseContent, conduct_actions: ["first_aid_applied", "acao_desconhecida"]},
+      }),
+      deps,
+    ),
+    "validation",
+    "invalid conduct action item",
+    /Ação de conduta inválida/,
+  );
+
+  // Invalid has_operational_impact type
+  await expectReject(
+    () => runHealthOpenClinicalCase(
+      mockRequest({
+        ...base,
+        operationId: "op-val-impact-type",
+        content: {...baseContent, has_operational_impact: "sim"},
+      }),
+      deps,
+    ),
+    "validation",
+    "invalid has_operational_impact type",
+    /has_operational_impact deve ser booleano/,
+  );
 }
 
 async function testIncidentGuardsAndOCC() {

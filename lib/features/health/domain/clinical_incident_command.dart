@@ -205,7 +205,6 @@ final class ClinicalIncidentCommand {
       'severity': severity.wireValue,
       'description': description.trim(),
       'has_operational_impact': hasOperationalImpact,
-      'operational_impact_flag': hasOperationalImpact,
     };
 
     final conduct = initialConductNotes?.trim();
