@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/features/health/presentation/clinical/clinical_consultation_screen.dart';
+import 'package:canil_gcm/features/health/presentation/clinical/clinical_incident_screen.dart';
 import 'package:canil_gcm/features/health/presentation/clinical/exam_process_flow_screen.dart';
 import 'package:canil_gcm/features/health/presentation/clinical/treatment_execution_screen.dart';
 import 'health_event_form_screen.dart';
@@ -113,10 +114,10 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
       group: _HealthActionGroup.clinical,
     ),
     const _HealthActionCategory(
-      id: 'symptom',
-      label: 'Sintoma',
-      subtitle: 'Adicionar reação ou sintoma',
-      icon: Icons.warning_rounded,
+      id: 'incident',
+      label: 'Intercorrência',
+      subtitle: 'Registrar ocorrência clínica ou sintoma',
+      icon: Icons.warning_amber_rounded,
       color: AppTheme.error,
       group: _HealthActionGroup.clinical,
     ),
@@ -249,6 +250,19 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
         context,
         MaterialPageRoute(
           builder: (_) => TreatmentExecutionScreen(dogId: widget.dogId),
+        ),
+      );
+      if (!mounted) return;
+      if (saved == true && widget.popOnSave) Navigator.pop(context, true);
+      return;
+    }
+
+    // Intercorrência Clínica possui fluxo canônico próprio (F20.INTERCORRENCIA-V1)
+    if (selectedId == 'incident' || selectedId == 'symptom') {
+      final saved = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ClinicalIncidentScreen(dogId: widget.dogId),
         ),
       );
       if (!mounted) return;

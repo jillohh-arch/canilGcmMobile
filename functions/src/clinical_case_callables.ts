@@ -177,6 +177,67 @@ export const CLINICAL_PAYLOAD_TYPES = [
 
 export type ClinicalPayloadType = typeof CLINICAL_PAYLOAD_TYPES[number];
 
+/**
+ * Vocabulário canônico de categorias/naturezas de intercorrência clínica (F20.INTERCORRENCIA-V1).
+ */
+export const INCIDENT_CATEGORIES = [
+  "trauma",
+  "intoxication",
+  "heatstroke",
+  "respiratory",
+  "digestive",
+  "allergic",
+  "behavioral",
+  "neurological",
+  "musculoskeletal",
+  "dermatological",
+  "other",
+] as const;
+
+export type IncidentCategory = typeof INCIDENT_CATEGORIES[number];
+
+/**
+ * Vocabulário canônico de gravidade de intercorrência clínica (F20.INTERCORRENCIA-V1).
+ */
+export const INCIDENT_SEVERITIES = [
+  "mild",
+  "moderate",
+  "severe",
+  "critical",
+] as const;
+
+export type IncidentSeverity = typeof INCIDENT_SEVERITIES[number];
+
+/**
+ * Validação de integridade semântica para payloads de intercorrência clínica (incident_v1).
+ */
+export function validateIncidentContent(content: JsonMap): void {
+  const category = content.category ?? content.nature;
+  if (typeof category !== "string" || !INCIDENT_CATEGORIES.includes(category as IncidentCategory)) {
+    throw logicError("validation", `Categoria de intercorrência inválida: ${category}`);
+  }
+  const severity = content.severity;
+  if (typeof severity !== "string" || !INCIDENT_SEVERITIES.includes(severity as IncidentSeverity)) {
+    throw logicError("validation", `Gravidade de intercorrência inválida: ${severity}`);
+  }
+  const description = content.description;
+  if (typeof description !== "string" || description.trim().length === 0) {
+    throw logicError("validation", "Descrição da intercorrência é obrigatória.");
+  }
+  if (description.length > MAX_REASON_LEN) {
+    throw logicError("validation", "Descrição da intercorrência excede o tamanho máximo.");
+  }
+  const initialConduct = content.initial_conduct ?? content.initialConduct;
+  if (initialConduct !== undefined && initialConduct !== null) {
+    if (typeof initialConduct !== "string") {
+      throw logicError("validation", "Conduta inicial deve ser um texto quando informada.");
+    }
+    if (initialConduct.length > MAX_REASON_LEN) {
+      throw logicError("validation", "Conduta inicial excede o tamanho máximo.");
+    }
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Seams
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1754,6 +1815,17 @@ interface ParsedOpenCaseInput {
 }
 
 function parseOpenCaseInput(data: JsonMap, now: Date): ParsedOpenCaseInput {
+  const openingType = parseClinicalCaseOpeningType(
+    data.openingType ?? data.opening_type,
+  );
+  const eventType = parseClinicalEventType(data.eventType ?? data.event_type);
+  const payloadType = parsePayloadType(data.payloadType ?? data.payload_type);
+  const content = assertContent(data.content);
+
+  if (payloadType === "incident_v1") {
+    validateIncidentContent(content);
+  }
+
   return {
     dogId: assertDogId(data.dogId ?? data.dog_id),
     operationId: normalizeOperationId(
@@ -1762,16 +1834,14 @@ function parseOpenCaseInput(data: JsonMap, now: Date): ParsedOpenCaseInput {
     title: assertText(data.title, "title", MAX_CASE_TITLE_LEN),
     // Frozen domain parsers: unknown wire value is a rejected input, never
     // silently stored (`unknown_case_opening_type` / `unknown_event_type`).
-    openingType: parseClinicalCaseOpeningType(
-      data.openingType ?? data.opening_type,
-    ),
-    eventType: parseClinicalEventType(data.eventType ?? data.event_type),
+    openingType,
+    eventType,
     occurredAt: assertOccurredAt(data.occurredAt ?? data.occurred_at, now),
-    payloadType: parsePayloadType(data.payloadType ?? data.payload_type),
+    payloadType,
     payloadVersion: parsePayloadVersion(
       data.payloadVersion ?? data.payload_version,
     ),
-    content: assertContent(data.content),
+    content,
     professional: assertProfessional(data.professional),
     attachmentRefs: assertAttachmentRefs(
       data.attachmentRefs ?? data.attachment_refs,
@@ -2015,19 +2085,27 @@ function parseAppendEventInput(
   data: JsonMap,
   now: Date,
 ): ParsedAppendEventInput {
+  const eventType = parseClinicalEventType(data.eventType ?? data.event_type);
+  const payloadType = parsePayloadType(data.payloadType ?? data.payload_type);
+  const content = assertContent(data.content);
+
+  if (payloadType === "incident_v1") {
+    validateIncidentContent(content);
+  }
+
   return {
     dogId: assertDogId(data.dogId ?? data.dog_id),
     caseId: assertPathId(data.caseId ?? data.case_id, "caseId"),
     operationId: normalizeOperationId(
       data.idempotencyKey ?? data.operationId ?? data.operation_id,
     ),
-    eventType: parseClinicalEventType(data.eventType ?? data.event_type),
+    eventType,
     occurredAt: assertOccurredAt(data.occurredAt ?? data.occurred_at, now),
-    payloadType: parsePayloadType(data.payloadType ?? data.payload_type),
+    payloadType,
     payloadVersion: parsePayloadVersion(
       data.payloadVersion ?? data.payload_version,
     ),
-    content: assertContent(data.content),
+    content,
     professional: assertProfessional(data.professional),
     attachmentRefs: assertAttachmentRefs(
       data.attachmentRefs ?? data.attachment_refs,
