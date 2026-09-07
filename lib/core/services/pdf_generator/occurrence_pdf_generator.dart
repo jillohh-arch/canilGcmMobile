@@ -2063,24 +2063,12 @@ class OccurrencePdfGenerator {
         if (visibleMedia.isEmpty)
           _emptyBox('Nenhuma midia anexada aos eventos desta ocorrencia.', f)
         else
-          pw.Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: visibleMedia
-                .map((item) => _mediaCard(item, ctx))
-                .toList(),
-          ),
+          ..._buildMediaGrid(visibleMedia, ctx),
         if (finalizationMedia.isNotEmpty) ...[
           pw.SizedBox(height: 16),
           _sectionLabel('Fotos da finalizacao', f),
           pw.SizedBox(height: 10),
-          pw.Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: finalizationMedia
-                .map((item) => _finalizationMediaCard(item, ctx))
-                .toList(),
-          ),
+          ..._buildFinalizationMediaGrid(finalizationMedia, ctx),
         ],
         pw.SizedBox(height: 16),
         _sectionLabel('Anexos', f),
@@ -2088,6 +2076,58 @@ class OccurrencePdfGenerator {
         _attachmentCard(ctx),
       ],
     );
+  }
+
+  List<pw.Widget> _buildMediaGrid(
+    List<_PdfMediaItem> items,
+    _OccurrencePdfContext ctx,
+  ) {
+    final rows = <pw.Widget>[];
+    for (var i = 0; i < items.length; i += 2) {
+      final first = items[i];
+      final second = i + 1 < items.length ? items[i + 1] : null;
+      rows.add(
+        pw.Padding(
+          padding: const pw.EdgeInsets.only(bottom: 12),
+          child: pw.Row(
+            children: [
+              _mediaCard(first, ctx),
+              if (second != null) ...[
+                pw.SizedBox(width: 12),
+                _mediaCard(second, ctx),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+    return rows;
+  }
+
+  List<pw.Widget> _buildFinalizationMediaGrid(
+    List<_PdfFinalizationMediaItem> items,
+    _OccurrencePdfContext ctx,
+  ) {
+    final rows = <pw.Widget>[];
+    for (var i = 0; i < items.length; i += 2) {
+      final first = items[i];
+      final second = i + 1 < items.length ? items[i + 1] : null;
+      rows.add(
+        pw.Padding(
+          padding: const pw.EdgeInsets.only(bottom: 12),
+          child: pw.Row(
+            children: [
+              _finalizationMediaCard(first, ctx),
+              if (second != null) ...[
+                pw.SizedBox(width: 12),
+                _finalizationMediaCard(second, ctx),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+    return rows;
   }
 
   pw.Widget _mediaCount(_OccurrencePdfContext ctx) {
@@ -2451,98 +2491,141 @@ class OccurrencePdfGenerator {
         .where((r) => r != OccurrenceResult.noOccurrence)
         .toList();
     final report = ctx.occurrence.finalReport?.trim();
+    final resultCards = <pw.Widget>[
+      if (activeResults.isEmpty)
+        _resultCard(OccurrenceResult.noOccurrence, ctx)
+      else
+        ...activeResults.map((result) => _resultCard(result, ctx)),
+      if (ctx.media.isNotEmpty) _resultCard(null, ctx),
+    ];
+
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         _contextBar(ctx, status: true),
-        pw.SizedBox(height: 20),
-        pw.Row(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Expanded(
-              flex: 6,
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  _sectionLabel('Relato institucional', f),
-                  pw.SizedBox(height: 12),
-                  pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: pw.BoxDecoration(
-                      color: PdfInstitutionalColors.panelCyan,
-                      border: pw.Border.all(
-                        color: PdfInstitutionalColors.panelCyanBorder,
-                      ),
-                      borderRadius: const pw.BorderRadius.all(
-                        pw.Radius.circular(7),
-                      ),
-                    ),
-                    child: pw.Text(
-                      'TRANSCRICAO DE AUDIO - REVISADA PELO CONDUTOR',
-                      style: _bodyBold(f, size: 7.8, color: _cyanDeep),
-                    ),
-                  ),
-                  pw.SizedBox(height: 10),
-                  pw.Container(
-                    padding: const pw.EdgeInsets.only(left: 11),
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border(
-                        left: pw.BorderSide(color: _cyan, width: 2.4),
-                      ),
-                    ),
-                    child: pw.Text(
-                      report == null || report.isEmpty
-                          ? 'Relato institucional nao registrado na finalizacao.'
-                          : report,
-                      textAlign: pw.TextAlign.justify,
-                      style: _body(
-                        f,
-                        size: 9.5,
-                        color: PdfInstitutionalColors.timelineDark,
-                      ),
-                    ),
-                  ),
-                  pw.SizedBox(height: 12),
-                  pw.Container(
-                    padding: const pw.EdgeInsets.all(10),
-                    decoration: pw.BoxDecoration(
-                      color: PdfInstitutionalColors.panelSubtle,
-                      border: pw.Border.all(color: _lineSoft),
-                      borderRadius: const pw.BorderRadius.all(
-                        pw.Radius.circular(7),
-                      ),
-                    ),
-                    child: pw.Text(
-                      'Relato transcrito de audio gravado em campo, quando aplicavel, e revisado pelo condutor responsavel antes da finalizacao.',
-                      style: _body(f, size: 7.8, color: _inkSoft),
-                    ),
-                  ),
-                ],
-              ),
+        pw.SizedBox(height: 16),
+        _sectionLabel('Resultados', f),
+        pw.SizedBox(height: 10),
+        ..._buildResultCardsGrid(resultCards),
+        pw.SizedBox(height: 14),
+        _sectionLabel('Relato institucional', f),
+        pw.SizedBox(height: 10),
+        pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: pw.BoxDecoration(
+            color: PdfInstitutionalColors.panelCyan,
+            border: pw.Border.all(
+              color: PdfInstitutionalColors.panelCyanBorder,
             ),
-            pw.SizedBox(width: 18),
-            pw.Expanded(
-              flex: 5,
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  _sectionLabel('Resultados', f),
-                  pw.SizedBox(height: 12),
-                  if (activeResults.isEmpty)
-                    _resultCard(OccurrenceResult.noOccurrence, ctx)
-                  else
-                    ...activeResults.map((result) => _resultCard(result, ctx)),
-                  if (ctx.media.isNotEmpty) _resultCard(null, ctx),
-                ],
-              ),
-            ),
-          ],
+            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(7)),
+          ),
+          child: pw.Text(
+            'TRANSCRICAO DE AUDIO - REVISADA PELO CONDUTOR',
+            style: _bodyBold(f, size: 7.8, color: _cyanDeep),
+          ),
+        ),
+        pw.SizedBox(height: 10),
+        ..._buildReportParagraphs(report, f),
+        pw.SizedBox(height: 6),
+        pw.Container(
+          padding: const pw.EdgeInsets.all(10),
+          decoration: pw.BoxDecoration(
+            color: PdfInstitutionalColors.panelSubtle,
+            border: pw.Border.all(color: _lineSoft),
+            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(7)),
+          ),
+          child: pw.Text(
+            'Relato transcrito de audio gravado em campo, quando aplicavel, e revisado pelo condutor responsavel antes da finalizacao.',
+            style: _body(f, size: 7.8, color: _inkSoft),
+          ),
         ),
       ],
     );
+  }
+
+  List<pw.Widget> _buildResultCardsGrid(List<pw.Widget> cards) {
+    final rows = <pw.Widget>[];
+    for (var i = 0; i < cards.length; i += 2) {
+      final first = cards[i];
+      final second = i + 1 < cards.length ? cards[i + 1] : null;
+      rows.add(
+        pw.Padding(
+          padding: const pw.EdgeInsets.only(bottom: 2),
+          child: pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Expanded(child: first),
+              if (second != null) ...[
+                pw.SizedBox(width: 12),
+                pw.Expanded(child: second),
+              ] else
+                pw.Spacer(),
+            ],
+          ),
+        ),
+      );
+    }
+    return rows;
+  }
+
+  List<pw.Widget> _buildReportParagraphs(String? report, PdfFonts f) {
+    final paragraphs = _splitReportIntoParagraphs(report);
+    return paragraphs.map((paragraph) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 8),
+        child: pw.Container(
+          padding: const pw.EdgeInsets.only(left: 11),
+          decoration: pw.BoxDecoration(
+            border: pw.Border(left: pw.BorderSide(color: _cyan, width: 2.4)),
+          ),
+          child: pw.Text(
+            paragraph,
+            textAlign: pw.TextAlign.justify,
+            style: _body(
+              f,
+              size: 9.5,
+              color: PdfInstitutionalColors.timelineDark,
+            ),
+          ),
+        ),
+      );
+    }).toList();
+  }
+
+  List<String> _splitReportIntoParagraphs(String? report) {
+    if (report == null || report.trim().isEmpty) {
+      return const ['Relato institucional nao registrado na finalizacao.'];
+    }
+    final rawParagraphs = report.split(RegExp(r'\r?\n+'));
+    final chunks = <String>[];
+    for (final raw in rawParagraphs) {
+      final trimmed = raw.trim();
+      if (trimmed.isEmpty) continue;
+      if (trimmed.length <= 800) {
+        chunks.add(trimmed);
+      } else {
+        var remaining = trimmed;
+        while (remaining.length > 800) {
+          var splitIndex = remaining.lastIndexOf('. ', 800);
+          if (splitIndex == -1 || splitIndex < 200) {
+            splitIndex = remaining.lastIndexOf(' ', 800);
+          }
+          if (splitIndex == -1 || splitIndex < 200) {
+            splitIndex = 800;
+          } else {
+            splitIndex += 1;
+          }
+          chunks.add(remaining.substring(0, splitIndex).trim());
+          remaining = remaining.substring(splitIndex).trim();
+        }
+        if (remaining.isNotEmpty) {
+          chunks.add(remaining);
+        }
+      }
+    }
+    return chunks.isEmpty
+        ? const ['Relato institucional nao registrado na finalizacao.']
+        : chunks;
   }
 
   pw.Widget _resultCard(OccurrenceResult? result, _OccurrencePdfContext ctx) {
