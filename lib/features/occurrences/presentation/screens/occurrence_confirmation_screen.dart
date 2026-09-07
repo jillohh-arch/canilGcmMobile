@@ -10,6 +10,7 @@ import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
+import 'package:canil_gcm/core/services/pdf_generator/occurrence_pdf_generator.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
@@ -40,10 +41,41 @@ class OccurrenceConfirmationData {
   });
 }
 
-class OccurrenceConfirmationScreen extends StatelessWidget {
+class OccurrenceConfirmationScreen extends StatefulWidget {
   final OccurrenceConfirmationData data;
+  final Future<Uint8List> Function(
+    BuildContext context, {
+    required String auditAction,
+  })?
+  pdfBytesBuilder;
+  final Future<void> Function({required Uint8List bytes, required String name})?
+  pdfPreviewLauncher;
+  final Future<void> Function({
+    required Uint8List bytes,
+    required String filename,
+  })?
+  pdfShareLauncher;
 
-  const OccurrenceConfirmationScreen({super.key, required this.data});
+  const OccurrenceConfirmationScreen({
+    super.key,
+    required this.data,
+    this.pdfBytesBuilder,
+    this.pdfPreviewLauncher,
+    this.pdfShareLauncher,
+  });
+
+  @override
+  State<OccurrenceConfirmationScreen> createState() =>
+      _OccurrenceConfirmationScreenState();
+}
+
+class _OccurrenceConfirmationScreenState
+    extends State<OccurrenceConfirmationScreen> {
+  bool _isGeneratingPdf = false;
+  bool _isSharingPdf = false;
+
+  bool get _isBusy => _isGeneratingPdf || _isSharingPdf;
+  OccurrenceConfirmationData get data => widget.data;
 
   @override
   Widget build(BuildContext context) {
@@ -291,20 +323,7 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
     if (detail == null) return '';
 
     if (result == OccurrenceResult.drugSeized && detail is List) {
-      final drugs = detail.cast<Map<String, dynamic>>();
-      if (drugs.isEmpty) return '';
-      if (drugs.length == 1) {
-        final d = drugs.first;
-        final parts = <String>[];
-        if ((d['weight_grams'] ?? '').toString().isNotEmpty) {
-          parts.add('${d["weight_grams"]}g');
-        }
-        if ((d['type'] ?? '').toString().isNotEmpty) {
-          parts.add('${d["type"]}');
-        }
-        return parts.join(' de ');
-      }
-      return '${drugs.length} substâncias';
+      return OccurrencePdfGenerator.formatDrugDescription(detail);
     }
 
     if (detail is Map<String, dynamic>) {
@@ -331,53 +350,77 @@ class OccurrenceConfirmationScreen extends StatelessWidget {
         Expanded(
           child: _ActionButton(
             icon: Icons.description_outlined,
-            label: 'Gerar PDF',
-            onTap: () => _generateAndPreviewPdf(context),
+            label: _isGeneratingPdf ? 'Gerando...' : 'Gerar PDF',
+            isLoading: _isGeneratingPdf,
+            onTap: _isBusy ? null : _generateAndPreviewPdf,
           ),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: _ActionButton(
             icon: Icons.share_outlined,
-            label: 'Compartilhar',
-            onTap: () => _generateAndSharePdf(context),
+            label: _isSharingPdf ? 'Preparando...' : 'Compartilhar',
+            isLoading: _isSharingPdf,
+            onTap: _isBusy ? null : _generateAndSharePdf,
           ),
         ),
       ],
     );
   }
 
-  Future<void> _generateAndPreviewPdf(BuildContext context) async {
+  Future<void> _generateAndPreviewPdf() async {
+    if (_isBusy) return;
     HapticFeedback.lightImpact();
-    AppFeedback.loading(context, 'Gerando PDF...');
+    setState(() => _isGeneratingPdf = true);
 
     try {
-      final bytes = await _buildPdfBytes(context, auditAction: 'pdf_previewed');
-      if (!context.mounted) return;
-      await Printing.layoutPdf(
-        onLayout: (_) => bytes,
-        name: 'Ocorrencia_${data.occurrenceId.substring(0, 8)}.pdf',
-      );
+      final builder = widget.pdfBytesBuilder;
+      final bytesFuture = builder != null
+          ? builder(context, auditAction: 'pdf_previewed')
+          : _buildPdfBytes(context, auditAction: 'pdf_previewed');
+      final bytes = await bytesFuture;
+      if (!mounted) return;
+      final filename = 'Ocorrencia_${data.occurrenceId.substring(0, 8)}.pdf';
+      if (widget.pdfPreviewLauncher != null) {
+        await widget.pdfPreviewLauncher!(bytes: bytes, name: filename);
+      } else {
+        await Printing.layoutPdf(onLayout: (_) => bytes, name: filename);
+      }
     } catch (e) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       AppFeedback.error(context, 'Erro ao gerar PDF: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isGeneratingPdf = false);
+      }
     }
   }
 
-  Future<void> _generateAndSharePdf(BuildContext context) async {
+  Future<void> _generateAndSharePdf() async {
+    if (_isBusy) return;
     HapticFeedback.lightImpact();
-    AppFeedback.loading(context, 'Preparando PDF...');
+    setState(() => _isSharingPdf = true);
 
     try {
-      final bytes = await _buildPdfBytes(context, auditAction: 'pdf_shared');
-      if (!context.mounted) return;
-      await Printing.sharePdf(
-        bytes: bytes,
-        filename: 'Ocorrencia_${data.occurrenceId.substring(0, 8)}.pdf',
-      );
+      final builder = widget.pdfBytesBuilder;
+      final bytesFuture = builder != null
+          ? builder(context, auditAction: 'pdf_shared')
+          : _buildPdfBytes(context, auditAction: 'pdf_shared');
+      final bytes = await bytesFuture;
+      if (!mounted) return;
+      final filename = 'Ocorrencia_${data.occurrenceId.substring(0, 8)}.pdf';
+      if (widget.pdfShareLauncher != null) {
+        await widget.pdfShareLauncher!(bytes: bytes, filename: filename);
+      } else {
+        await Printing.sharePdf(bytes: bytes, filename: filename);
+      }
     } catch (e) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       AppFeedback.error(context, 'Erro ao compartilhar: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isSharingPdf = false);
+      }
     }
   }
 
@@ -593,33 +636,52 @@ class _SummaryRow extends StatelessWidget {
 class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool isLoading;
 
   const _ActionButton({
     required this.icon,
     required this.label,
     required this.onTap,
+    this.isLoading = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final enabled = onTap != null && !isLoading;
     return GestureDetector(
-      onTap: onTap,
+      onTap: enabled ? onTap : null,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
         decoration: BoxDecoration(
-          color: AppTheme.primary.withAlpha(20),
+          color: AppTheme.primary.withAlpha(enabled ? 20 : 8),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.primary.withAlpha(77)),
+          border: Border.all(
+            color: AppTheme.primary.withAlpha(enabled ? 77 : 30),
+          ),
         ),
         child: Column(
           children: [
-            Icon(icon, color: AppTheme.primary, size: 18),
+            if (isLoading)
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
+                ),
+              )
+            else
+              Icon(
+                icon,
+                color: AppTheme.primary.withAlpha(enabled ? 255 : 100),
+                size: 18,
+              ),
             const SizedBox(height: 4),
             Text(
               label,
               style: GoogleFonts.inter(
-                color: AppTheme.primary,
+                color: AppTheme.primary.withAlpha(enabled ? 255 : 100),
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),

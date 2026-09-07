@@ -2239,7 +2239,7 @@ class OccurrencePdfGenerator {
               children: [
                 if (item.image != null)
                   pw.Positioned.fill(
-                    child: pw.Image(item.image!, fit: pw.BoxFit.cover),
+                    child: pw.Image(item.image!, fit: pw.BoxFit.contain),
                   )
                 else
                   pw.Center(
@@ -2367,7 +2367,7 @@ class OccurrencePdfGenerator {
               children: [
                 if (item.image != null)
                   pw.Positioned.fill(
-                    child: pw.Image(item.image!, fit: pw.BoxFit.cover),
+                    child: pw.Image(item.image!, fit: pw.BoxFit.contain),
                   )
                 else
                   pw.Center(
@@ -2729,11 +2729,14 @@ class OccurrencePdfGenerator {
   /// `weight_grams` é peso em gramas (o campo que o operador preenche em
   /// "Peso em gramas"), então o documento precisa mostrar a unidade. O campo
   /// legado `quantidade` não tem unidade conhecida e é renderizado cru.
-  @visibleForTesting
-  static String formatDrugDescriptionForTest(dynamic raw) =>
-      _formatDrugDescription(raw);
-
-  static String _formatDrugDescription(dynamic raw) {
+  static String formatDrugDescription(dynamic raw) {
+    if (raw is Map &&
+        (raw.containsKey('type') ||
+            raw.containsKey('tipo') ||
+            raw.containsKey('weight_grams') ||
+            raw.containsKey('quantidade'))) {
+      raw = [raw];
+    }
     if (raw is List && raw.isNotEmpty) {
       final entries = raw
           .whereType<Map>()
@@ -2752,7 +2755,11 @@ class OccurrencePdfGenerator {
     return 'Substancia analoga a entorpecente apreendida e registrada na ocorrencia.';
   }
 
-  String _drugDescription(dynamic raw) => _formatDrugDescription(raw);
+  @visibleForTesting
+  static String formatDrugDescriptionForTest(dynamic raw) =>
+      formatDrugDescription(raw);
+
+  String _drugDescription(dynamic raw) => formatDrugDescription(raw);
 
   String _weaponDescription(Map<String, dynamic>? details) {
     final type = details?['type']?.toString();

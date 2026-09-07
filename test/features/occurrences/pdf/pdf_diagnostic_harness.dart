@@ -78,21 +78,20 @@ class _FakeFirebasePlatform extends FirebasePlatform {
   Future<FirebaseAppPlatform> initializeApp({
     String? name,
     FirebaseOptions? options,
-  }) async =>
-      _app;
+  }) async => _app;
 }
 
 class _FakeFirebaseAppPlatform extends FirebaseAppPlatform {
   _FakeFirebaseAppPlatform()
-      : super(
-          defaultFirebaseAppName,
-          const FirebaseOptions(
-            apiKey: 'diagnostic-api-key',
-            appId: 'diagnostic-app-id',
-            messagingSenderId: 'diagnostic-sender-id',
-            projectId: 'diagnostic-project',
-          ),
-        );
+    : super(
+        defaultFirebaseAppName,
+        const FirebaseOptions(
+          apiKey: 'diagnostic-api-key',
+          appId: 'diagnostic-app-id',
+          messagingSenderId: 'diagnostic-sender-id',
+          projectId: 'diagnostic-project',
+        ),
+      );
 }
 
 /// Outcome of one real-generator attempt.
@@ -144,8 +143,7 @@ const flexUnboundedHeightMessage =
     'Flex children have non-zero flex but incoming height constraints are unbounded';
 
 /// Any flex-unbounded message, either axis, for classification.
-const flexUnboundedAnyAxis =
-    'Flex children have non-zero flex but incoming';
+const flexUnboundedAnyAxis = 'Flex children have non-zero flex but incoming';
 
 /// Marks failures that happened before any pdf widget was laid out.
 bool isPreLayoutFailure(Object error) {
@@ -284,6 +282,11 @@ class _BlockedHttpClient implements HttpClient {
   }
 }
 
+HttpOverrides? _previousHttpOverrides;
+PdfBaseCache? _previousPdfCache;
+FirebasePlatform? _previousFirebasePlatform;
+bool _isHarnessInstalled = false;
+
 /// Installs the hermetic harness. Call from setUpAll().
 ///
 /// Order matters: Firebase must be initialized BEFORE the generator runs,
@@ -292,6 +295,16 @@ class _BlockedHttpClient implements HttpClient {
 /// answer (measured in the first D1-E1 run).
 Future<void> installHermeticPdfHarness() async {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  if (!_isHarnessInstalled) {
+    _previousHttpOverrides = HttpOverrides.current;
+    _previousPdfCache = PdfBaseCache.defaultCache;
+    _previousFirebasePlatform = FirebasePlatform.instance;
+    _isHarnessInstalled = true;
+  }
+
+  firestoreChannelCalls.clear();
+  attemptedNetworkHosts.clear();
 
   HttpOverrides.global = _NoNetworkHttpOverrides();
 
@@ -316,11 +329,38 @@ Future<void> installHermeticPdfHarness() async {
   });
 }
 
-/// Removes the mock handlers so state does not leak into other test files.
+/// Removes the mock handlers and cleanly restores all global process state
+/// (FirebasePlatform, PdfBaseCache, HttpOverrides) so state does not leak into other test files.
 void uninstallHermeticPdfHarness() {
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   messenger.setMockMessageHandler(_queryGetChannel, null);
   messenger.setMockMessageHandler(_docGetChannel, null);
-  HttpOverrides.global = null;
+
+  HttpOverrides.global = _previousHttpOverrides;
+  if (_previousPdfCache != null) {
+    PdfBaseCache.defaultCache = _previousPdfCache!;
+  }
+  if (_previousFirebasePlatform != null) {
+    FirebasePlatform.instance = _previousFirebasePlatform!;
+  }
+
+  firestoreChannelCalls.clear();
+  attemptedNetworkHosts.clear();
+
+  _previousHttpOverrides = null;
+  _previousPdfCache = null;
+  _previousFirebasePlatform = null;
+  _isHarnessInstalled = false;
+}
+
+/// Runs [body] inside the hermetic harness and guarantees full uninstallation
+/// even if [body] throws an error or returns a Future that rejects.
+Future<T> runWithHermeticPdfHarness<T>(Future<T> Function() body) async {
+  await installHermeticPdfHarness();
+  try {
+    return await body();
+  } finally {
+    uninstallHermeticPdfHarness();
+  }
 }

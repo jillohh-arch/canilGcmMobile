@@ -23,6 +23,7 @@ import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
 import 'package:canil_gcm/features/occurrences/domain/amendment.dart';
 import 'package:canil_gcm/features/occurrences/data/amendment_repository.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/create_amendment_screen.dart';
+import 'package:canil_gcm/core/services/pdf_generator/occurrence_pdf_generator.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
@@ -51,13 +52,30 @@ const Color _red = AppTheme.error;
 typedef IntegrityVerifier =
     Future<IntegrityVerdict> Function({required bool verifyMediaBytes});
 
-class RegistroDetalhePage extends StatelessWidget {
+class RegistroDetalhePage extends StatefulWidget {
   final HistoryEntry entry;
-  const RegistroDetalhePage({super.key, required this.entry});
+  final Future<Uint8List> Function(BuildContext context, RecordDetail detail)?
+  pdfBytesBuilder;
+
+  const RegistroDetalhePage({
+    super.key,
+    required this.entry,
+    this.pdfBytesBuilder,
+  });
+
+  @override
+  State<RegistroDetalhePage> createState() => _RegistroDetalhePageState();
+}
+
+class _RegistroDetalhePageState extends State<RegistroDetalhePage> {
+  bool _isGeneratingPdf = false;
+  bool _isSharingPdf = false;
+
+  bool get _isBusy => _isGeneratingPdf || _isSharingPdf;
 
   @override
   Widget build(BuildContext context) {
-    final detail = RecordDetail.fromEntry(entry);
+    final detail = RecordDetail.fromEntry(widget.entry);
 
     // Determine the specialized body widget
     final Widget specificBody;
@@ -90,50 +108,57 @@ class RegistroDetalhePage extends StatelessWidget {
     return HistoryDetailScaffold(
       detail: detail,
       body: specificBody,
-      onPdfTap: () => _handlePdfAction(context, detail, share: false),
-      onShareTap: () => _handlePdfAction(context, detail, share: true),
+      onPdfTap: _isBusy ? null : () => _handlePdfAction(detail, share: false),
+      onShareTap: _isBusy ? null : () => _handlePdfAction(detail, share: true),
       onMenuTap: () => _openRecordMenu(context),
+      isGeneratingPdf: _isGeneratingPdf,
+      isSharingPdf: _isSharingPdf,
     );
   }
 
   Future<void> _handlePdfAction(
-    BuildContext context,
     RecordDetail detail, {
     required bool share,
   }) async {
+    if (_isBusy) return;
     final original = detail.source.originalModel;
     if (original is! Occurrence) {
       _notify(context, 'PDF disponível apenas para ocorrências.');
       return;
     }
 
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    AppFeedback.info(
-      context,
-      share ? 'Preparando compartilhamento...' : 'Gerando PDF...',
-    );
+    setState(() {
+      if (share) {
+        _isSharingPdf = true;
+      } else {
+        _isGeneratingPdf = true;
+      }
+    });
 
     final occurrenceVM = context.read<OccurrenceViewModel>();
     final dogVM = context.read<DogViewModel>();
     final authVM = context.read<AuthViewModel>();
     try {
-      final latestOcc = await occurrenceVM.getById(original.id) ?? original;
-      final events = await occurrenceVM.getEvents(original.id);
-      final matchingDogs = dogVM.dogs.where((d) => d.id == latestOcc.dogId);
-      final dog = matchingDogs.isNotEmpty ? matchingDogs.first : null;
-      if (dog == null) throw Exception('Dados do cão não disponíveis');
+      final Uint8List bytes;
+      if (widget.pdfBytesBuilder != null) {
+        bytes = await widget.pdfBytesBuilder!(context, detail);
+      } else {
+        final latestOcc = await occurrenceVM.getById(original.id) ?? original;
+        final events = await occurrenceVM.getEvents(original.id);
+        final matchingDogs = dogVM.dogs.where((d) => d.id == latestOcc.dogId);
+        final dog = matchingDogs.isNotEmpty ? matchingDogs.first : null;
+        if (dog == null) throw Exception('Dados do cão não disponíveis');
 
-      final bytes = await occurrenceVM.generatePdf(
-        occurrence: latestOcc,
-        events: events,
-        dog: dog,
-        handlerName: detail.handlerName,
-        handlerRa: HandlerIdentityService.raFromUser(authVM.user) ?? '',
-      );
+        bytes = await occurrenceVM.generatePdf(
+          occurrence: latestOcc,
+          events: events,
+          dog: dog,
+          handlerName: detail.handlerName,
+          handlerRa: HandlerIdentityService.raFromUser(authVM.user) ?? '',
+        );
+      }
 
-      if (!context.mounted) return;
-      messenger.hideCurrentSnackBar();
+      if (!mounted) return;
       final filename = 'Ocorrencia_${original.id.substring(0, 8)}.pdf';
       if (share) {
         await Printing.sharePdf(bytes: bytes, filename: filename);
@@ -141,9 +166,15 @@ class RegistroDetalhePage extends StatelessWidget {
         await Printing.layoutPdf(onLayout: (_) => bytes, name: filename);
       }
     } catch (e) {
-      if (!context.mounted) return;
-      messenger.hideCurrentSnackBar();
+      if (!mounted) return;
       AppFeedback.error(context, e, fallback: 'Erro ao gerar PDF.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGeneratingPdf = false;
+          _isSharingPdf = false;
+        });
+      }
     }
   }
 
@@ -204,9 +235,11 @@ class RegistroDetalhePage extends StatelessWidget {
 class HistoryDetailScaffold extends StatelessWidget {
   final RecordDetail detail;
   final Widget body;
-  final VoidCallback onPdfTap;
-  final VoidCallback onShareTap;
+  final VoidCallback? onPdfTap;
+  final VoidCallback? onShareTap;
   final VoidCallback onMenuTap;
+  final bool isGeneratingPdf;
+  final bool isSharingPdf;
 
   /// Somente para testes de widget. `null` em produção.
   final IntegrityVerifier? integrityVerifier;
@@ -218,6 +251,8 @@ class HistoryDetailScaffold extends StatelessWidget {
     required this.onPdfTap,
     required this.onShareTap,
     required this.onMenuTap,
+    this.isGeneratingPdf = false,
+    this.isSharingPdf = false,
     this.integrityVerifier,
   });
 
@@ -263,7 +298,12 @@ class HistoryDetailScaffold extends StatelessWidget {
               left: 0,
               right: 0,
               bottom: 0,
-              child: _CtaBar(onPdfTap: onPdfTap, onShareTap: onShareTap),
+              child: _CtaBar(
+                onPdfTap: onPdfTap,
+                onShareTap: onShareTap,
+                isGeneratingPdf: isGeneratingPdf,
+                isSharingPdf: isSharingPdf,
+              ),
             ),
           ],
         ),
@@ -1345,6 +1385,13 @@ class HistoryOccurrenceBody extends StatelessWidget {
             } else if (o is String) {
               final res = OccurrenceResult.fromMap(o);
               label = res.label;
+              final occ = detail.source.originalModel;
+              if (occ is Occurrence && occ.details != null) {
+                if (res == OccurrenceResult.drugSeized) {
+                  final raw = occ.details!['drug_seized'];
+                  desc = OccurrencePdfGenerator.formatDrugDescription(raw);
+                }
+              }
             }
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
@@ -3331,13 +3378,21 @@ class _MenuRow extends StatelessWidget {
 }
 
 class _CtaBar extends StatelessWidget {
-  final VoidCallback onPdfTap;
-  final VoidCallback onShareTap;
+  final VoidCallback? onPdfTap;
+  final VoidCallback? onShareTap;
+  final bool isGeneratingPdf;
+  final bool isSharingPdf;
 
-  const _CtaBar({required this.onPdfTap, required this.onShareTap});
+  const _CtaBar({
+    required this.onPdfTap,
+    required this.onShareTap,
+    this.isGeneratingPdf = false,
+    this.isSharingPdf = false,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final isBusy = isGeneratingPdf || isSharingPdf;
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 14, 18, 24),
       decoration: const BoxDecoration(
@@ -3351,9 +3406,18 @@ class _CtaBar extends StatelessWidget {
         children: [
           Expanded(
             child: ElevatedButton.icon(
-              onPressed: onPdfTap,
-              icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
-              label: const Text('Gerar PDF'),
+              onPressed: isBusy ? null : onPdfTap,
+              icon: isGeneratingPdf
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(_bg),
+                      ),
+                    )
+                  : const Icon(Icons.picture_as_pdf_outlined, size: 16),
+              label: Text(isGeneratingPdf ? 'Gerando...' : 'Gerar PDF'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _cyan,
                 foregroundColor: _bg,
@@ -3371,9 +3435,18 @@ class _CtaBar extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: OutlinedButton.icon(
-              onPressed: onShareTap,
-              icon: const Icon(Icons.share_outlined, size: 16),
-              label: const Text('Compartilhar'),
+              onPressed: isBusy ? null : onShareTap,
+              icon: isSharingPdf
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(_cyan),
+                      ),
+                    )
+                  : const Icon(Icons.share_outlined, size: 16),
+              label: Text(isSharingPdf ? 'Preparando...' : 'Compartilhar'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: _cyan,
                 side: const BorderSide(color: _cyan, width: 1.2),
