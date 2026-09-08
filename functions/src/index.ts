@@ -138,6 +138,7 @@ import {
   healthReadinessProjectHealthEvent,
   healthReadinessProjectNutritionPlan,
   healthReadinessProjectRestriction,
+  healthReadinessProjectClinicalEvent,
 } from "./health_readiness_triggers";
 import {runSystemAuthoritativeTimeNow} from "./system_authoritative_time_callable";
 import {
@@ -9231,6 +9232,10 @@ export {healthReadinessProjectNutritionPlan};
 
 /** Readiness trigger — fires on any operational_restrictions write. */
 export {healthReadinessProjectRestriction};
+
+/** Readiness trigger — fires on any clinical_events write (canonical consultation). */
+export {healthReadinessProjectClinicalEvent};
+
 
 
 // =============================================================================

@@ -102,6 +102,32 @@ export function buildReadinessProjectorDeps(
           return {kind: "failed" as const, reasonCode: String(err)};
         }
       },
+      readClinicalEvents: async (dogId) => {
+        try {
+          const casesSnap = await db
+            .collection("dogs")
+            .doc(dogId)
+            .collection("clinical_cases")
+            .get();
+          if (casesSnap.empty) {
+            return {kind: "docs" as const, docs: []};
+          }
+          const eventSnaps = await Promise.all(
+            casesSnap.docs.map((cDoc) =>
+              cDoc.ref.collection("clinical_events").get(),
+            ),
+          );
+          const docs: Array<{id: string; data: Record<string, unknown>}> = [];
+          for (const snap of eventSnaps) {
+            for (const d of snap.docs) {
+              docs.push({id: d.id, data: d.data()});
+            }
+          }
+          return {kind: "docs" as const, docs};
+        } catch (err) {
+          return {kind: "failed" as const, reasonCode: String(err)};
+        }
+      },
       readCurrentSummary: async (dogId) => {
         try {
           const doc = await db
@@ -298,5 +324,18 @@ export async function handleRestrictionTrigger(
     logger.info("Readiness restriction trigger: received event without snapshot");
     return;
   }
+  await runReadinessProjection(params, sourcePath, db);
+}
+
+/**
+ * Clinical events trigger handler.
+ * Fires on relevant consultation writes under dogs/{dogId}/clinical_cases/{caseId}/clinical_events/{eventId}.
+ */
+export async function handleClinicalEventTrigger(
+  params: ReadinessTriggerParams,
+  _snapshot: DocumentSnapshot | undefined,
+  sourcePath: string,
+  db: FirebaseFirestore.Firestore,
+): Promise<void> {
   await runReadinessProjection(params, sourcePath, db);
 }
