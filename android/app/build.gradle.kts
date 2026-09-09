@@ -37,6 +37,32 @@ android {
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
+    // Alvos Firebase explícitos por flavor.
+    //
+    // `production` mantém o applicationId histórico e resolve
+    // `android/app/google-services.json` (canil-gcm). `staging` acrescenta o
+    // sufixo `.staging`, o que faz o plugin Google Services resolver
+    // `android/app/src/staging/google-services.json` (k9-ops-staging).
+    //
+    // applicationIds distintos permitem que os dois APKs coexistam no mesmo
+    // aparelho — homologação nunca sobrescreve produção.
+    flavorDimensions += "environment"
+
+    productFlavors {
+        create("production") {
+            dimension = "environment"
+            // Herda defaultConfig.applicationId = "com.ragonha.k9ops"
+        }
+        create("staging") {
+            dimension = "environment"
+            applicationId = "com.example.canil_gcm.staging"
+            versionNameSuffix = "-stg"
+            // O rótulo visível vem do source-set `src/staging/res`, que
+            // sobrepõe `src/main/res` — não de `resValue`, para não duplicar
+            // recurso com o `strings.xml` de main.
+        }
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
