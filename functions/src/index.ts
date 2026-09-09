@@ -4443,6 +4443,20 @@ export const onTrainingPromotionRequestUpdated = onDocumentUpdated(
     if (before.status !== "pending") return;
 
     if (after.status === "approved") {
+      // Short-circuit: already processed by authoritative transactional callable (decidePromotionRequest)
+      if (after.processing_status === "completed" || after.applied_by_core === true) {
+        await resolveTrainingPromotionRequestNotifications(
+          event.params.requestId,
+          "training_promotion_approved",
+          {
+            request_id: event.params.requestId,
+            status: "approved",
+            processing_status: "completed",
+          },
+        );
+        return;
+      }
+
       let processingStatus = "completed";
       try {
         await applyApprovedTrainingPromotion(event.params.requestId, after);
@@ -4472,10 +4486,12 @@ export const onTrainingPromotionRequestUpdated = onDocumentUpdated(
 
     if (after.status === "rejected") {
       await notifyPromotionRequester("training_promotion_rejected", event.params.requestId, after);
-      await change.after.ref.set({
-        processed_at: admin.firestore.FieldValue.serverTimestamp(),
-        processing_status: "completed",
-      }, {merge: true});
+      if (after.processing_status !== "completed") {
+        await change.after.ref.set({
+          processed_at: admin.firestore.FieldValue.serverTimestamp(),
+          processing_status: "completed",
+        }, {merge: true});
+      }
       await resolveTrainingPromotionRequestNotifications(
         event.params.requestId,
         "training_promotion_rejected",
