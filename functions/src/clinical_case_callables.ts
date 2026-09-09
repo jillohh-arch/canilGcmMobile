@@ -177,6 +177,97 @@ export const CLINICAL_PAYLOAD_TYPES = [
 
 export type ClinicalPayloadType = typeof CLINICAL_PAYLOAD_TYPES[number];
 
+/**
+ * Vocabulário canônico de categorias/naturezas de intercorrência clínica (F20.INTERCORRENCIA-V1).
+ */
+export const INCIDENT_CATEGORIES = [
+  "trauma",
+  "intoxication",
+  "heatstroke",
+  "respiratory",
+  "digestive",
+  "allergic",
+  "behavioral",
+  "neurological",
+  "musculoskeletal",
+  "dermatological",
+  "other",
+] as const;
+
+export type IncidentCategory = typeof INCIDENT_CATEGORIES[number];
+
+/**
+ * Vocabulário canônico de gravidade de intercorrência clínica (F20.INTERCORRENCIA-V1).
+ */
+export const INCIDENT_SEVERITIES = [
+  "mild",
+  "moderate",
+  "severe",
+  "critical",
+] as const;
+
+export type IncidentSeverity = typeof INCIDENT_SEVERITIES[number];
+
+/**
+ * Vocabulário canônico de ações de conduta de intercorrência clínica (F20.INTERCORRENCIA-V1).
+ */
+export const INCIDENT_CONDUCT_ACTIONS = [
+  "first_aid_applied",
+  "veterinary_referral",
+  "isolation_rest",
+  "medication_given",
+  "monitoring",
+  "operational_pause",
+  "other",
+] as const;
+
+export type IncidentConductAction = typeof INCIDENT_CONDUCT_ACTIONS[number];
+
+/**
+ * Validação de integridade semântica para payloads de intercorrência clínica (incident_v1).
+ */
+export function validateIncidentContent(content: JsonMap): void {
+  const category = content.category ?? content.nature;
+  if (typeof category !== "string" || !INCIDENT_CATEGORIES.includes(category as IncidentCategory)) {
+    throw logicError("validation", `Categoria de intercorrência inválida: ${category}`);
+  }
+  const severity = content.severity;
+  if (typeof severity !== "string" || !INCIDENT_SEVERITIES.includes(severity as IncidentSeverity)) {
+    throw logicError("validation", `Gravidade de intercorrência inválida: ${severity}`);
+  }
+  const description = content.description;
+  if (typeof description !== "string" || description.trim().length === 0) {
+    throw logicError("validation", "Descrição da intercorrência é obrigatória.");
+  }
+  if (description.length > MAX_REASON_LEN) {
+    throw logicError("validation", "Descrição da intercorrência excede o tamanho máximo.");
+  }
+  const initialConduct = content.initial_conduct ?? content.initialConduct;
+  if (initialConduct !== undefined && initialConduct !== null) {
+    if (typeof initialConduct !== "string") {
+      throw logicError("validation", "Conduta inicial deve ser um texto quando informada.");
+    }
+    if (initialConduct.length > MAX_REASON_LEN) {
+      throw logicError("validation", "Conduta inicial excede o tamanho máximo.");
+    }
+  }
+  const conductActions = content.conduct_actions ?? content.conductActions;
+  if (conductActions !== undefined && conductActions !== null) {
+    if (!Array.isArray(conductActions)) {
+      throw logicError("validation", "Ações de conduta devem ser uma lista.");
+    }
+    for (const action of conductActions) {
+      if (typeof action !== "string" || !INCIDENT_CONDUCT_ACTIONS.includes(action as IncidentConductAction)) {
+        throw logicError("validation", `Ação de conduta inválida: ${action}`);
+      }
+    }
+  }
+  const hasImpact = content.has_operational_impact ?? content.hasOperationalImpact;
+  if (hasImpact !== undefined && hasImpact !== null && typeof hasImpact !== "boolean") {
+    throw logicError("validation", "has_operational_impact deve ser booleano.");
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Seams
 // ─────────────────────────────────────────────────────────────────────────────
@@ -292,7 +383,7 @@ function isHttpsError(err: unknown): err is HttpsError {
  * Anything unrecognised degrades to `internal` WITHOUT leaking its message, so
  * a raw TypeError or an internal detail never reaches a client.
  */
-function mapClinicalError(err: unknown): never {
+export function mapClinicalError(err: unknown): never {
   if (isHttpsError(err)) throw err;
 
   if (err instanceof ClinicalDomainError) {
@@ -449,7 +540,7 @@ const FORBIDDEN_PAYLOAD_KEYS = [
  * mutations: that is the AT-REST server-managed field, and accepting it would let
  * a caller rewrite the stored identity of the document it is mutating.
  */
-function rejectServerManagedInjection(
+export function rejectServerManagedInjection(
   data: JsonMap,
   allowedSelectors: readonly string[] = [],
 ): void {
@@ -771,7 +862,7 @@ function assertOccurredAt(raw: unknown, now: Date): Date {
  * Clinical has no such population, and accepting 0 would be a gratuitous
  * fail-open.
  */
-function parseExpectedRevision(raw: unknown): number {
+export function parseExpectedRevision(raw: unknown): number {
   if (raw === undefined || raw === null) {
     throw logicError(
       "validation",
@@ -834,7 +925,7 @@ function parseStoredRevision(raw: unknown): number {
  * `MAX_SAFE_INTEGER` a counter stops being exact, and an inexact concurrency
  * token is worse than a refused mutation.
  */
-function nextRevision(current: number): number {
+export function nextRevision(current: number): number {
   if (current >= Number.MAX_SAFE_INTEGER) {
     throw logicError(
       "integrity",
@@ -879,7 +970,7 @@ function receiptResultRevision(stored: JsonMap): number {
 }
 
 /** Stale precondition. NEVER retried automatically: the caller must re-read. */
-function assertFreshRevision(stored: number, expected: number): void {
+export function assertFreshRevision(stored: number, expected: number): void {
   if (stored !== expected) {
     throw logicError(
       "conflict",
@@ -1515,7 +1606,7 @@ export function matchClinicalReceipt(params: {
   return "replay";
 }
 
-function receiptPayload(params: {
+export function receiptPayload(params: {
   kind: string;
   operationType: string;
   operationId: string;
@@ -1754,6 +1845,17 @@ interface ParsedOpenCaseInput {
 }
 
 function parseOpenCaseInput(data: JsonMap, now: Date): ParsedOpenCaseInput {
+  const openingType = parseClinicalCaseOpeningType(
+    data.openingType ?? data.opening_type,
+  );
+  const eventType = parseClinicalEventType(data.eventType ?? data.event_type);
+  const payloadType = parsePayloadType(data.payloadType ?? data.payload_type);
+  const content = assertContent(data.content);
+
+  if (payloadType === "incident_v1") {
+    validateIncidentContent(content);
+  }
+
   return {
     dogId: assertDogId(data.dogId ?? data.dog_id),
     operationId: normalizeOperationId(
@@ -1762,16 +1864,14 @@ function parseOpenCaseInput(data: JsonMap, now: Date): ParsedOpenCaseInput {
     title: assertText(data.title, "title", MAX_CASE_TITLE_LEN),
     // Frozen domain parsers: unknown wire value is a rejected input, never
     // silently stored (`unknown_case_opening_type` / `unknown_event_type`).
-    openingType: parseClinicalCaseOpeningType(
-      data.openingType ?? data.opening_type,
-    ),
-    eventType: parseClinicalEventType(data.eventType ?? data.event_type),
+    openingType,
+    eventType,
     occurredAt: assertOccurredAt(data.occurredAt ?? data.occurred_at, now),
-    payloadType: parsePayloadType(data.payloadType ?? data.payload_type),
+    payloadType,
     payloadVersion: parsePayloadVersion(
       data.payloadVersion ?? data.payload_version,
     ),
-    content: assertContent(data.content),
+    content,
     professional: assertProfessional(data.professional),
     attachmentRefs: assertAttachmentRefs(
       data.attachmentRefs ?? data.attachment_refs,
@@ -2015,19 +2115,27 @@ function parseAppendEventInput(
   data: JsonMap,
   now: Date,
 ): ParsedAppendEventInput {
+  const eventType = parseClinicalEventType(data.eventType ?? data.event_type);
+  const payloadType = parsePayloadType(data.payloadType ?? data.payload_type);
+  const content = assertContent(data.content);
+
+  if (payloadType === "incident_v1") {
+    validateIncidentContent(content);
+  }
+
   return {
     dogId: assertDogId(data.dogId ?? data.dog_id),
     caseId: assertPathId(data.caseId ?? data.case_id, "caseId"),
     operationId: normalizeOperationId(
       data.idempotencyKey ?? data.operationId ?? data.operation_id,
     ),
-    eventType: parseClinicalEventType(data.eventType ?? data.event_type),
+    eventType,
     occurredAt: assertOccurredAt(data.occurredAt ?? data.occurred_at, now),
-    payloadType: parsePayloadType(data.payloadType ?? data.payload_type),
+    payloadType,
     payloadVersion: parsePayloadVersion(
       data.payloadVersion ?? data.payload_version,
     ),
-    content: assertContent(data.content),
+    content,
     professional: assertProfessional(data.professional),
     attachmentRefs: assertAttachmentRefs(
       data.attachmentRefs ?? data.attachment_refs,
@@ -3427,6 +3535,93 @@ export function parseReopenCaseRequest(
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Internal ClinicalCase transition core (CLINICAL-BE.MERGE-I1, Option A)
+//
+// SINGLE AUTHORITY over `clinical_status`. Specialized aggregates (Exam, and any
+// future Treatment/Procedure) MUST route their case transitions through this core
+// inside their OWN transaction instead of writing `clinical_status` themselves.
+// A second implementation is forbidden: the Exam writer previously mutated the
+// status inline with no OCC precondition and a `revision ?? 1` default, which is
+// exactly the class of defect a single authority removes.
+//
+// This is NOT callable-to-callable invocation — it is a pure, transaction-scoped
+// helper, so the caller's Exam write and the case transition stay atomic.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ClinicalCaseTransitionOutcome {
+  readonly previousStatus: ClinicalCaseStatus;
+  readonly resultingStatus: ClinicalCaseStatus;
+  readonly resultingRevision: number;
+}
+
+/**
+ * Stored-aggregate integrity followed by OCC freshness, in the frozen order.
+ *
+ * Integrity BEFORE stale: a corrupted aggregate must be reported as corruption,
+ * never masked as a stale-token conflict. A stored case without a valid
+ * `revision` fails closed here (F1.C1) — absence is corruption, never a default.
+ */
+export function assertClinicalCasePrecondition(
+  storedCase: JsonMap,
+  expectedRevision: number,
+): StoredCaseIntegrityResult {
+  const storedIntegrity = assertStoredCaseIntegrity(storedCase);
+  assertFreshRevision(storedIntegrity.revision, expectedRevision);
+  return storedIntegrity;
+}
+
+/**
+ * Applies one legal ClinicalCase status transition inside an open transaction.
+ *
+ * Preserves every W6 guarantee: stored integrity before stale, expected-revision
+ * validation, same-status rejection, terminal-destination rejection (terminals
+ * belong to discharge/cancel), the frozen domain transition matrix, and explicit
+ * `nextRevision` accounting. Receipt and audit writes stay with the CALLER, whose
+ * operation semantics differ (`transition_clinical_case` vs `request_exam`).
+ */
+export function applyClinicalCaseTransition(params: {
+  readonly tx: FirebaseFirestore.Transaction;
+  readonly caseDocRef: FirebaseFirestore.DocumentReference;
+  readonly storedCase: JsonMap;
+  readonly destination: ClinicalCaseStatus;
+  readonly expectedRevision: number;
+  readonly nowTimestamp: Timestamp;
+}): ClinicalCaseTransitionOutcome {
+  const storedIntegrity = assertClinicalCasePrecondition(
+    params.storedCase,
+    params.expectedRevision,
+  );
+
+  if (storedIntegrity.status === params.destination) {
+    throw logicError(
+      "conflict",
+      `Transição ${storedIntegrity.status} → ${params.destination} não permitida (mesmo status).`,
+    );
+  }
+  if (isTerminalCaseStatus(params.destination)) {
+    throw logicError(
+      "conflict",
+      `Transição genérica não aceita destino terminal (${params.destination}): use discharge ou cancel.`,
+    );
+  }
+  assertCaseTransition(storedIntegrity.status, params.destination);
+
+  const resultingRevision = nextRevision(storedIntegrity.revision);
+
+  params.tx.update(params.caseDocRef, {
+    clinical_status: params.destination,
+    revision: resultingRevision,
+    updated_at: params.nowTimestamp,
+  });
+
+  return {
+    previousStatus: storedIntegrity.status,
+    resultingStatus: params.destination,
+    resultingRevision,
+  };
+}
+
 export async function runHealthTransitionClinicalCase(
   request: CallableRequest,
   deps: ClinicalCaseCallableDeps,
@@ -3506,33 +3701,17 @@ export async function runHealthTransitionClinicalCase(
       }
       const storedCase = (caseSnap.data() ?? {}) as JsonMap;
 
-      // Stored aggregate integrity BEFORE stale
-      const storedIntegrity = assertStoredCaseIntegrity(storedCase);
-
-      // OCC freshness
-      assertFreshRevision(storedIntegrity.revision, input.expectedRevision);
-
-      // Command eligibility (10 active-to-active pairs only; no same status, no terminal destination)
-      if (storedIntegrity.status === destination) {
-        throw logicError(
-          "conflict",
-          `Transição ${storedIntegrity.status} → ${destination} não permitida (mesmo status).`,
-        );
-      }
-      if (isTerminalCaseStatus(destination)) {
-        throw logicError(
-          "conflict",
-          `Transição genérica não aceita destino terminal (${destination}): use discharge ou cancel.`,
-        );
-      }
-      assertCaseTransition(storedIntegrity.status, destination);
-
-      const resultingRevision = nextRevision(storedIntegrity.revision);
-
-      tx.update(cRef, {
-        clinical_status: destination,
-        revision: resultingRevision,
-        updated_at: nowTimestamp,
+      // SINGLE case-status authority (Option A): stored integrity → OCC freshness
+      // → same-status/terminal eligibility → frozen domain matrix → explicit
+      // revision accounting, all inside applyClinicalCaseTransition. The Exam
+      // writer reuses the SAME core, so no second transition path exists.
+      const {resultingRevision} = applyClinicalCaseTransition({
+        tx,
+        caseDocRef: cRef,
+        storedCase,
+        destination,
+        expectedRevision: input.expectedRevision,
+        nowTimestamp,
       });
 
       tx.set(

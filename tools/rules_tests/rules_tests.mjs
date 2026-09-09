@@ -44,6 +44,7 @@ function test(name, fn) {
 function auth(ra, claims = {}) {
   return testEnv.authenticatedContext(`uid-${ra}`, {
     email: `${ra}@gcm.com.br`,
+    ra,
     ...claims,
   });
 }
@@ -251,30 +252,57 @@ async function seedFirestore(seedFn) {
   });
 }
 
+async function seedLegacyDogAuthorization() {
+  await seedFirestore(async (adminDb) => {
+    await setDoc(doc(adminDb, 'access_profiles', 'operador_k9'), {
+      status: 'active',
+      scope: 'own_records',
+      permissions: {health: {view: true, create: true, edit: true}},
+    });
+    await setDoc(doc(adminDb, 'users', PRIMARY_RA), {
+      ra: PRIMARY_RA,
+      access_profile_id: 'operador_k9',
+      access_scope: 'own_records',
+    });
+    await setDoc(doc(adminDb, 'dogs', DOG_ID), {
+      id: DOG_ID,
+      name: 'Bono',
+      conductorRa: PRIMARY_RA,
+      conductor_ra: PRIMARY_RA,
+      status: 'active',
+    });
+  });
+}
+
 async function clearAll() {
   await testEnv.clearFirestore();
   if (typeof testEnv.clearStorage === 'function') {
     await testEnv.clearStorage();
   }
+  await seedLegacyDogAuthorization();
 }
 
-test('treino sem turno ativo e recusado; com turno ativo e aceito', async () => {
+test('treino sem turno ativo e recusado; turno operacional com K9 é backend-only', async () => {
   const db = dbFor(PRIMARY_RA);
 
   await assertFails(
     setDoc(doc(db, 'trainings/no-shift'), trainingPayload()),
   );
 
-  await assertSucceeds(
+  await assertFails(
     setDoc(doc(db, 'active_shifts', PRIMARY_RA), activeShiftPayload()),
   );
+
+  await seedFirestore(async (adminDb) => {
+    await setDoc(doc(adminDb, 'active_shifts', PRIMARY_RA), activeShiftPayload());
+  });
 
   await assertSucceeds(
     setDoc(doc(db, 'trainings/with-shift'), trainingPayload()),
   );
 });
 
-test('turno ativo so pode ser gravado pelo proprio RA autenticado', async () => {
+test('turno operacional com K9 é backend-only, independentemente do RA', async () => {
   await assertFails(
     setDoc(
       doc(dbFor(PRIMARY_RA), 'active_shifts', MEMBER_RA),
@@ -282,7 +310,7 @@ test('turno ativo so pode ser gravado pelo proprio RA autenticado', async () => 
     ),
   );
 
-  await assertSucceeds(
+  await assertFails(
     setDoc(
       doc(dbFor(PRIMARY_RA), 'active_shifts', PRIMARY_RA),
       activeShiftPayload(PRIMARY_RA),
@@ -290,7 +318,7 @@ test('turno ativo so pode ser gravado pelo proprio RA autenticado', async () => 
   );
 });
 
-test('inicio de turno com viatura pode reabrir guarnicao encerrada', async () => {
+test('inicio de turno com K9 e viatura é decidido pelo backend', async () => {
   const db = dbFor(PRIMARY_RA);
 
   await seedFirestore(async (adminDb) => {
@@ -371,6 +399,7 @@ test('inicio de turno com viatura pode reabrir guarnicao encerrada', async () =>
     startedAt: now(),
     endedAt: null,
     dogSwitches: [],
+    vehicleChanges: [],
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -413,15 +442,18 @@ test('inicio de turno com viatura pode reabrir guarnicao encerrada', async () =>
     responded_at: serverTimestamp(),
   }, {merge: true});
 
-  await assertSucceeds(batch.commit());
+  // A abertura/reabertura com associação operacional de K9 não pode ser
+  // reproduzida por um batch client-side. O backend deve semear as decisões
+  // de active_shifts/vehicle_crews/members; o cliente não pode forjá-las.
+  await assertFails(batch.commit());
 });
 
 test('treino para K9 diferente do turno ativo e recusado', async () => {
   const db = dbFor(PRIMARY_RA);
 
-  await assertSucceeds(
-    setDoc(doc(db, 'active_shifts', PRIMARY_RA), activeShiftPayload()),
-  );
+  await seedFirestore(async (adminDb) => {
+    await setDoc(doc(adminDb, 'active_shifts', PRIMARY_RA), activeShiftPayload());
+  });
 
   await assertFails(
     setDoc(doc(db, 'trainings/wrong-dog'), trainingPayload(PRIMARY_RA, 'rex')),
@@ -595,6 +627,15 @@ test('progressao canonica de treino exige status valido e auditoria', async () =
 
 test('modulo concluido e imutavel e correcao exige trilha de instrutor', async () => {
   await seedFirestore(async (seedDb) => {
+    await setDoc(doc(seedDb, 'access_profiles', 'instrutor_global'), {
+      status: 'active',
+      scope: 'global',
+      permissions: {},
+    });
+    await setDoc(doc(seedDb, 'users', MEMBER_RA), {
+      ra: MEMBER_RA,
+      access_profile_id: 'instrutor_global',
+    });
     await setDoc(doc(seedDb, 'dogs/bono/training/busca_captura'), {
       ...trainingProgressPayload({
         status: 'operational',
@@ -1073,9 +1114,9 @@ test('promotion_requests: condutor solicita e Instrutor K9 decide', async () => 
 test('sessao de trilha B&C grava na subcollection do cao com dog coerente', async () => {
   const db = dbFor(PRIMARY_RA);
 
-  await assertSucceeds(
-    setDoc(doc(db, 'active_shifts', PRIMARY_RA), activeShiftPayload()),
-  );
+  await seedFirestore(async (adminDb) => {
+    await setDoc(doc(adminDb, 'active_shifts', PRIMARY_RA), activeShiftPayload());
+  });
 
   await assertSucceeds(
     setDoc(doc(db, 'dogs/bono/training_sessions/bc-track-1'), {
@@ -1129,6 +1170,8 @@ test('sessao B&C offline pode sincronizar sem turno ativo pelo proprio condutor'
     await setDoc(doc(adminDb, 'dogs/bono'), {
       id: DOG_ID,
       name: 'Bono',
+      conductorRa: PRIMARY_RA,
+      conductor_ra: PRIMARY_RA,
       audit_trail: audit(),
     });
   });

@@ -4913,7 +4913,433 @@ async function testLifecycleCaseOnlyInvariants(): Promise<void> {
   );
 }
 
+/**
+ * CLINICAL-BE.MERGE-I1 §22.11 — the main-only administrative callables must
+ * survive the Clinical convergence merge.
+ *
+ * A two-tip diff between the two Front 20 heads rendered these five as
+ * "deletions", because they were added on main after the merge base and never
+ * existed on the canonical branch. Reading that diff literally — or resolving the
+ * merge from the canonical side — would silently drop five callables, one of which
+ * (adminPatchHumanPersonnel) is deployed in production. Source-level proof,
+ * because a behavioural test in this suite would never exercise them.
+ */
+async function testAdminCallablesSurviveMerge() {
+  const index = readSource("index.ts");
+  const expected = [
+    "adminCreateHuman",
+    "adminDeactivateHuman",
+    "adminReactivateHuman",
+    "adminPatchHumanPersonnel",
+    "adminPatchK9Identity",
+  ];
+  for (const name of expected) {
+    assert.ok(
+      new RegExp(`^export const ${name} = onCall`, "m").test(index),
+      `callable administrativo ${name} deve permanecer exportado após o merge`,
+    );
+  }
+  // Os módulos que os implementam também devem existir.
+  for (const mod of [
+    "admin_create_human.ts",
+    "admin_human_lifecycle.ts",
+    "admin_patch_human_personnel.ts",
+    "admin_patch_k9_identity.ts",
+    "auth_error_classification.ts",
+  ]) {
+    assert.ok(readSource(mod).length > 0, `módulo ${mod} deve sobreviver ao merge`);
+  }
+
+  // E o conjunto clínico + exame precisa coexistir com eles.
+  for (const name of [
+    "healthOpenClinicalCase", "healthAppendClinicalEvent", "healthFinalizeClinicalEvent",
+    "healthCancelClinicalEvent", "healthAmendClinicalEvent", "healthTransitionClinicalCase",
+    "healthDischargeClinicalCase", "healthCancelClinicalCase", "healthReopenClinicalCase",
+    "healthRequestExam", "healthRecordExamCollection", "healthRecordExamResult",
+    "healthRecordExamInterpretation", "healthAssessExamImpact", "healthCancelExam",
+  ]) {
+    assert.ok(
+      new RegExp(`^export const ${name} = onCall`, "m").test(index),
+      `callable ${name} deve estar exportado no head único`,
+    );
+  }
+}
+
+/**
+ * CLINICAL-BE.MERGE-I1 §22.12 — the Front 30 Web reader contract.
+ *
+ * `/health/clinical` parses `dogs/{dogId}/clinical_cases/{caseId}` and marks a
+ * case `partial` unless all EIGHT required fields are present and well formed,
+ * with the actor as `{uid, name, internal_role}`. Front 30 is frozen and must not
+ * be changed, so this asserts the WRITER keeps its side of that contract: a case
+ * opened here must parse as `complete` on the Web.
+ */
+async function testFront30RequiredCaseShape() {
+  const db = dbWithDog();
+  const res = (await runHealthOpenClinicalCase(
+    mockRequest(validOpen),
+    depsFor({db}),
+  )) as JsonMap;
+
+  const caseDoc = db._store.get(
+    `dogs/dog-1/clinical_cases/${res.case_id as string}`,
+  ) as JsonMap;
+  assert.ok(caseDoc, "caso persistido");
+
+  // 1..8 — obrigatórios para o parser da Front 30.
+  const required = [
+    "clinical_status",
+    "title",
+    "opened_at",
+    "opened_by",
+    "recorded_by",
+    "opening_event_id",
+    "opening_type",
+    "schema_version",
+  ];
+  for (const field of required) {
+    assert.ok(
+      caseDoc[field] !== undefined && caseDoc[field] !== null && caseDoc[field] !== "",
+      `campo requerido pela Front 30 ausente: ${field}`,
+    );
+  }
+
+  // Vocabulários que a Front 30 reconhece (fora deles ela degrada para partial).
+  assert.ok(
+    ["open", "under_investigation", "under_treatment", "monitoring", "discharged", "cancelled"]
+      .includes(caseDoc.clinical_status as string),
+    "clinical_status precisa estar no vocabulário da Front 30",
+  );
+  assert.ok(
+    ["incident", "consultation", "preventive", "administrative"]
+      .includes(caseDoc.opening_type as string),
+    "opening_type precisa estar no vocabulário da Front 30",
+  );
+  assert.strictEqual(typeof caseDoc.schema_version, "number", "schema_version numérico");
+
+  // Envelope de ator: uid/name/internal_role, os três preenchidos — qualquer
+  // subcampo ausente vira `incomplete_actor` na Front 30.
+  for (const actorField of ["opened_by", "recorded_by"]) {
+    const actor = caseDoc[actorField] as JsonMap;
+    assert.strictEqual(typeof actor, "object", `${actorField} deve ser objeto`);
+    for (const sub of ["uid", "name", "internal_role"]) {
+      assert.ok(
+        typeof actor[sub] === "string" && (actor[sub] as string).trim().length > 0,
+        `${actorField}.${sub} deve ser string não vazia`,
+      );
+    }
+  }
+}
+
+async function testIncidentOpenAndAppendSuccess() {
+  const db = dbWithDog();
+  const deps = depsFor({db});
+
+  const incidentOpenCmd: JsonMap = {
+    dogId: "dog-1",
+    operationId: "op-inc-open-1",
+    title: "Intercorrência em Treino",
+    openingType: "incident",
+    eventType: "incident",
+    occurredAt: "2026-08-15T10:00:00.000Z",
+    payloadType: "incident_v1",
+    payloadVersion: 1,
+    content: {
+      category: "trauma",
+      severity: "moderate",
+      description: "Corte na pata dianteira direita durante transposição de obstáculo",
+      initial_conduct: "Curativo de emergência e limpeza com soro fisiológico",
+      conduct_actions: ["first_aid_applied", "veterinary_referral"],
+      has_operational_impact: true,
+    },
+  };
+
+  const openRes = await runHealthOpenClinicalCase(mockRequest(incidentOpenCmd), deps);
+  assert.strictEqual(openRes.dogId, "dog-1");
+  assert.strictEqual(openRes.wasNoOp, false);
+  const caseId = openRes.caseId as string;
+  const openingEventId = openRes.openingEventId as string;
+
+  // Verify Case Doc
+  const caseDoc = db._store.get(`dogs/dog-1/clinical_cases/${caseId}`)!;
+  assert.ok(caseDoc, "Caso deve existir");
+  assert.strictEqual(caseDoc.opening_type, "incident");
+  assert.strictEqual(caseDoc.clinical_status, "open");
+  assert.strictEqual(caseDoc.event_count, 1);
+
+  // Verify Event Doc
+  const eventDoc = db._store.get(`dogs/dog-1/clinical_cases/${caseId}/clinical_events/${openingEventId}`)!;
+  assert.ok(eventDoc, "Evento de abertura deve existir");
+  assert.strictEqual(eventDoc.event_type, "incident");
+  assert.strictEqual(eventDoc.payload_type, "incident_v1");
+  assert.strictEqual(eventDoc.status, "draft");
+  const content = eventDoc.content as JsonMap;
+  assert.strictEqual(content.category, "trauma");
+  assert.strictEqual(content.severity, "moderate");
+  assert.strictEqual(content.description, "Corte na pata dianteira direita durante transposição de obstáculo");
+
+  // Replay test (idempotency)
+  const replayRes = await runHealthOpenClinicalCase(mockRequest(incidentOpenCmd), deps);
+  assert.strictEqual(replayRes.caseId, caseId);
+  assert.strictEqual(replayRes.openingEventId, openingEventId);
+  assert.strictEqual(replayRes.wasNoOp, true);
+
+  // Append incident event to existing case
+  const incidentAppendCmd: JsonMap = {
+    dogId: "dog-1",
+    caseId,
+    operationId: "op-inc-app-1",
+    eventType: "incident",
+    occurredAt: "2026-08-15T11:00:00.000Z",
+    payloadType: "incident_v1",
+    payloadVersion: 1,
+    content: {
+      category: "heatstroke",
+      severity: "severe",
+      description: "Sinais de hipertermia no retorno ao canil",
+      initial_conduct: "Resfriamento ativo com água morna e hidratação",
+    },
+  };
+
+  const appendRes = await runHealthAppendClinicalEvent(mockRequest(incidentAppendCmd), deps);
+  assert.strictEqual(appendRes.caseId, caseId);
+  assert.strictEqual(appendRes.wasNoOp, false);
+  const secondEventId = appendRes.eventId as string;
+  assert.notStrictEqual(secondEventId, openingEventId);
+
+  const updatedCaseDoc = db._store.get(`dogs/dog-1/clinical_cases/${caseId}`)!;
+  assert.ok(updatedCaseDoc.event_count, "event_count deve estar presente");
+  assert.ok(updatedCaseDoc.last_event_at, "last_event_at deve estar presente");
+
+  // Finalize event (draft -> final)
+  const finalizeRes = await runHealthFinalizeClinicalEvent(
+    mockRequest({
+      dogId: "dog-1",
+      caseId,
+      eventId: openingEventId,
+      operationId: "op-inc-fin-1",
+      expectedRevision: 1,
+    }),
+    deps,
+  );
+  assert.strictEqual(finalizeRes.status, "final");
+  const finalEventDoc = db._store.get(`dogs/dog-1/clinical_cases/${caseId}/clinical_events/${openingEventId}`)!;
+  assert.strictEqual(finalEventDoc.status, "final");
+}
+
+async function testIncidentValidations() {
+  const db = dbWithDog();
+  const deps = depsFor({db});
+
+  const baseContent: JsonMap = {
+    category: "trauma",
+    severity: "mild",
+    description: "Escoriação leve",
+  };
+
+  const base: JsonMap = {
+    dogId: "dog-1",
+    operationId: "op-val-1",
+    title: "Intercorrência Teste",
+    openingType: "incident",
+    eventType: "incident",
+    occurredAt: "2026-08-15T10:00:00.000Z",
+    payloadType: "incident_v1",
+    payloadVersion: 1,
+    content: baseContent,
+  };
+
+  // Missing dog
+  await expectReject(
+    () => runHealthOpenClinicalCase(mockRequest({...base, dogId: ""}), deps),
+    "validation",
+    "missing dogId",
+  );
+
+  // Invalid category
+  await expectReject(
+    () => runHealthOpenClinicalCase(
+      mockRequest({
+        ...base,
+        operationId: "op-val-cat",
+        content: {...baseContent, category: "inexistente"},
+      }),
+      deps,
+    ),
+    "validation",
+    "invalid category",
+    /Categoria de intercorrência inválida/,
+  );
+
+  // Invalid severity
+  await expectReject(
+    () => runHealthOpenClinicalCase(
+      mockRequest({
+        ...base,
+        operationId: "op-val-sev",
+        content: {...baseContent, severity: "catastrofica"},
+      }),
+      deps,
+    ),
+    "validation",
+    "invalid severity",
+    /Gravidade de intercorrência inválida/,
+  );
+
+  // Empty description
+  await expectReject(
+    () => runHealthOpenClinicalCase(
+      mockRequest({
+        ...base,
+        operationId: "op-val-desc",
+        content: {...baseContent, description: "   "},
+      }),
+      deps,
+    ),
+    "validation",
+    "empty description",
+    /Descrição da intercorrência é obrigatória/,
+  );
+
+  // Invalid initial conduct type
+  await expectReject(
+    () => runHealthOpenClinicalCase(
+      mockRequest({
+        ...base,
+        operationId: "op-val-cond",
+        content: {...baseContent, initial_conduct: 12345},
+      }),
+      deps,
+    ),
+    "validation",
+    "invalid initial conduct",
+    /Conduta inicial deve ser um texto/,
+  );
+
+  // Invalid conduct actions (not an array)
+  await expectReject(
+    () => runHealthOpenClinicalCase(
+      mockRequest({
+        ...base,
+        operationId: "op-val-act-type",
+        content: {...baseContent, conduct_actions: "invalid_not_array"},
+      }),
+      deps,
+    ),
+    "validation",
+    "invalid conduct actions type",
+    /Ações de conduta devem ser uma lista/,
+  );
+
+  // Invalid conduct action item
+  await expectReject(
+    () => runHealthOpenClinicalCase(
+      mockRequest({
+        ...base,
+        operationId: "op-val-act-item",
+        content: {...baseContent, conduct_actions: ["first_aid_applied", "acao_desconhecida"]},
+      }),
+      deps,
+    ),
+    "validation",
+    "invalid conduct action item",
+    /Ação de conduta inválida/,
+  );
+
+  // Invalid has_operational_impact type
+  await expectReject(
+    () => runHealthOpenClinicalCase(
+      mockRequest({
+        ...base,
+        operationId: "op-val-impact-type",
+        content: {...baseContent, has_operational_impact: "sim"},
+      }),
+      deps,
+    ),
+    "validation",
+    "invalid has_operational_impact type",
+    /has_operational_impact deve ser booleano/,
+  );
+}
+
+async function testIncidentGuardsAndOCC() {
+  const db = dbWithDog();
+  const validCmd: JsonMap = {
+    dogId: "dog-1",
+    operationId: "op-guard-1",
+    title: "Intercorrência Guard",
+    openingType: "incident",
+    eventType: "incident",
+    occurredAt: "2026-08-15T10:00:00.000Z",
+    payloadType: "incident_v1",
+    payloadVersion: 1,
+    content: {
+      category: "allergic",
+      severity: "mild",
+      description: "Edema labial após picada",
+    },
+  };
+
+  // Capability absent
+  await expectReject(
+    () => runHealthOpenClinicalCase(mockRequest(validCmd), depsFor({db, allowRecord: false})),
+    "permission-denied",
+    "capability absent",
+  );
+
+  // Dog access denied
+  await expectReject(
+    () => runHealthOpenClinicalCase(mockRequest(validCmd), depsFor({db, dogAccess: false})),
+    "permission-denied",
+    "dog access denied",
+  );
+
+  // Terminal case rejected on append
+  const dischargedDb = dbWithDog({
+    "dogs/dog-1/clinical_cases/cc-closed": {
+      clinical_status: "discharged",
+      schema_version: 1,
+      revision: 1,
+      opened_at: new Timestamp(100, 0),
+    },
+  });
+  await expectReject(
+    () => runHealthAppendClinicalEvent(
+      mockRequest({
+        ...validCmd,
+        caseId: "cc-closed",
+        operationId: "op-guard-term",
+      }),
+      depsFor({db: dischargedDb}),
+    ),
+    "conflict",
+    "terminal case rejected",
+  );
+
+  // Idempotency conflict
+  const deps = depsFor({db});
+  await runHealthOpenClinicalCase(mockRequest(validCmd), deps);
+  await expectReject(
+    () => runHealthOpenClinicalCase(
+      mockRequest({
+        ...validCmd,
+        content: {
+          category: "trauma",
+          severity: "severe",
+          description: "Outro conteúdo conflitante",
+        },
+      }),
+      deps,
+    ),
+    "idempotency-conflict",
+    "idempotency conflict",
+  );
+}
+
 const tests: Array<[string, () => Promise<void>]> = [
+  ["INCIDENT abertura e append com sucesso e idempotência", testIncidentOpenAndAppendSuccess],
+  ["INCIDENT validações semânticas de categoria, gravidade e descrição", testIncidentValidations],
+  ["INCIDENT guards de autorização, acesso ao K9 e idempotency-conflict", testIncidentGuardsAndOCC],
   ["OPEN sucesso e shape canônico", testOpenSuccess],
   ["OPEN replay sem duplicação", testOpenReplayNoDuplicate],
   ["OPEN conflito de idempotência", testOpenIdempotencyConflict],
@@ -4973,6 +5399,8 @@ const tests: Array<[string, () => Promise<void>]> = [
   ["LIFECYCLE integridade armazenada falha fechada antes de OCC", testLifecycleStoredIntegrityFailClosed],
   ["LIFECYCLE matriz de autorização, capabilities e guards", testLifecycleGuardsAndAuthorization],
   ["LIFECYCLE invariantes case-only (sem eventos extras)", testLifecycleCaseOnlyInvariants],
+  ["MERGE callables administrativos da main sobrevivem", testAdminCallablesSurviveMerge],
+  ["MERGE contrato de leitura da Front 30 preservado", testFront30RequiredCaseShape],
 ];
 
 (async () => {

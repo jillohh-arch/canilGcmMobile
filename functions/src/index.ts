@@ -100,6 +100,27 @@ import {
   type ClinicalCaseCallableDeps,
 } from "./clinical_case_callables";
 import {
+  type ExamCaller,
+  type ExamProcessCallableDeps,
+  runHealthRequestExam,
+  runHealthRecordExamCollection,
+  runHealthRecordExamResult,
+  runHealthRecordExamInterpretation,
+  runHealthAssessExamImpact,
+  runHealthCancelExam,
+} from "./exam_process_callables";
+import {
+  type TreatmentCaller,
+  type TreatmentProtocolCallableDeps,
+  runHealthCreateTreatmentProtocol,
+  runHealthPauseTreatmentProtocol,
+  runHealthResumeTreatmentProtocol,
+  runHealthCompleteTreatmentProtocol,
+  runHealthCancelTreatmentProtocol,
+  runHealthAdministerTreatmentDose,
+  runHealthSkipTreatmentDose,
+} from "./treatment_protocol_callables";
+import {
   RestrictionCaller,
   runHealthRestrictionCancel,
   runHealthRestrictionEnd,
@@ -129,6 +150,7 @@ import {
   healthReadinessProjectHealthEvent,
   healthReadinessProjectNutritionPlan,
   healthReadinessProjectRestriction,
+  healthReadinessProjectClinicalEvent,
 } from "./health_readiness_triggers";
 import {runSystemAuthoritativeTimeNow} from "./system_authoritative_time_callable";
 import {
@@ -8997,6 +9019,200 @@ export const healthReopenClinicalCase = onCall({region}, async (request) => {
   return runHealthReopenClinicalCase(request, clinicalCaseDeps);
 });
 
+function toExamCaller(caller: CallerIdentity): ExamCaller {
+  return {
+    uid: caller.uid,
+    email: caller.email,
+    ra: caller.ra,
+    name: caller.name,
+  };
+}
+
+const examProcessDeps: ExamProcessCallableDeps = {
+  db,
+  requireRequestExam: async (auth) => {
+    return toExamCaller(await requireClinicalCapability(auth, "record_clinical"));
+  },
+  requireRecordClinical: async (auth) => {
+    return toExamCaller(await requireClinicalCapability(auth, "record_clinical"));
+  },
+  requireInterpretExam: async (auth) => {
+    return toExamCaller(await requireClinicalCapability(auth, "finalize_clinical"));
+  },
+  requireManageClinicalCase: async (auth) => {
+    return toExamCaller(await requireClinicalCapability(auth, "manage_clinical_case"));
+  },
+  requireDogAccess: async (auth, caller, dogId, dog) => {
+    await requireDogRecordAccess(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+      dogId,
+      dog,
+    );
+  },
+  isAdministrativeAuthority: async (auth, caller) => {
+    return isAdministrativeHealthAuthority(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+    );
+  },
+};
+
+/**
+ * F20.EXAM-V1: Solicita um exame clínico para um caso existente.
+ */
+export const healthRequestExam = onCall({region}, async (request) => {
+  return runHealthRequestExam(request, examProcessDeps);
+});
+
+/**
+ * F20.EXAM-V1: Registra coleta física de material do exame.
+ */
+export const healthRecordExamCollection = onCall({region}, async (request) => {
+  return runHealthRecordExamCollection(request, examProcessDeps);
+});
+
+/**
+ * F20.EXAM-V1: Registra laudo / resultado técnico recebido do laboratório.
+ */
+export const healthRecordExamResult = onCall({region}, async (request) => {
+  return runHealthRecordExamResult(request, examProcessDeps);
+});
+
+/**
+ * F20.EXAM-V1: Registra interpretação clínica emitida por veterinário responsável.
+ */
+export const healthRecordExamInterpretation = onCall({region}, async (request) => {
+  return runHealthRecordExamInterpretation(request, examProcessDeps);
+});
+
+/**
+ * F20.EXAM-V1: Registra avaliação de impacto operacional do exame.
+ */
+export const healthAssessExamImpact = onCall({region}, async (request) => {
+  return runHealthAssessExamImpact(request, examProcessDeps);
+});
+
+/**
+ * F20.EXAM-V1: Cancela exame com justificativa obrigatória.
+ */
+export const healthCancelExam = onCall({region}, async (request) => {
+  return runHealthCancelExam(request, examProcessDeps);
+});
+
+function toTreatmentCaller(caller: CallerIdentity): TreatmentCaller {
+  return {
+    uid: caller.uid,
+    email: caller.email,
+    ra: caller.ra,
+    name: caller.name,
+  };
+}
+
+const treatmentProtocolDeps: TreatmentProtocolCallableDeps = {
+  db,
+  requireRecordClinical: async (auth) => {
+    return toTreatmentCaller(await requireClinicalCapability(auth, "record_clinical"));
+  },
+  requireFinalizeClinical: async (auth) => {
+    return toTreatmentCaller(await requireClinicalCapability(auth, "finalize_clinical"));
+  },
+  requireAmendClinical: async (auth) => {
+    return toTreatmentCaller(await requireClinicalCapability(auth, "amend_clinical"));
+  },
+  requireRecordRoutine: async (auth) => {
+    try {
+      const caller = await requireAccessPermission(auth, "health", "record_routine");
+      return toTreatmentCaller(caller);
+    } catch {
+      return toTreatmentCaller(await requireClinicalCapability(auth, "record_clinical"));
+    }
+  },
+  requireDogAccess: async (auth, caller, dogId, dog) => {
+    await requireDogRecordAccess(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+      dogId,
+      dog,
+    );
+  },
+  isAdministrativeAuthority: async (auth, caller) => {
+    return isAdministrativeHealthAuthority(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+    );
+  },
+  hasOtherOpenCaseSchedule: async (dogId, caseId, excludeProtocolId) => {
+    const snap = await db
+      .collection("dogs")
+      .doc(dogId)
+      .collection("health_schedule")
+      .where("case_id", "==", caseId)
+      .where("lifecycle_status", "==", "open")
+      .limit(20)
+      .get();
+    if (snap.empty) {
+      return false;
+    }
+    for (const doc of snap.docs) {
+      const data = doc.data();
+      if (!excludeProtocolId || data.source_id !== excludeProtocolId) {
+        return true;
+      }
+    }
+    return false;
+  },
+};
+
+/**
+ * F20.TREATMENT-V1: Cria e ativa um protocolo de tratamento (prescrição externa).
+ */
+export const healthCreateTreatmentProtocol = onCall({region}, async (request) => {
+  return runHealthCreateTreatmentProtocol(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Pausa protocolo de tratamento com motivo obrigatório.
+ */
+export const healthPauseTreatmentProtocol = onCall({region}, async (request) => {
+  return runHealthPauseTreatmentProtocol(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Retoma protocolo de tratamento previamente pausado.
+ */
+export const healthResumeTreatmentProtocol = onCall({region}, async (request) => {
+  return runHealthResumeTreatmentProtocol(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Conclui protocolo de tratamento e atualiza ClinicalCase para monitoring.
+ */
+export const healthCompleteTreatmentProtocol = onCall({region}, async (request) => {
+  return runHealthCompleteTreatmentProtocol(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Cancela protocolo de tratamento com justificativa obrigatória.
+ */
+export const healthCancelTreatmentProtocol = onCall({region}, async (request) => {
+  return runHealthCancelTreatmentProtocol(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Registra administração de dose com doseId determinístico e idempotência.
+ */
+export const healthAdministerTreatmentDose = onCall({region}, async (request) => {
+  return runHealthAdministerTreatmentDose(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Registra dose pulada com justificativa obrigatória.
+ */
+export const healthSkipTreatmentDose = onCall({region}, async (request) => {
+  return runHealthSkipTreatmentDose(request, treatmentProtocolDeps);
+});
+
 function toRestrictionCaller(caller: CallerIdentity): RestrictionCaller {
   return {
     uid: caller.uid,
@@ -9313,6 +9529,10 @@ export {healthReadinessProjectNutritionPlan};
 
 /** Readiness trigger — fires on any operational_restrictions write. */
 export {healthReadinessProjectRestriction};
+
+/** Readiness trigger — fires on any clinical_events write (canonical consultation). */
+export {healthReadinessProjectClinicalEvent};
+
 
 
 // =============================================================================

@@ -58,6 +58,8 @@ export interface ProjectorLogger {
 export interface ProjectorFirestore {
   /** Reads a whole subcollection under a dog. */
   readSubcollection: (dogId: string, collection: string) => Promise<RawQuery>;
+  /** Reads all clinical_events under dogs/{dogId}/clinical_cases. */
+  readClinicalEvents?: (dogId: string) => Promise<RawQuery>;
   /** Reads `dogs/{dogId}/health_summary/current`, or null when absent. */
   readCurrentSummary: (
     dogId: string,
@@ -175,18 +177,24 @@ export async function readReadinessEvidence(
 ): Promise<ReadinessEvidenceBundle> {
   assertSafeDogId(dogId);
 
+  const clinicalEventsPromise = deps.firestore.readClinicalEvents
+    ? deps.firestore.readClinicalEvents(dogId)
+    : Promise.resolve({kind: "docs" as const, docs: []});
+
   const [
     weightQuery,
     canonicalVaccinationQuery,
     healthEventsQuery,
     nutritionQuery,
     restrictionsQuery,
+    clinicalEventsQuery,
   ] = await Promise.all([
     deps.firestore.readSubcollection(dogId, WEIGHT_RECORDS),
     deps.firestore.readSubcollection(dogId, VACCINATION_RECORDS),
     deps.firestore.readSubcollection(dogId, HEALTH_EVENTS),
     deps.firestore.readSubcollection(dogId, NUTRITION_PLANS),
     deps.firestore.readSubcollection(dogId, OPERATIONAL_RESTRICTIONS),
+    clinicalEventsPromise,
   ]);
 
   const latestWeightAt = resolveWeightEvidence(weightQuery, dogId);
@@ -194,7 +202,10 @@ export async function readReadinessEvidence(
     canonicalVaccinationQuery,
     healthEventsQuery,
   );
-  const latestConsultationAt = resolveConsultationEvidence(healthEventsQuery);
+  const latestConsultationAt = resolveConsultationEvidence(
+    clinicalEventsQuery,
+    healthEventsQuery,
+  );
   const nutrition = resolveNutritionEvidence(nutritionQuery);
   const latestExamAt = resolveExamEvidence(healthEventsQuery);
   const restrictions = resolveRestrictionsEvidence(restrictionsQuery);
