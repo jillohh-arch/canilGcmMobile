@@ -12,18 +12,23 @@ import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmode
 import 'package:canil_gcm/features/training/data/detection_service.dart';
 import 'package:canil_gcm/features/training/domain/detection/detection_formation_session.dart';
 import 'package:canil_gcm/features/training/domain/detection/detection_line.dart';
+import 'dart:async';
+import 'package:canil_gcm/features/training/data/training_program_service.dart';
+import 'package:canil_gcm/features/training/domain/training_program.dart';
 import 'package:canil_gcm/features/training/domain/detection/detection_phase_config.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 
 class DetectionFormationScreen extends StatefulWidget {
   final Dog dog;
   final DetectionService? service;
+  final TrainingProgramService? programService;
   final String? initialLineType;
 
   const DetectionFormationScreen({
     super.key,
     required this.dog,
     this.service,
+    this.programService,
     this.initialLineType,
   });
 
@@ -44,6 +49,9 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
   static const _mutedDark = AppTheme.textMuted;
 
   late final DetectionService _service;
+  late final TrainingProgramService _programService;
+  StreamSubscription<TrainingProgress>? _progressSub;
+  TrainingProgress? _faroProgress;
 
   bool _loading = true;
   bool _saving = false;
@@ -65,7 +73,27 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
   void initState() {
     super.initState();
     _service = widget.service ?? DetectionService();
+    _programService = widget.programService ??
+        TrainingProgramService(firestore: _service.firestore);
+    _subscribeProgress();
     Future.microtask(_loadLines);
+  }
+
+  void _subscribeProgress() {
+    _progressSub = _programService
+        .watchProgress(widget.dog.id, 'faro_deteccao')
+        .listen((progress) {
+      if (!mounted) return;
+      setState(() {
+        _faroProgress = progress;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _progressSub?.cancel();
+    super.dispose();
   }
 
   @override
@@ -146,8 +174,9 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
     return Column(
       children: [
         _buildHeader(
-          title: 'Formação · Detecção',
-          subtitle: '${widget.dog.name} · selecione a fase',
+          title: _faroProgress?.methodologyDisplayName ?? 'Formação · Detecção',
+          subtitle:
+              '${widget.dog.name} · v${_faroProgress?.methodologyVersion ?? 1} · selecione a fase',
           onBack: () => Navigator.of(context).pop(),
         ),
         Expanded(
@@ -345,7 +374,7 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
             children: [
               Expanded(
                 child: Text(
-                  'Progresso no protocolo',
+                  '${_faroProgress?.methodologyDisplayName ?? 'Método Ragonha'} · v${_faroProgress?.methodologyVersion ?? 1}',
                   style: GoogleFonts.inter(
                     color: AppTheme.textPrimary,
                     fontSize: 13,
@@ -1421,6 +1450,11 @@ class _DetectionFormationScreenState extends State<DetectionFormationScreen> {
             odorMaterial: _odorMaterial,
             handlerId: actor.ra,
             handlerName: actor.name,
+            programId: _faroProgress?.programId,
+            programVersionId: _faroProgress?.programVersionId,
+            methodologyFamilyId: _faroProgress?.methodologyFamilyId,
+            methodologyDisplayName: _faroProgress?.methodologyDisplayName,
+            methodologyVersion: _faroProgress?.methodologyVersion,
           );
       final recorder = DetectionSessionRecorder(
         phase: phase,

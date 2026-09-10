@@ -212,7 +212,58 @@ void main() {
     expect(data['methodology_version'], 2);
   });
 
-  test('DetectionFormationSession.toJson stamps methodology lineage stamps', () {
+  test('DetectionFormationSession.toJson with assigned v3 stamps v3 and NOT v1', () {
+    final session = DetectionFormationSession(
+      programId: 'ragonha-v3',
+      programVersionId: 'ragonha-v3',
+      methodologyFamilyId: 'ragonha',
+      methodologyDisplayName: 'Método Ragonha v3',
+      methodologyVersion: 3,
+      dogId: 'zeus',
+      dogName: 'Zeus',
+      lineId: 'linear_1',
+      lineName: 'Linear 1',
+      lineType: 'linear',
+      phase: 'phase_1',
+      phaseName: 'Fase 1',
+      boxCount: 6,
+      odorPositionMode: 'manual',
+      usedBall: true,
+      odorMaterial: 'nose_mp',
+      status: 'completed_by_criterion',
+      startedAt: DateTime(2026, 9, 9, 12, 0),
+      durationSeconds: 180,
+      repetitions: const [],
+      totalReps: 5,
+      longestStreak: 5,
+      currentStreak: 5,
+      criterionMet: true,
+      phaseAdvanced: true,
+      handlerId: 'RA 9999',
+      handlerName: 'Condutor Teste',
+    );
+
+    final json = session.toJson();
+
+    expect(json['program_id'], 'ragonha-v3');
+    expect(json['program_id'], isNot('ragonha-v1'));
+    expect(json['program_version_id'], 'ragonha-v3');
+    expect(json['methodology_family_id'], 'ragonha');
+    expect(json['methodology_display_name'], 'Método Ragonha v3');
+    expect(json['methodology_version'], 3);
+    expect(json['methodology_version'], isNot(1));
+
+    final metadata = json['metadata'] as Map<String, dynamic>;
+    expect(metadata['program_id'], 'ragonha-v3');
+    expect(metadata['program_id'], isNot('ragonha-v1'));
+    expect(metadata['program_version_id'], 'ragonha-v3');
+    expect(metadata['methodology_family_id'], 'ragonha');
+    expect(metadata['methodology_display_name'], 'Método Ragonha v3');
+    expect(metadata['methodology_version'], 3);
+    expect(metadata['methodology_version'], isNot(1));
+  });
+
+  test('DetectionFormationSession.toJson without assigned params uses legacy fallback v1', () {
     final session = DetectionFormationSession(
       dogId: 'zeus',
       dogName: 'Zeus',
@@ -248,9 +299,6 @@ void main() {
 
     final metadata = json['metadata'] as Map<String, dynamic>;
     expect(metadata['program_id'], 'ragonha-v1');
-    expect(metadata['program_version_id'], 'ragonha-v1');
-    expect(metadata['methodology_family_id'], 'ragonha');
-    expect(metadata['methodology_display_name'], 'Método Ragonha');
     expect(metadata['methodology_version'], 1);
   });
 }

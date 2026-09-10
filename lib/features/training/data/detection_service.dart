@@ -14,6 +14,7 @@ class DetectionService {
     : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
+  FirebaseFirestore get firestore => _firestore;
 
   CollectionReference<Map<String, dynamic>> _linesCol(String dogId) =>
       _firestore.collection('dogs').doc(dogId).collection('detection_lines');
@@ -23,6 +24,21 @@ class DetectionService {
 
   CollectionReference<Map<String, dynamic>> _attemptsCol(String dogId) =>
       _firestore.collection('dogs').doc(dogId).collection('training_attempts');
+
+  Future<Map<String, dynamic>?> getAssignedMethodology(String dogId) async {
+    try {
+      final doc = await _firestore
+          .collection('dogs')
+          .doc(dogId)
+          .collection('training')
+          .doc('faro_deteccao')
+          .get();
+      if (doc.exists && doc.data() != null) {
+        return doc.data();
+      }
+    } catch (_) {}
+    return null;
+  }
 
   Stream<List<DetectionLine>> watchLines(String dogId) {
     return _linesCol(dogId).snapshots().map((snap) {
@@ -243,6 +259,11 @@ class DetectionService {
     required String odorMaterial,
     required String handlerId,
     required String handlerName,
+    String? programId,
+    String? programVersionId,
+    String? methodologyFamilyId,
+    String? methodologyDisplayName,
+    int? methodologyVersion,
   }) async {
     final lineDocId = line.id ?? line.normalizedType;
     final open = await getOpenFormationSession(
@@ -261,6 +282,36 @@ class DetectionService {
           )
         : line;
 
+    String? resolvedProgramId = programId;
+    String? resolvedProgramVersionId = programVersionId;
+    String? resolvedFamilyId = methodologyFamilyId;
+    String? resolvedDisplayName = methodologyDisplayName;
+    int? resolvedVersion = methodologyVersion;
+
+    if (resolvedProgramId == null || resolvedProgramId.trim().isEmpty) {
+      final assigned = await getAssignedMethodology(dogId);
+      if (assigned != null) {
+        resolvedProgramId = assigned['program_id']?.toString() ??
+            assigned['program_version_id']?.toString();
+        resolvedProgramVersionId = assigned['program_version_id']?.toString() ??
+            resolvedProgramId;
+        resolvedFamilyId = assigned['methodology_family_id']?.toString();
+        resolvedDisplayName = assigned['methodology_display_name']?.toString() ??
+            assigned['methodologyDisplayName']?.toString();
+        final rawVersion = assigned['methodology_version'] ??
+            assigned['methodologyVersion'] ??
+            assigned['program_version'] ??
+            assigned['version'];
+        if (rawVersion is int) {
+          resolvedVersion = rawVersion;
+        } else if (rawVersion is num) {
+          resolvedVersion = rawVersion.toInt();
+        } else if (rawVersion is String) {
+          resolvedVersion = int.tryParse(rawVersion);
+        }
+      }
+    }
+
     final sessionRef = _sessionsCol(dogId).doc();
     final now = DateTime.now();
     final auditTrail = [
@@ -274,6 +325,11 @@ class DetectionService {
     ];
     final session = DetectionFormationSession.fromRecorder(
       id: sessionRef.id,
+      programId: resolvedProgramId,
+      programVersionId: resolvedProgramVersionId,
+      methodologyFamilyId: resolvedFamilyId,
+      methodologyDisplayName: resolvedDisplayName,
+      methodologyVersion: resolvedVersion,
       dogId: dogId,
       dogName: dogName,
       lineId: lineDocId,
@@ -544,6 +600,11 @@ class DetectionService {
     required String handlerName,
     String notes = '',
     String? odorMaterial,
+    String? programId,
+    String? programVersionId,
+    String? methodologyFamilyId,
+    String? methodologyDisplayName,
+    int? methodologyVersion,
   }) async {
     final session = await startFormationSession(
       dogId: dogId,
@@ -553,6 +614,11 @@ class DetectionService {
       odorMaterial: odorMaterial ?? DetectionOdorMaterials.noseMp,
       handlerId: handlerId,
       handlerName: handlerName,
+      programId: programId,
+      programVersionId: programVersionId,
+      methodologyFamilyId: methodologyFamilyId,
+      methodologyDisplayName: methodologyDisplayName,
+      methodologyVersion: methodologyVersion,
     );
 
     final updated = session.copyWith(
@@ -762,6 +828,11 @@ class DetectionService {
   }) {
     return DetectionFormationSession.fromRecorder(
       id: session.id,
+      programId: session.programId,
+      programVersionId: session.programVersionId,
+      methodologyFamilyId: session.methodologyFamilyId,
+      methodologyDisplayName: session.methodologyDisplayName,
+      methodologyVersion: session.methodologyVersion,
       dogId: session.dogId,
       dogName: session.dogName,
       lineId: session.lineId,

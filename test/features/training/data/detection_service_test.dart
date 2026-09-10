@@ -251,5 +251,237 @@ void main() {
       expect(lineSnap.data()!['current_phase'], '2b');
       expect(lineSnap.data()!['phases_completed'], ['1b']);
     });
+
+    group('Linhagem Curricular e Versionamento (F50)', () {
+      test('Caso A — assignment v1: grava metadata e raiz v1', () async {
+        // Atribui v1 ao cão
+        await firestore
+            .collection('dogs')
+            .doc('dog-v1')
+            .collection('training')
+            .doc('faro_deteccao')
+            .set({
+          'program_id': 'ragonha-v1',
+          'program_version_id': 'ragonha-v1',
+          'methodology_family_id': 'ragonha',
+          'methodology_display_name': 'Método Ragonha',
+          'methodology_version': 1,
+        });
+
+        final lines = await service.getOrCreateDefaultLines(
+          dogId: 'dog-v1',
+          handlerId: '12345',
+          handlerName: 'GCM Teste',
+        );
+        final line = lines.first;
+        final phase = DetectionPhaseCatalog.byCode('1b');
+        final recorder = DetectionSessionRecorder(phase: phase)
+          ..record(odorBox: 1, hit: true, at: DateTime(2026, 5, 24, 10));
+
+        final session = await service.saveFormationSession(
+          dogId: 'dog-v1',
+          dogName: 'Thor',
+          line: line,
+          phase: phase,
+          startedAt: DateTime(2026, 5, 24, 10),
+          recorder: recorder,
+          advancePhase: false,
+          handlerId: '12345',
+          handlerName: 'GCM Teste',
+        );
+
+        final snap = await firestore
+            .collection('dogs')
+            .doc('dog-v1')
+            .collection('training_sessions')
+            .doc(session.id)
+            .get();
+        final data = snap.data()!;
+
+        expect(data['program_id'], 'ragonha-v1');
+        expect(data['methodology_version'], 1);
+        expect(data['methodology_family_id'], 'ragonha');
+        expect(data['methodology_display_name'], 'Método Ragonha');
+
+        final meta = data['metadata'] as Map<String, dynamic>;
+        expect(meta['program_id'], 'ragonha-v1');
+        expect(meta['methodology_version'], 1);
+        expect(meta['methodology_family_id'], 'ragonha');
+        expect(meta['methodology_display_name'], 'Método Ragonha');
+      });
+
+      test('Caso B — assignment v3: grava metadata e raiz v3 (PROVA QUE NÃO GRAVA v1)', () async {
+        // Atribui v3 ao cão
+        await firestore
+            .collection('dogs')
+            .doc('dog-v3')
+            .collection('training')
+            .doc('faro_deteccao')
+            .set({
+          'program_id': 'ragonha-v3',
+          'program_version_id': 'ragonha-v3',
+          'methodology_family_id': 'ragonha',
+          'methodology_display_name': 'Método Ragonha Avançado',
+          'methodology_version': 3,
+        });
+
+        final lines = await service.getOrCreateDefaultLines(
+          dogId: 'dog-v3',
+          handlerId: '12345',
+          handlerName: 'GCM Teste',
+        );
+        final line = lines.first;
+        final phase = DetectionPhaseCatalog.byCode('1b');
+        final recorder = DetectionSessionRecorder(phase: phase)
+          ..record(odorBox: 1, hit: true, at: DateTime(2026, 5, 24, 10));
+
+        final session = await service.saveFormationSession(
+          dogId: 'dog-v3',
+          dogName: 'Bono',
+          line: line,
+          phase: phase,
+          startedAt: DateTime(2026, 5, 24, 10),
+          recorder: recorder,
+          advancePhase: false,
+          handlerId: '12345',
+          handlerName: 'GCM Teste',
+        );
+
+        final snap = await firestore
+            .collection('dogs')
+            .doc('dog-v3')
+            .collection('training_sessions')
+            .doc(session.id)
+            .get();
+        final data = snap.data()!;
+
+        // PROVA OBJETIVA DE QUE NÃO GRAVA v1
+        expect(data['program_id'], 'ragonha-v3');
+        expect(data['program_id'], isNot('ragonha-v1'));
+        expect(data['methodology_version'], 3);
+        expect(data['methodology_version'], isNot(1));
+        expect(data['methodology_family_id'], 'ragonha');
+        expect(data['methodology_display_name'], 'Método Ragonha Avançado');
+
+        final meta = data['metadata'] as Map<String, dynamic>;
+        expect(meta['program_id'], 'ragonha-v3');
+        expect(meta['program_id'], isNot('ragonha-v1'));
+        expect(meta['methodology_version'], 3);
+        expect(meta['methodology_version'], isNot(1));
+        expect(meta['methodology_family_id'], 'ragonha');
+        expect(meta['methodology_display_name'], 'Método Ragonha Avançado');
+      });
+
+      test('Caso C — fallback legado: sem assignment disponível grava default v1', () async {
+        // Cão sem nenhum documento em dogs/{dogId}/training/faro_deteccao
+        final lines = await service.getOrCreateDefaultLines(
+          dogId: 'dog-legado',
+          handlerId: '12345',
+          handlerName: 'GCM Teste',
+        );
+        final line = lines.first;
+        final phase = DetectionPhaseCatalog.byCode('1b');
+        final recorder = DetectionSessionRecorder(phase: phase)
+          ..record(odorBox: 1, hit: true, at: DateTime(2026, 5, 24, 10));
+
+        final session = await service.saveFormationSession(
+          dogId: 'dog-legado',
+          dogName: 'Zeus',
+          line: line,
+          phase: phase,
+          startedAt: DateTime(2026, 5, 24, 10),
+          recorder: recorder,
+          advancePhase: false,
+          handlerId: '12345',
+          handlerName: 'GCM Teste',
+        );
+
+        final snap = await firestore
+            .collection('dogs')
+            .doc('dog-legado')
+            .collection('training_sessions')
+            .doc(session.id)
+            .get();
+        final data = snap.data()!;
+
+        // Fallback de compatibilidade
+        expect(data['program_id'], 'ragonha-v1');
+        expect(data['methodology_version'], 1);
+        expect(data['methodology_family_id'], 'ragonha');
+        expect(data['methodology_display_name'], 'Método Ragonha');
+
+        final meta = data['metadata'] as Map<String, dynamic>;
+        expect(meta['program_id'], 'ragonha-v1');
+        expect(meta['methodology_version'], 1);
+      });
+
+      test('Caso D — publicação de v4: não altera sessão histórica já gravada em v3', () async {
+        // 1. Cão tem atribuição em v3 e grava sessão
+        await firestore
+            .collection('dogs')
+            .doc('dog-hist')
+            .collection('training')
+            .doc('faro_deteccao')
+            .set({
+          'program_id': 'ragonha-v3',
+          'program_version_id': 'ragonha-v3',
+          'methodology_family_id': 'ragonha',
+          'methodology_display_name': 'Método Ragonha v3',
+          'methodology_version': 3,
+        });
+
+        final lines = await service.getOrCreateDefaultLines(
+          dogId: 'dog-hist',
+          handlerId: '12345',
+          handlerName: 'GCM Teste',
+        );
+        final line = lines.first;
+        final phase = DetectionPhaseCatalog.byCode('1b');
+        final recorder = DetectionSessionRecorder(phase: phase)
+          ..record(odorBox: 1, hit: true, at: DateTime(2026, 5, 24, 10));
+
+        final session = await service.saveFormationSession(
+          dogId: 'dog-hist',
+          dogName: 'Atlas',
+          line: line,
+          phase: phase,
+          startedAt: DateTime(2026, 5, 24, 10),
+          recorder: recorder,
+          advancePhase: false,
+          handlerId: '12345',
+          handlerName: 'GCM Teste',
+        );
+
+        // 2. Simulamos a publicação de uma nova versão ragonha-v4 no catálogo
+        await firestore
+            .collection('training_programs')
+            .doc('ragonha-v4')
+            .set({
+          'name': 'Método Ragonha v4',
+          'version': 4,
+          'status': 'published',
+          'methodology_family_id': 'ragonha',
+        });
+
+        // 3. Lê novamente a sessão salva do Firestore
+        final snap = await firestore
+            .collection('dogs')
+            .doc('dog-hist')
+            .collection('training_sessions')
+            .doc(session.id)
+            .get();
+        final data = snap.data()!;
+
+        // A sessão pré-existente PERMANECE em v3, sem sofrer contaminação
+        expect(data['program_id'], 'ragonha-v3');
+        expect(data['methodology_version'], 3);
+        expect(data['program_id'], isNot('ragonha-v4'));
+        expect(data['methodology_version'], isNot(4));
+
+        final reloadedSession = DetectionFormationSession.fromJson(data, docId: session.id);
+        expect(reloadedSession.programId, 'ragonha-v3');
+        expect(reloadedSession.methodologyVersion, 3);
+      });
+    });
   });
 }
