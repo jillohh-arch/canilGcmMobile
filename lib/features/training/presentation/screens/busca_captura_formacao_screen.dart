@@ -46,6 +46,7 @@ class _BuscaCapturaFormacaoScreenState
   StreamSubscription<TrainingProgress>? _progressSub;
   StreamSubscription<List<BonusTrainingMilestone>>? _bonusSub;
   StreamSubscription<List<TrainingHubSession>>? _sessionsSub;
+  String? _subscribedProgramId;
   TrainingProgram? _program;
   TrainingProgress _progress = TrainingProgress.initial(_modality);
   List<BonusTrainingMilestone> _bonusMilestones =
@@ -111,10 +112,12 @@ class _BuscaCapturaFormacaoScreenState
     super.dispose();
   }
 
-  void _subscribeProgram() {
+  void _subscribeProgram({String? programId}) {
+    if (_subscribedProgramId == programId && _programSub != null) return;
+    _subscribedProgramId = programId;
     _programSub?.cancel();
     _programSub = _programService
-        .watchProgram(_modality)
+        .watchProgram(_modality, programId: programId)
         .listen(
           (program) {
             if (!mounted) return;
@@ -147,6 +150,10 @@ class _BuscaCapturaFormacaoScreenState
               _progressLoaded = true;
               _progressError = null;
             });
+            if (progress.programId != null &&
+                progress.programId != _subscribedProgramId) {
+              _subscribeProgram(programId: progress.programId);
+            }
             _ensureProgressInitializedIfNeeded();
           },
           onError: (error) {
@@ -500,7 +507,9 @@ class _BuscaCapturaFormacaoScreenState
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    'Busca & Captura',
+                                    _progress.methodologyDisplayName ??
+                                        _program?.name ??
+                                        'Busca & Captura',
                                     style: GoogleFonts.inter(
                                       color: AppTheme.textPrimary,
                                       fontSize: 17,
@@ -608,7 +617,7 @@ class _BuscaCapturaFormacaoScreenState
                                           TextSpan(
                                             text: _program == null
                                                 ? ' · aguardando seed'
-                                                : ' · currículo v${_program!.version}',
+                                                : ' · v${_progress.methodologyVersion ?? _program!.version}',
                                           ),
                                         ],
                                       ),
@@ -1261,6 +1270,13 @@ class _BuscaCapturaFormacaoScreenState
       'mode': 'formacao',
       'phase': 'formation',
       if (_program != null) 'program_version': _program!.version,
+      if (_program != null) 'program_id': _program!.id,
+      if (_program != null) 'program_version_id': _program!.id,
+      if (_program != null)
+        'methodology_family_id':
+            _program!.methodologyFamilyId ?? _program!.id,
+      if (_program != null) 'methodology_display_name': _program!.name,
+      if (_program != null) 'methodology_version': _program!.version,
       ...config.toJson(),
       'result': result.result ?? 'completa',
       'gps': true,

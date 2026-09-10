@@ -185,6 +185,11 @@ class DetectionFormationSession {
 
   Map<String, dynamic> toJson() {
     final metadata = {
+      'program_id': 'ragonha-v1',
+      'program_version_id': 'ragonha-v1',
+      'methodology_family_id': 'ragonha',
+      'methodology_display_name': 'Método Ragonha',
+      'methodology_version': 1,
       'line_id': lineId,
       'line': lineName,
       'line_type': lineType,
@@ -209,6 +214,11 @@ class DetectionFormationSession {
 
     return {
       if (id != null) 'id': id,
+      'program_id': 'ragonha-v1',
+      'program_version_id': 'ragonha-v1',
+      'methodology_family_id': 'ragonha',
+      'methodology_display_name': 'Método Ragonha',
+      'methodology_version': 1,
       'type': 'detection_formation',
       'trainingType': 'Detecção',
       'specialty': 'Detecção',

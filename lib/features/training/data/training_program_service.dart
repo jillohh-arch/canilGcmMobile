@@ -11,7 +11,14 @@ class TrainingProgramService {
 
   final FirebaseFirestore _firestore;
 
-  Stream<TrainingProgram?> watchProgram(String modality) {
+  Stream<TrainingProgram?> watchProgram(
+    String modality, {
+    String? programId,
+  }) {
+    final targetDocId =
+        (programId != null && programId.trim().isNotEmpty)
+            ? programId.trim()
+            : modality;
     late final StreamController<TrainingProgram?> controller;
     StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? programSub;
     StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? moduleSub;
@@ -55,7 +62,7 @@ class TrainingProgramService {
       if (milestoneSubs.containsKey(moduleId)) return;
       final milestonesRef = _firestore
           .collection('training_programs')
-          .doc(modality)
+          .doc(targetDocId)
           .collection('modules')
           .doc(moduleId)
           .collection('milestones')
@@ -73,7 +80,7 @@ class TrainingProgramService {
       onListen: () {
         final programRef = _firestore
             .collection('training_programs')
-            .doc(modality);
+            .doc(targetDocId);
 
         programSub = programRef.snapshots().listen((snapshot) {
           programDoc = snapshot;
@@ -132,6 +139,48 @@ class TrainingProgramService {
         .doc(modality)
         .snapshots()
         .map((snapshot) => TrainingProgress.fromFirestore(snapshot, modality));
+  }
+
+  Stream<TrainingProgram?> watchProgramForDog(String dogId, String modality) {
+    late final StreamController<TrainingProgram?> controller;
+    StreamSubscription<TrainingProgress>? progressSub;
+    StreamSubscription<TrainingProgram?>? programSub;
+    String? currentProgramId;
+    var isClosed = false;
+
+    void updateProgramSubscription(String? targetProgramId) {
+      if (currentProgramId == targetProgramId && programSub != null) return;
+      currentProgramId = targetProgramId;
+      unawaited(programSub?.cancel());
+      programSub = watchProgram(modality, programId: targetProgramId).listen(
+        (program) {
+          if (!isClosed) controller.add(program);
+        },
+        onError: (Object err) {
+          if (!isClosed) controller.addError(err);
+        },
+      );
+    }
+
+    controller = StreamController<TrainingProgram?>(
+      onListen: () {
+        progressSub = watchProgress(dogId, modality).listen(
+          (progress) {
+            updateProgramSubscription(progress.programId);
+          },
+          onError: (Object err) {
+            if (!isClosed) controller.addError(err);
+          },
+        );
+      },
+      onCancel: () async {
+        isClosed = true;
+        await progressSub?.cancel();
+        await programSub?.cancel();
+      },
+    );
+
+    return controller.stream;
   }
 
   Stream<List<BonusTrainingMilestone>> watchBonusMilestones(
@@ -208,6 +257,19 @@ class TrainingProgramService {
             'current_module': currentModuleId,
             'current_module_id': currentModuleId,
             'program_version': progress.programVersion ?? program.version,
+            'program_id': progress.programId ?? program.id,
+            'program_version_id':
+                progress.programVersionId ?? progress.programId ?? program.id,
+            'methodology_family_id':
+                progress.methodologyFamilyId ??
+                program.methodologyFamilyId ??
+                program.id,
+            'methodology_display_name':
+                progress.methodologyDisplayName ?? program.name,
+            'methodology_version':
+                progress.methodologyVersion ??
+                progress.programVersion ??
+                program.version,
             'completed_module_ids': progress.completedModuleIds,
             'completed_modules': progress.completedModules
                 .map(_completedModuleToJson)
@@ -247,6 +309,11 @@ class TrainingProgramService {
         'current_module': firstModule.id,
         'current_module_id': firstModule.id,
         'program_version': program.version,
+        'program_id': program.id,
+        'program_version_id': program.id,
+        'methodology_family_id': program.methodologyFamilyId ?? program.id,
+        'methodology_display_name': program.name,
+        'methodology_version': program.version,
         'completed_module_ids': <String>[],
         'completed_modules': <Map<String, dynamic>>[],
         'achieved_milestones': <String, dynamic>{},
