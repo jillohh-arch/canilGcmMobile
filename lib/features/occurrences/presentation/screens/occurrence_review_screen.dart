@@ -243,7 +243,7 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
   Future<void> _acceptParticipation() async {
     setState(() => _isRespondingParticipation = true);
     try {
-      await OccurrenceTransitionService().acceptParticipation(
+      await _occurrenceRepository.acceptParticipation(
         occurrenceId: widget.occurrenceId,
       );
       if (!mounted) return;

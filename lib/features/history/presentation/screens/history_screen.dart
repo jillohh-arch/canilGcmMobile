@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -111,27 +112,25 @@ class _HistoryScreenState extends State<HistoryScreen>
     final userVM = Provider.of<UserViewModel>(context);
     final authVM = Provider.of<AuthViewModel>(context);
 
-    if (!shiftVM.hasActiveShift || shiftVM.activeDogId == null) {
+    if (!shiftVM.hasActiveShift) {
       return const _HistoryNoShift();
     }
 
-    final dogId = shiftVM.activeDogId!;
-    if (_lastLoadedDogId != dogId) {
-      _lastLoadedDogId = dogId;
+    final effectiveDogId = shiftVM.activeDogId ?? shiftVM.serviceDogId;
+    if (effectiveDogId != null && _lastLoadedDogId != effectiveDogId) {
+      _lastLoadedDogId = effectiveDogId;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _loadAllData();
       });
     }
 
-    final dog = dogVM.dogs.cast<Dog?>().firstWhere(
-      (d) => d?.id == dogId,
-      orElse: () => dogVM.dogs.isNotEmpty ? dogVM.dogs.first : null,
-    );
-
-    if (dog == null) {
-      return const _HistoryNoShift();
-    }
+    final dog = effectiveDogId != null
+        ? dogVM.dogs.cast<Dog?>().firstWhere(
+            (d) => d?.id == effectiveDogId,
+            orElse: () => dogVM.dogs.isNotEmpty ? dogVM.dogs.first : null,
+          )
+        : null;
 
     final fbUser = authVM.user;
     final currentRa = HandlerIdentityService.raFromUser(fbUser);
@@ -145,7 +144,7 @@ class _HistoryScreenState extends State<HistoryScreen>
         ? firebasePhoto
         : null;
 
-    final allEntries = _buildAllEntries(dogId);
+    final allEntries = _buildAllEntries(effectiveDogId);
     final filteredEntries = _filterEntries(allEntries);
     final visibleEntries = filteredEntries.take(_visibleCount).toList();
     final groupedEntries = _groupEntriesByDay(visibleEntries);
@@ -262,7 +261,7 @@ class _HistoryScreenState extends State<HistoryScreen>
 
   Future<void> _exportPdf(
     List<HistoryEntry> entries,
-    Dog dog,
+    Dog? dog,
     String handlerName,
   ) async {
     if (entries.isEmpty) {
@@ -271,16 +270,17 @@ class _HistoryScreenState extends State<HistoryScreen>
     }
 
     final bytes = await _buildHistoryPdf(entries, dog, handlerName);
+    final dogName = dog?.name ?? 'operador';
     await Printing.layoutPdf(
       onLayout: (_) async => bytes,
       name:
-          'historico_${dog.name}_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf',
+          'historico_${dogName}_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf',
     );
   }
 
   Future<Uint8List> _buildHistoryPdf(
     List<HistoryEntry> entries,
-    Dog dog,
+    Dog? dog,
     String handlerName,
   ) async {
     final pdf = pw.Document();
@@ -338,7 +338,7 @@ class _HistoryScreenState extends State<HistoryScreen>
             child: pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                _pdfMetric('Cao K9', dog.name),
+                _pdfMetric('Cao K9', dog?.name ?? 'Sem K9'),
                 _pdfMetric('Condutor', handlerName),
                 _pdfMetric('Periodo', dateLabel),
                 _pdfMetric('Registros', entries.length.toString()),
@@ -536,7 +536,7 @@ class _FilterSummaryRow extends StatelessWidget {
 }
 
 class _HistoryShiftHeader extends StatelessWidget {
-  final Dog dog;
+  final Dog? dog;
   final String callsign;
   final String? handlerImageUrl;
   final DateTime? shiftStartTime;
@@ -552,6 +552,29 @@ class _HistoryShiftHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final elapsed = _formatElapsed(shiftStartTime);
 
+    if (dog != null) {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+        decoration: BoxDecoration(
+          color: AppTheme.primary.withAlpha(10),
+          border: Border(
+            bottom: BorderSide(color: AppTheme.primary.withAlpha(30)),
+          ),
+        ),
+        child: BinomioHeader(
+          dog: dog!,
+          handlerNameOverride: callsign,
+          conductorPhotoUrl: handlerImageUrl,
+          subtitle: 'Turno ativo · $elapsed',
+          subtitleColor: _hGreen,
+          statusDotColor: _hGreen,
+          showStatusDot: true,
+          withBackground: false,
+          onSwitchDog: () => showDogSwitcher(context),
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
       decoration: BoxDecoration(
@@ -560,16 +583,62 @@ class _HistoryShiftHeader extends StatelessWidget {
           bottom: BorderSide(color: AppTheme.primary.withAlpha(30)),
         ),
       ),
-      child: BinomioHeader(
-        dog: dog,
-        handlerNameOverride: callsign,
-        conductorPhotoUrl: handlerImageUrl,
-        subtitle: 'Turno ativo · $elapsed',
-        subtitleColor: _hGreen,
-        statusDotColor: _hGreen,
-        showStatusDot: true,
-        withBackground: false,
-        onSwitchDog: () => showDogSwitcher(context),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppTheme.primary.withAlpha(12),
+              border: Border.all(color: AppTheme.primary.withAlpha(180)),
+            ),
+            child: handlerImageUrl != null
+                ? ClipOval(
+                    child: CachedNetworkImage(
+                      imageUrl: handlerImageUrl!,
+                      width: 44,
+                      height: 44,
+                      fit: BoxFit.cover,
+                      errorWidget: (_, _, _) => const Icon(
+                        Icons.person_rounded,
+                        color: AppTheme.primary,
+                        size: 22,
+                      ),
+                    ),
+                  )
+                : const Icon(
+                    Icons.person_rounded,
+                    color: AppTheme.primary,
+                    size: 22,
+                  ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  callsign,
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Turno ativo · Sem K9 · $elapsed',
+                  style: GoogleFonts.inter(
+                    color: _hGreen,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

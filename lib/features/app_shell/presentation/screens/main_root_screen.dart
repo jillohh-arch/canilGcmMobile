@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/permission_service.dart';
+import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_provider.dart';
 import 'package:canil_gcm/core/services/authoritative_time/firebase_functions_authoritative_time_gateway.dart';
 import 'package:canil_gcm/core/services/authoritative_time/monotonic_elapsed_clock.dart';
@@ -134,22 +136,35 @@ class _MainRootScreenState extends State<MainRootScreen> {
   Widget build(BuildContext context) {
     final shiftVM = Provider.of<ShiftViewModel>(context);
     final activeDogId = shiftVM.activeDogId;
+    final effectiveDogId = activeDogId ?? shiftVM.serviceDogId;
     final occurrenceVM = Provider.of<OccurrenceViewModel>(context);
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    final currentRa = HandlerIdentityService.raFromUser(authVM.user);
     final openOccurrence = occurrenceVM.openOccurrence;
+
+    final bool isAcceptedParticipant =
+        currentRa != null &&
+        (openOccurrence?.acceptedHandlerIds.contains(currentRa) ?? false);
+    final bool isPersonalDogOccurrence =
+        activeDogId != null && openOccurrence?.dogId == activeDogId;
+
     final activeOccurrence =
-        openOccurrence != null && openOccurrence.dogId == activeDogId
+        (openOccurrence != null &&
+            (isPersonalDogOccurrence || isAcceptedParticipant))
         ? openOccurrence
         : null;
-    if (activeDogId != null &&
-        (activeDogId != _lastOccurrenceWatchDogId ||
+
+    if (effectiveDogId != null &&
+        effectiveDogId.isNotEmpty &&
+        (effectiveDogId != _lastOccurrenceWatchDogId ||
             !occurrenceVM.isWatchingOpen)) {
-      _lastOccurrenceWatchDogId = activeDogId;
+      _lastOccurrenceWatchDogId = effectiveDogId;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         Provider.of<OccurrenceViewModel>(
           context,
           listen: false,
-        ).watchOpen(activeDogId);
+        ).watchOpen(effectiveDogId);
       });
     }
 
@@ -165,14 +180,14 @@ class _MainRootScreenState extends State<MainRootScreen> {
         body: Stack(
           children: [
             IndexedStack(index: _currentIndex, children: _screens),
-            if (activeDogId != null && activeOccurrence != null)
+            if (activeOccurrence != null)
               Positioned(
                 left: 14,
                 right: 14,
                 bottom: 100,
                 child: _ActiveOccurrenceBanner(
                   occurrence: activeOccurrence,
-                  dogName: _dogNameFor(context, activeDogId),
+                  dogName: _dogNameFor(context, activeOccurrence.dogId),
                   onTap: () => _continueActiveOccurrence(
                     context,
                     occurrence: activeOccurrence,
@@ -181,7 +196,7 @@ class _MainRootScreenState extends State<MainRootScreen> {
               ),
           ],
         ),
-        bottomNavigationBar: _buildBottomNavigation(context, activeDogId),
+        bottomNavigationBar: _buildBottomNavigation(context, effectiveDogId),
       ),
     );
   }

@@ -4,9 +4,12 @@ extension _HistoryDataLoader on _HistoryScreenState {
   void _loadAllData({bool forceReload = false}) {
     if (!mounted) return;
     final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
-    if (!shiftVM.hasActiveShift || shiftVM.activeDogId == null) return;
+    if (!shiftVM.hasActiveShift) return;
 
-    final dogId = shiftVM.activeDogId!;
+    final effectiveDogId = shiftVM.activeDogId ?? shiftVM.serviceDogId;
+    if (effectiveDogId == null || effectiveDogId.isEmpty) return;
+
+    final dogId = effectiveDogId;
 
     debugPrint(
       '[History] _loadAllData chamado para dogId=$dogId (force=$forceReload)',
@@ -69,26 +72,46 @@ extension _HistoryDataLoader on _HistoryScreenState {
     debugPrint('[History] watchByDog iniciado para dogId=$dogId');
   }
 
-  List<HistoryEntry> _buildAllEntries(String dogId) {
+  List<HistoryEntry> _buildAllEntries(String? dogId) {
+    final shiftVM = Provider.of<ShiftViewModel>(context);
     final trainingVM = Provider.of<TrainingViewModel>(context);
     final healthVM = Provider.of<HealthViewModel>(context);
     final nutritionVM = Provider.of<NutritionViewModel>(context);
     final occurrenceVM = Provider.of<OccurrenceViewModel>(context);
     final dogVM = Provider.of<DogViewModel>(context);
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    final currentRa = HandlerIdentityService.raFromUser(authVM.user);
 
-    final dogName = _resolveDogName(dogId, dogVM);
+    final dogName = dogId != null ? _resolveDogName(dogId, dogVM) : 'K9';
     final entries = <HistoryEntry>[];
 
-    for (final log in healthVM.healthLogs) {
-      if (log.dogId == dogId) entries.add(_buildHealthEntry(log, dogName));
-    }
+    if (dogId != null && dogId.isNotEmpty) {
+      for (final log in healthVM.healthLogs) {
+        if (log.dogId == dogId) entries.add(_buildHealthEntry(log, dogName));
+      }
 
-    for (final record in _weightRecords) {
-      entries.add(_buildWeightRecordEntry(record, dogName));
-    }
+      for (final record in _weightRecords) {
+        entries.add(_buildWeightRecordEntry(record, dogName));
+      }
 
-    for (final occ in occurrenceVM.occurrences) {
-      if (occ.dogId == dogId) entries.add(_buildOccurrenceEntry(occ));
+      for (final occ in occurrenceVM.occurrences) {
+        if (occ.dogId == dogId) {
+          final isPersonalDog =
+              shiftVM.activeDogId != null && shiftVM.activeDogId == occ.dogId;
+          final isPrimary =
+              currentRa != null &&
+              (occ.primaryHandlerRa == currentRa ||
+                  occ.primaryHandlerId == currentRa);
+          final isTeamMember =
+              currentRa != null &&
+              (occ.teamHandlerIds.contains(currentRa) ||
+                  occ.acceptedHandlerIds.contains(currentRa));
+
+          if (isPersonalDog || isPrimary || isTeamMember) {
+            entries.add(_buildOccurrenceEntry(occ));
+          }
+        }
+      }
     }
 
     for (final training in trainingVM.trainings) {
@@ -170,7 +193,9 @@ extension _HistoryDataLoader on _HistoryScreenState {
 
   HistoryEntry _buildWeightRecordEntry(WeightRecord record, String dogName) {
     return HistoryEntry(
-      id: record.id ?? 'weight_${record.measuredAt.millisecondsSinceEpoch}',
+      id: record.id.isEmpty
+          ? 'weight_${record.measuredAt.millisecondsSinceEpoch}'
+          : record.id,
       type: HistoryEntryType.health,
       title: 'Pesagem operacional registrada',
       subtitle: 'Peso atual: ${record.weightKg.toStringAsFixed(1)} kg',

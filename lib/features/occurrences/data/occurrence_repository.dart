@@ -13,15 +13,19 @@ import 'package:canil_gcm/features/occurrences/domain/occurrence_nature.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
 
-enum CloseForSignaturesResult {
-  awaitingSignatures,
-  sealedDirectly,
-}
+enum CloseForSignaturesResult { awaitingSignatures, sealedDirectly }
 
 class OccurrenceRepository {
   final FirebaseFirestore _firestore;
+  OccurrenceTransitionService? _injectedTransitionService;
 
-  OccurrenceRepository(this._firestore);
+  OccurrenceRepository(
+    this._firestore, {
+    OccurrenceTransitionService? transitionService,
+  }) : _injectedTransitionService = transitionService;
+
+  OccurrenceTransitionService get _transitionService =>
+      _injectedTransitionService ??= OccurrenceTransitionService();
 
   CollectionReference<Map<String, dynamic>> get _collection =>
       _firestore.collection('occurrences');
@@ -215,7 +219,7 @@ class OccurrenceRepository {
     int hashVersion = 2,
   }) async {
     if (hashVersion >= 4) {
-      await OccurrenceTransitionService().sealOccurrenceV4(
+      await _transitionService.sealOccurrenceV4(
         occurrenceId: id,
         finalReport: finalReport,
         results: results,
@@ -592,7 +596,7 @@ class OccurrenceRepository {
           ? finalizationPhotoHashes
           : current.finalizationPhotoHashes;
 
-      await OccurrenceTransitionService().sealOccurrenceV4(
+      await _transitionService.sealOccurrenceV4(
         occurrenceId: resolvedId,
         finalReport: resolvedFinalReport,
         results: finalResults,
@@ -606,7 +610,8 @@ class OccurrenceRepository {
           action: 'finalized_no_cosigners',
           entityType: 'occurrence',
           entityId: resolvedId,
-          summary: 'Ocorrencia finalizada diretamente (sem coassinantes elegiveis)',
+          summary:
+              'Ocorrencia finalizada diretamente (sem coassinantes elegiveis)',
           after: {
             'status': 'finalized',
             'has_final_report': true,
@@ -649,7 +654,7 @@ class OccurrenceRepository {
     final signatureRound = current.signatureRound <= 0
         ? 1
         : current.signatureRound;
-    await OccurrenceTransitionService().closeForSignatures(
+    await _transitionService.closeForSignatures(
       occurrenceId: resolvedId,
       finalReport: resolvedFinalReport,
       results: finalResults,
@@ -713,7 +718,7 @@ class OccurrenceRepository {
     final round = current.signatureRound <= 0 ? 1 : current.signatureRound;
     final roundedSignature = signature.copyWith(round: round);
 
-    await OccurrenceTransitionService().signOccurrence(
+    await _transitionService.signOccurrence(
       occurrenceId: occurrenceId,
       signature: roundedSignature,
     );
@@ -787,7 +792,7 @@ class OccurrenceRepository {
   }
 
   Future<void> revertToDraft({required String occurrenceId}) async {
-    await OccurrenceTransitionService().requestCorrection(
+    await _transitionService.requestCorrection(
       occurrenceId: occurrenceId,
       reason: 'Reabertura para correcao antes do selo',
     );
@@ -800,6 +805,10 @@ class OccurrenceRepository {
       ),
     );
     return;
+  }
+
+  Future<void> acceptParticipation({required String occurrenceId}) async {
+    await _transitionService.acceptParticipation(occurrenceId: occurrenceId);
   }
 
   Future<void> revertToDraftLocallyForLegacy({

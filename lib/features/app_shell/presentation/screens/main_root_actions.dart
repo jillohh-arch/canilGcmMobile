@@ -184,7 +184,8 @@ extension _MainRootActions on _MainRootScreenState {
     String? dogId,
   ) async {
     HapticFeedback.mediumImpact();
-    if (dogId == null) {
+    final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
+    if (!shiftVM.hasActiveShift) {
       AppFeedback.warning(
         context,
         'Inicie um turno para registrar ocorrência.',
@@ -192,16 +193,19 @@ extension _MainRootActions on _MainRootScreenState {
       return;
     }
 
+    final effectiveDogId = dogId ?? shiftVM.serviceDogId;
     final rootNavigator = Navigator.of(context, rootNavigator: true);
     final occurrenceVM = Provider.of<OccurrenceViewModel>(
       context,
       listen: false,
     );
     final openOccurrence =
-        occurrenceVM.openOccurrence ?? await occurrenceVM.findOpen(dogId);
+        occurrenceVM.openOccurrence ??
+        (effectiveDogId != null && effectiveDogId.isNotEmpty
+            ? await occurrenceVM.findOpen(effectiveDogId)
+            : null);
     if (!context.mounted) return;
 
-    final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
     await routeRootOccurrenceEntrypoint(
       hasOpenOccurrence: openOccurrence != null,
       eligibility: evaluateOccurrenceStartEligibility(

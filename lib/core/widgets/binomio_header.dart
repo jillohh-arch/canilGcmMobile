@@ -243,7 +243,7 @@ class BinomioHeader extends StatelessWidget {
         if (trailing != null) ...[const SizedBox(width: 8), trailing!],
         if (showNotificationButton && notificationRa != null) ...[
           const SizedBox(width: 8),
-          _HeaderNotificationBell(userId: notificationRa),
+          HeaderNotificationBell(userId: notificationRa),
         ],
         const SizedBox(width: 8),
       ],
@@ -299,10 +299,10 @@ class _HeaderMenuVisualButton extends StatelessWidget {
   }
 }
 
-class _HeaderNotificationBell extends StatelessWidget {
+class HeaderNotificationBell extends StatelessWidget {
   final String userId;
 
-  const _HeaderNotificationBell({required this.userId});
+  const HeaderNotificationBell({super.key, required this.userId});
 
   @override
   Widget build(BuildContext context) {
