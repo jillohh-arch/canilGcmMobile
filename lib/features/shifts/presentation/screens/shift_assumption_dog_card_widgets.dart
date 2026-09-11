@@ -1,6 +1,6 @@
 part of 'shift_assumption_screen.dart';
 
-class _DogSelectionCard extends StatelessWidget {
+class DogSelectionCard extends StatelessWidget {
   final Dog dog;
   final bool isSelected;
   final bool isTitular;
@@ -8,7 +8,8 @@ class _DogSelectionCard extends StatelessWidget {
   final DogFitnessResult fitness;
   final VoidCallback onTap;
 
-  const _DogSelectionCard({
+  const DogSelectionCard({
+    super.key,
     required this.dog,
     required this.isSelected,
     required this.isTitular,
@@ -86,12 +87,16 @@ class _DogSelectionCard extends StatelessWidget {
                               // Nome + badge titular
                               Row(
                                 children: [
-                                  Text(
-                                    dog.name,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppTheme.textPrimary,
+                                  Flexible(
+                                    child: Text(
+                                      dog.name,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppTheme.textPrimary,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                   if (isTitular) ...[

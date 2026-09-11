@@ -16,18 +16,26 @@ import 'package:canil_gcm/features/shifts/domain/vehicle.dart';
 import 'package:canil_gcm/core/services/audit_service.dart';
 
 class ShiftViewModel extends ChangeNotifier {
-  ShiftViewModel({ShiftAuthorizationGateway? authorizationGateway})
-    : _authorization =
-          authorizationGateway ??
-          FirebaseFunctionsShiftAuthorizationGateway() {
+  ShiftViewModel({
+    ShiftAuthorizationGateway? authorizationGateway,
+    ShiftService? shiftService,
+    AuthService? authService,
+    ShiftGroupService? shiftGroupService,
+    PushNotificationService? pushNotifications,
+  })  : _authorization = authorizationGateway ??
+            FirebaseFunctionsShiftAuthorizationGateway(),
+        _shiftService = shiftService ?? ShiftService(),
+        _authService = authService ?? AuthService(),
+        _shiftGroupService = shiftGroupService ?? ShiftGroupService(),
+        _pushNotifications = pushNotifications ?? PushNotificationService() {
     _authSubscription = _authService.authStateChanges.listen(_bindToUser);
     _bindToUser(_authService.currentUser);
   }
 
-  final AuthService _authService = AuthService();
-  final ShiftService _shiftService = ShiftService();
-  final ShiftGroupService _shiftGroupService = ShiftGroupService();
-  final PushNotificationService _pushNotifications = PushNotificationService();
+  final AuthService _authService;
+  final ShiftService _shiftService;
+  final ShiftGroupService _shiftGroupService;
+  final PushNotificationService _pushNotifications;
 
   /// HEALTH-V1-OP-AUTH — boundary autoritativa das ações que introduzem ou
   /// substituem o K9 operacional. O ViewModel NÃO decide autorização.
@@ -50,6 +58,12 @@ class ShiftViewModel extends ChangeNotifier {
   String? _error;
 
   ActiveShiftSession? get session => _session;
+
+  @visibleForTesting
+  void setSessionForTesting(ActiveShiftSession? session) {
+    _session = session;
+    notifyListeners();
+  }
   String? get activeDogId => _session?.effectiveServiceDogId;
   String? get legacyDogId => _session?.dogId;
   String? get serviceDogId => _session?.serviceDogId ?? _session?.dogId;
@@ -382,7 +396,7 @@ class ShiftViewModel extends ChangeNotifier {
     _error = null;
     _setLoading(true);
 
-    if (resolvedHandlerId == null || activeDogId == null) {
+    if (resolvedHandlerId == null || _session == null) {
       _error = 'Turno ativo nao encontrado para assumir viatura.';
       _setLoading(false);
       return;
@@ -390,9 +404,60 @@ class ShiftViewModel extends ChangeNotifier {
 
     final joinedAt = DateTime.now();
 
+    void applyLocalState([ShiftAuthorizationResult? _]) {
+      _session = _session?.copyWith(
+        authUid: currentUser?.uid,
+        handlerEmail: currentUser?.email,
+        vehicleId: vehicle.id,
+        vehicleLabel: vehicle.label,
+        vehiclePrefix: vehicle.prefix,
+        vehicleModel: vehicle.modelName,
+        vehicleUnit: vehicle.unit,
+        vehicleJoinedAt: joinedAt,
+        vehicleCrewId: vehicle.id,
+        crewRole: role,
+        crewStatus: 'active',
+      );
+
+      AuditService.log(
+        action: 'update',
+        entityType: 'shifts',
+        entityId: resolvedHandlerId,
+        summary: 'Viatura assumida: ${vehicle.label}',
+        after: {'vehicle_id': vehicle.id, 'vehicle_label': vehicle.label},
+      );
+    }
+
+    // Turno SEM K9: o operador assume posto na guarnição sem introduzir K9.
+    // Não há decisão clínica a validar — roteia diretamente pelo writer canônico
+    // sem disparar comando de autorização com K9 vazio.
+    if (activeDogId == null || activeDogId.trim().isEmpty) {
+      try {
+        await _shiftService.assumeVehicle(
+          handlerId: resolvedHandlerId,
+          handlerAuthUid: currentUser?.uid,
+          handlerEmail: currentUser?.email,
+          handlerName: name,
+          dogId: '',
+          vehicle: vehicle,
+          role: role,
+        );
+        applyLocalState();
+        _setLoading(false);
+        return;
+      } on FirebaseException catch (e) {
+        _error = 'Falha ao assumir viatura [${e.code}]: ${e.message}';
+        _setLoading(false);
+        return;
+      } catch (e) {
+        _error = 'Falha ao assumir viatura: $e';
+        _setLoading(false);
+        return;
+      }
+    }
+
+    // Turno COM K9: operação clínica crítica protegida pelo backend OP-AUTH.
     try {
-      // Assumir viatura grava o K9 na guarnição — e quando o turno estava sem
-      // cão, essa é a operação que o INTRODUZ. Logo, passa pelo guard.
       final command = ShiftAuthorizationCommand(
         action: ShiftAuthorizedAction.assumeVehicle,
         dogId: activeDogId,
@@ -406,30 +471,6 @@ class ShiftViewModel extends ChangeNotifier {
         vehicle: _vehiclePayload(vehicle),
         role: role,
       );
-
-      void applyLocalState(ShiftAuthorizationResult _) {
-        _session = _session?.copyWith(
-          authUid: currentUser?.uid,
-          handlerEmail: currentUser?.email,
-          vehicleId: vehicle.id,
-          vehicleLabel: vehicle.label,
-          vehiclePrefix: vehicle.prefix,
-          vehicleModel: vehicle.modelName,
-          vehicleUnit: vehicle.unit,
-          vehicleJoinedAt: joinedAt,
-          vehicleCrewId: vehicle.id,
-          crewRole: role,
-          crewStatus: 'active',
-        );
-
-        AuditService.log(
-          action: 'update',
-          entityType: 'shifts',
-          entityId: resolvedHandlerId,
-          summary: 'Viatura assumida: ${vehicle.label}',
-          after: {'vehicle_id': vehicle.id, 'vehicle_label': vehicle.label},
-        );
-      }
 
       _pendingAcknowledgement = _PendingAcknowledgement(
         command: command,
@@ -596,6 +637,11 @@ class ShiftViewModel extends ChangeNotifier {
             notifyListeners();
           },
         );
+  }
+
+  @visibleForTesting
+  void setBoundRaForTesting(String? ra) {
+    _boundRa = ra;
   }
 
   String? _resolveHandlerId() {

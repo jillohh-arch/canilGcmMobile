@@ -19,7 +19,16 @@ import 'package:canil_gcm/features/dogs/data/dog_service.dart';
 
 /// Bottom sheet full-height com fluxo de 2 passos para assumir posto na guarnição.
 class VehicleCrewPostSheet extends StatefulWidget {
-  const VehicleCrewPostSheet({super.key});
+  final Vehicle? initialVehicle;
+  final VehicleService? vehicleService;
+  final VehicleCrewService? crewService;
+
+  const VehicleCrewPostSheet({
+    super.key,
+    this.initialVehicle,
+    this.vehicleService,
+    this.crewService,
+  });
 
   static Future<void> show(BuildContext context) {
     return showModalBottomSheet<void>(
@@ -35,9 +44,17 @@ class VehicleCrewPostSheet extends StatefulWidget {
 }
 
 class _VehicleCrewPostSheetState extends State<VehicleCrewPostSheet> {
-  final VehicleService _vehicleService = VehicleService();
-  final VehicleCrewService _crewService = VehicleCrewService();
+  late final VehicleService _vehicleService;
+  late final VehicleCrewService _crewService;
   Vehicle? _selectedVehicle;
+
+  @override
+  void initState() {
+    super.initState();
+    _vehicleService = widget.vehicleService ?? VehicleService();
+    _crewService = widget.crewService ?? VehicleCrewService();
+    _selectedVehicle = widget.initialVehicle;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -728,14 +745,18 @@ class _OperationalStatusChip extends StatelessWidget {
 /// 4 postos humanos (K9 é vínculo, não posto).
 /// Role 'k9' mantido no enum/rule por retrocompatibilidade.
 /// Cada member com dog_id preenchido é o condutor responsável pelo cão.
-class _PostBoard extends StatelessWidget {
+typedef _PostBoard = VehicleCrewPostBoard;
+
+@visibleForTesting
+class VehicleCrewPostBoard extends StatelessWidget {
   final Vehicle vehicle;
   final Map<String, VehicleCrewMember> activeMembers;
   final bool hasBinomioActive;
   final void Function(String role) onPostSelected;
   final VoidCallback onLeaveVehicle;
 
-  const _PostBoard({
+  const VehicleCrewPostBoard({
+    super.key,
     required this.vehicle,
     required this.activeMembers,
     required this.hasBinomioActive,
@@ -775,7 +796,7 @@ class _PostBoard extends StatelessWidget {
                 final member = activeMembers[role];
                 final isOccupied = member != null;
                 // Badge K9 se o membro tem cão embarcado
-                final hasK9 = isOccupied && member.dogId!.trim().isNotEmpty;
+                final hasK9 = isOccupied && (member.dogId?.trim().isNotEmpty ?? false);
                 // Verificar se este slot é do usuário atual
                 final isCurrentUser = isOccupied && member.handlerId == currentHandlerId;
 

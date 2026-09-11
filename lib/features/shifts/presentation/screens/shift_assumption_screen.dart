@@ -321,7 +321,7 @@ class _ShiftAssumptionScreenState extends State<ShiftAssumptionScreen> {
           titularName = userVM.displayNameFor(ra: dog.conductorRa);
         }
 
-        return _DogSelectionCard(
+        return DogSelectionCard(
           dog: dog,
           isSelected: isSelected,
           isTitular: isTitular,

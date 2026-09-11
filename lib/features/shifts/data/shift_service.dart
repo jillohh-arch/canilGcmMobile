@@ -265,27 +265,25 @@ class ShiftService {
           dogId;
       if (!activeSnapshot.exists ||
           activeData == null ||
-          activeData['status'] != 'active' ||
-          activeDogId.isEmpty) {
+          activeData['status'] != 'active') {
         throw StateError('Turno ativo não encontrado para assumir viatura');
       }
+
+      final crewDocSnap = await transaction.get(_vehicleCrews.doc(crewId));
+      final crewData = crewDocSnap.data();
+      final isCrewActive = crewDocSnap.exists && crewData?['active'] == true;
 
       // ── Validação 1 cão: rejeitar se guarnição ATIVA já tem cão ──
       // Lê o doc pai. Só vale para crew ativa (active == true):
       // crew encerrada (active == false) tem service_dog_id resíduo de ciclos
       // anteriores — ignora, pois a reopening reescreverá o campo.
-      if (activeDogId.isNotEmpty) {
-        final crewDocSnap = await transaction.get(_vehicleCrews.doc(crewId));
-        final crewData = crewDocSnap.data();
-        final isCrewActive = crewData?['active'] == true;
-        if (isCrewActive) {
-          final crewDogId = crewData?['service_dog_id']?.toString().trim();
-          if (crewDogId != null && crewDogId.isNotEmpty) {
-            throw StateError(
-              'Guarnição já possui K9 embarcado. '
-              'Máximo 1 cão por guarnição.',
-            );
-          }
+      if (activeDogId.isNotEmpty && isCrewActive) {
+        final crewDogId = crewData?['service_dog_id']?.toString().trim();
+        if (crewDogId != null && crewDogId.isNotEmpty && crewDogId != activeDogId) {
+          throw StateError(
+            'Guarnição já possui K9 embarcado. '
+            'Máximo 1 cão por guarnição.',
+          );
         }
       }
 
@@ -335,28 +333,42 @@ class ShiftService {
         }, SetOptions(merge: true));
       }
 
-      // ── vehicle_crews/{vehicle_id} — só atualiza, não sobrescreve created_at ──
-      final crewDocData = <String, dynamic>{
-        'id': crewId,
-        'vehicle_id': vehicle.id,
-        'vehicle_label': vehicle.label,
-        'vehicle_prefix': vehicle.prefix,
-        'vehicle_model': vehicle.modelName,
-        'vehicle_unit': vehicle.unit,
-        'crew_size': vehicle.crewSize,
-        'service_dog_id': activeDogId,
-        'titular_handler_id': _nonEmpty(activeData['titular_handler_id']) ??
-            handlerId,
-        'active': true,
-        'updated_at': FieldValue.serverTimestamp(),
-        // ended_at: NÃO toca — só abertura limpa (startShift)
-        // created_at: NÃO sobrescreve — só abertura limpa (startShift)
-      };
-      transaction.set(
-        _vehicleCrews.doc(crewId),
-        crewDocData,
-        SetOptions(merge: true),
-      );
+      // ── vehicle_crews/{vehicle_id} ──
+      // Só atualiza o doc pai da guarnição se a guarnição não estiver ativa (abertura/reativação)
+      // ou se o usuário atual for o condutor titular da guarnição.
+      // Membros secundários não alteram o doc pai, respeitando as regras de segurança.
+      final titularHandlerId = crewData?['titular_handler_id']?.toString().trim();
+      final isTitular = !isCrewActive ||
+          titularHandlerId == handlerId ||
+          titularHandlerId == null ||
+          titularHandlerId.isEmpty;
+
+      if (isTitular) {
+        final effectiveDogId = activeDogId.isNotEmpty
+            ? activeDogId
+            : (crewData?['service_dog_id']?.toString().trim() ?? '');
+
+        final crewDocData = <String, dynamic>{
+          'id': crewId,
+          'vehicle_id': vehicle.id,
+          'vehicle_label': vehicle.label,
+          'vehicle_prefix': vehicle.prefix,
+          'vehicle_model': vehicle.modelName,
+          'vehicle_unit': vehicle.unit,
+          'crew_size': vehicle.crewSize,
+          'service_dog_id': effectiveDogId,
+          'titular_handler_id': _nonEmpty(activeData['titular_handler_id']) ??
+              titularHandlerId ??
+              handlerId,
+          'active': true,
+          'updated_at': FieldValue.serverTimestamp(),
+        };
+        transaction.set(
+          _vehicleCrews.doc(crewId),
+          crewDocData,
+          SetOptions(merge: true),
+        );
+      }
 
       // ── members/{ra} ──
       transaction.set(
