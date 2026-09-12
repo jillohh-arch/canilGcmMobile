@@ -55,7 +55,6 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     super.initState();
     final vm = context.read<OccurrenceViewModel>();
     vm.watchEvents(widget.occurrenceId);
-    vm.watchOccurrence(widget.occurrenceId);
     _occurrenceSub = vm.watchById(widget.occurrenceId).listen((occ) {
       if (!mounted) return;
       setState(() {
@@ -91,9 +90,10 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
   }
 
   Occurrence? _currentOccurrence(OccurrenceViewModel vm) {
+    if (_loadedOccurrence != null) return _loadedOccurrence;
     final open = vm.openOccurrence;
     if (open != null && open.id == widget.occurrenceId) return open;
-    return _loadedOccurrence;
+    return null;
   }
 
   Future<void> _loadOccurrence() async {

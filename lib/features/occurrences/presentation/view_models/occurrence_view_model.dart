@@ -128,25 +128,6 @@ class OccurrenceViewModel extends ChangeNotifier {
         );
   }
 
-  /// Observa reativamente uma ocorrência específica por ID e a define como [openOccurrence].
-  ///
-  /// Garante que alterações em campos do documento pai (endereço, natureza, etc.)
-  /// propaguem em tempo real para telas ativas em múltiplos dispositivos.
-  void watchOccurrence(String id) {
-    _openSub?.cancel();
-    _openSub = _repository
-        .watchById(id)
-        .listen(
-          (occ) {
-            _openOccurrence = occ;
-            notifyListeners();
-          },
-          onError: (e) {
-            debugPrint('[OccurrenceViewModel] watchOccurrence error: $e');
-          },
-        );
-  }
-
   /// Retorna o stream reativo de uma ocorrência por ID.
   Stream<Occurrence?> watchById(String id) {
     return _repository.watchById(id);

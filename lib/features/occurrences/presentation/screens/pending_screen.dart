@@ -34,7 +34,7 @@ class _PendingScreenState extends State<PendingScreen> {
   @override
   void initState() {
     super.initState();
-    _notificationsStream = _notificationService.getVisibleNotifications(
+    _notificationsStream = _notificationService.getAllNotifications(
       userId: widget.userId,
     );
   }
@@ -44,29 +44,33 @@ class _PendingScreenState extends State<PendingScreen> {
     return StreamBuilder<List<NotificationItem>>(
       stream: _notificationsStream,
       builder: (context, snapshot) {
-        final notifications = snapshot.data ?? const <NotificationItem>[];
-        final finalizedOccurrenceIds = notifications
+        final allNotifications = snapshot.data ?? const <NotificationItem>[];
+        final finalizedOccurrenceIds = allNotifications
             .where((item) =>
                 item.type == NotificationType.occurrenceFinalized &&
                 item.occurrenceId.isNotEmpty)
             .map((item) => item.occurrenceId)
             .toSet();
 
-        final actionItems = notifications
+        final visibleNotifications = allNotifications
+            .where((item) => !item.isArchived)
+            .toList();
+
+        final actionItems = visibleNotifications
             .where((item) =>
                 item.isOpenAction &&
                 !(item.type == NotificationType.occurrenceParticipationRequested &&
                     finalizedOccurrenceIds.contains(item.occurrenceId)))
             .toList()
           ..sort(_compareActionItems);
-        final notices = notifications
+        final notices = visibleNotifications
             .where((item) =>
                 !item.isOpenAction ||
                 (item.type == NotificationType.occurrenceParticipationRequested &&
                     finalizedOccurrenceIds.contains(item.occurrenceId)))
             .toList()
           ..sort(_compareByCreatedAtDesc);
-        final hasUnread = notifications.any((item) => item.isUnread);
+        final hasUnread = visibleNotifications.any((item) => item.isUnread);
 
         return Scaffold(
           backgroundColor: AppTheme.background,

@@ -314,23 +314,26 @@ class NotificationService {
   /// composta, para evitar depender de índice enquanto a migração/backfill roda.
   ///
   /// D3: Ocorrências seladas não podem reter solicitações impossíveis de ciência
-  /// sob contagem acionável. Se o feed já possui `occurrenceFinalized` daquela
-  /// ocorrência, a pendência de participação é desqualificada de ação aberta.
+  /// sob contagem acionável. O conjunto de ocorrências finalizadas é derivado
+  /// de TODAS as notificações conhecidas do usuário (incluindo avisos arquivados
+  /// ou lidos), garantindo que arquivar a notificação de finalização não
+  /// ressuscite uma solicitação de participação pendente (actionRequired).
   Stream<List<NotificationItem>> getOpenActionNotifications({
     required String userId,
   }) {
-    return getVisibleNotifications(
+    return getAllNotifications(
       userId: userId,
-    ).map((items) {
-      final finalizedOccurrenceIds = items
+    ).map((allItems) {
+      final finalizedOccurrenceIds = allItems
           .where((item) =>
               item.type == NotificationType.occurrenceFinalized &&
               item.occurrenceId.isNotEmpty)
           .map((item) => item.occurrenceId)
           .toSet();
 
-      return items
+      return allItems
           .where((item) =>
+              !item.isArchived &&
               item.isOpenAction &&
               !(item.type == NotificationType.occurrenceParticipationRequested &&
                   finalizedOccurrenceIds.contains(item.occurrenceId)))

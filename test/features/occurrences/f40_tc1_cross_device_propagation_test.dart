@@ -142,7 +142,7 @@ void main() {
       await subscription.cancel();
     });
 
-    test('OccurrenceViewModel.watchOccurrence keeps openOccurrence updated on parent doc change', () async {
+    test('OccurrenceViewModel.watchById returns reactive stream that updates on parent doc change', () async {
       final initialOccurrence = Occurrence(
         id: occurrenceId,
         shiftId: 'shift-001',
@@ -159,12 +159,14 @@ void main() {
       );
       await occurrenceRepo.create(initialOccurrence);
 
-      occurrenceVM.watchOccurrence(occurrenceId);
+      final snapshots = <Occurrence?>[];
+      final sub = occurrenceVM.watchById(occurrenceId).listen(snapshots.add);
 
       await pumpEventQueue();
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
-      expect(occurrenceVM.openOccurrence?.locationAddress, equals('Rua Alfa, 10'));
+      expect(snapshots.isNotEmpty, isTrue);
+      expect(snapshots.last?.locationAddress, equals('Rua Alfa, 10'));
 
       // Device A modifies address
       await occurrenceRepo.update(occurrenceId, {
@@ -174,7 +176,9 @@ void main() {
       await pumpEventQueue();
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
-      expect(occurrenceVM.openOccurrence?.locationAddress, equals('Rua Beta, 20'));
+      expect(snapshots.last?.locationAddress, equals('Rua Beta, 20'));
+
+      await sub.cancel();
     });
   });
 }
