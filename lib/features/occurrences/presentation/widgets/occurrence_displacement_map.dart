@@ -130,9 +130,20 @@ class _OccurrenceDisplacementMapState extends State<OccurrenceDisplacementMap> {
       myLocationButtonEnabled: false,
       mapToolbarEnabled: false,
       onMapCreated: (controller) {
-        controller.animateCamera(
-          CameraUpdate.newLatLngBounds(bounds, 40),
-        );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          try {
+            controller.animateCamera(
+              CameraUpdate.newLatLngBounds(bounds, 40),
+            );
+          } catch (_) {
+            controller.animateCamera(
+              CameraUpdate.newCameraPosition(
+                CameraPosition(target: points.first, zoom: 15),
+              ),
+            );
+          }
+        });
       },
       polylines: points.length > 1
           ? {

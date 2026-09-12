@@ -560,6 +560,11 @@ class _HeaderMenuButton extends StatelessWidget {
     // Sem guard de mounted: ao encerrar o turno o app troca de tela e desmonta
     // este widget. O AppFeedback detecta isso e roteia para o messenger global,
     // que sobrevive à navegação.
+    if (shiftVM.error != null && shiftVM.error!.trim().isNotEmpty) {
+      // ignore: use_build_context_synchronously
+      AppFeedback.error(context, shiftVM.error!);
+      return;
+    }
     // ignore: use_build_context_synchronously
     AppFeedback.success(context, 'Expediente finalizado. Bom descanso, GCM!', title: 'Até logo');
   }

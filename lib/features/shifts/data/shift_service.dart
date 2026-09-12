@@ -480,8 +480,19 @@ class ShiftService {
     final vehicleId = activeData?['vehicle_id']?.toString().trim();
     final dogId = activeData?['service_dog_id']?.toString().trim();
 
-    // Verificar se é o último member ativo da guarnição
-    final bool closeCrew =
+    // Ler doc da guarnição para checar se quem está encerrando é o titular
+    final DocumentSnapshot<Map<String, dynamic>>? crewDoc =
+        (crewId != null && crewId.isNotEmpty)
+            ? await _vehicleCrews.doc(crewId).get()
+            : null;
+    final crewData = crewDoc?.data();
+    final titularHandlerId =
+        crewData?['titular_handler_id']?.toString().trim();
+    final bool isTitular = titularHandlerId != null &&
+        titularHandlerId.toLowerCase() == handlerId.toLowerCase();
+
+    // Fechar guarnição somente se for o titular e não houver outros membros ativos
+    final bool closeCrew = isTitular &&
         crewId != null &&
         crewId.isNotEmpty &&
         vehicleId != null &&
@@ -491,18 +502,25 @@ class ShiftService {
           excludingHandlerId: handlerId,
         ));
 
-    // Phase 2: ler members e doc pai antes da transaction (para o snapshot)
+    // Phase 2: ler members antes da transaction (para o snapshot se closeCrew)
     final List<QueryDocumentSnapshot<Map<String, dynamic>>>? allMembers =
         closeCrew ? await _getAllMembers(crewId) : null;
-    final DocumentSnapshot<Map<String, dynamic>>? crewDoc =
-        closeCrew ? await _vehicleCrews.doc(crewId).get() : null;
 
     // Phase 3: transaction atômica
     return _db.runTransaction((transaction) async {
-      // ── active_shifts — marca como ended ──
+      // ── active_shifts — marca como ended e limpa campos de viatura ──
       transaction.set(activeRef, {
         'status': 'ended',
         'endedAt': endedAt,
+        'vehicle_id': null,
+        'vehicle_label': null,
+        'vehicle_prefix': null,
+        'vehicle_model': null,
+        'vehicle_unit': null,
+        'vehicle_crew_id': null,
+        'crew_role': null,
+        'crew_status': null,
+        'vehicle_joined_at': null,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
@@ -511,54 +529,66 @@ class ShiftService {
         transaction.set(_shiftLogs.doc(shiftId), {
           'status': 'ended',
           'endedAt': endedAt,
+          'vehicle_id': null,
+          'vehicle_label': null,
+          'vehicle_prefix': null,
+          'vehicle_model': null,
+          'vehicle_unit': null,
+          'vehicle_crew_id': null,
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       }
 
       // ── vehicle_crews/{crewId}/members/{handlerId} — marca saída ──
+      // HEALTH-V1-OP-AUTH: remoção usa `FieldValue.delete()`, NUNCA `null` ou
+      // `dogId` não-verificado, preservando a regra de proveniência do K9.
       if (crewId != null && crewId.isNotEmpty) {
         transaction.set(
           _vehicleCrews.doc(crewId).collection('members').doc(handlerId),
           {
             'status': 'ended',
             'left_at': endedAt,
-            'dog_id': dogId,
+            'dog_id': FieldValue.delete(),
             'updated_at': FieldValue.serverTimestamp(),
           },
           SetOptions(merge: true),
         );
 
-        if (closeCrew) {
-          // Criar snapshot imutável da guarnição
-          _writeCrewHistorySnapshot(
-            transaction: transaction,
-            crewId: crewId,
-            vehicleId: vehicleId,
-            membersDocs: allMembers ?? [],
-            crewData: crewDoc?.data(),
-            endedAt: endedAt,
-            endedBy: handlerId,
-            shiftIds:
-                shiftId != null && shiftId.isNotEmpty ? [shiftId] : <String>[],
-          );
+        if (isTitular) {
+          if (closeCrew) {
+            // Criar snapshot imutável da guarnição
+            _writeCrewHistorySnapshot(
+              transaction: transaction,
+              crewId: crewId,
+              vehicleId: vehicleId,
+              membersDocs: allMembers ?? [],
+              crewData: crewData,
+              endedAt: endedAt,
+              endedBy: handlerId,
+              shiftIds:
+                  shiftId != null && shiftId.isNotEmpty ? [shiftId] : <String>[],
+            );
 
-          // Marcar guarnição como encerrada
-          transaction.set(_vehicleCrews.doc(crewId), {
-            'active': false,
-            'ended_at': endedAt,
-            'service_dog_id': FieldValue.delete(),
-            'updated_at': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-        } else {
-          // ── Guarnição continua (outros members ativos):
-          //    se quem encerra era o condutor K9, limpa service_dog_id do doc pai.
-          //    dogId foi lido antes da transaction (activeData).
-          if (dogId != null && dogId.isNotEmpty) {
+            // Marcar guarnição como encerrada
             transaction.set(_vehicleCrews.doc(crewId), {
+              'active': false,
+              'ended_at': endedAt,
               'service_dog_id': FieldValue.delete(),
+              'updated_at': FieldValue.serverTimestamp(),
             }, SetOptions(merge: true));
+          } else {
+            // Guarnição continua (outros members ativos):
+            // se quem encerra era o condutor K9, limpa service_dog_id do doc pai.
+            if (dogId != null && dogId.isNotEmpty) {
+              transaction.update(_vehicleCrews.doc(crewId), {
+                'service_dog_id': FieldValue.delete(),
+                'updated_at': FieldValue.serverTimestamp(),
+              });
+            }
           }
         }
+        // Se NÃO for titular: não toca no doc pai _vehicleCrews.doc(crewId)!
+        // As Firestore Rules restringem a mutação de vehicle_crews ao titular.
       }
     });
   }
@@ -774,7 +804,17 @@ class ShiftService {
       return;
     }
 
+    // Ler doc da guarnição para checar se é titular antes de mutar doc pai
+    final crewDoc = await _vehicleCrews.doc(previousCrewId).get();
+    final crewData = crewDoc.data();
+    final titularHandlerId =
+        crewData?['titular_handler_id']?.toString().trim();
+    final bool isTitular = titularHandlerId != null &&
+        titularHandlerId.toLowerCase() == handlerId.toLowerCase();
+
     return _db.runTransaction((transaction) async {
+      await transaction.get(activeRef);
+
       // ── 1) Marcar membro como saiu ──
       // dog_id limpo junto na saída (rule exige dog_id no affectedKeys).
       //
@@ -795,13 +835,12 @@ class ShiftService {
         SetOptions(merge: true),
       );
 
-      // ── 1b) Limpar service_dog_id do doc pai SE o saindo era o condutor K9 ──
-      // dogId lido antes da transaction (activeData já contém o dog_id do member).
-      // Se o member não tinha cão (dogId vazio/nulo), não limpa — outro membro
-      // pode ser o condutor K9 ativo na guarnição.
-      if (dogId != null && dogId.isNotEmpty) {
+      // ── 1b) Limpar service_dog_id do doc pai SE o saindo era o condutor K9 titular ──
+      // Apenas o titular tem permissão para alterar o documento raiz da guarnição.
+      if (isTitular && dogId != null && dogId.isNotEmpty) {
         transaction.set(_vehicleCrews.doc(previousCrewId), {
           'service_dog_id': FieldValue.delete(),
+          'updated_at': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       }
 

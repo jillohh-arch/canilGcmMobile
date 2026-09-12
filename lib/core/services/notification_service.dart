@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -75,12 +77,16 @@ class NotificationService {
     return false;
   }
 
-  // Cache do stream base compartilhado. pending_badge, binomio_header e
-  // pending_screen consomem getOpenActionCount/getVisibleNotifications, que
-  // derivam de getAllNotifications — sem cache isso abre 3 listeners Firestore
-  // simultâneos na mesma subcoleção. Com broadcast + cache por userId, fica 1.
+  // Cache do stream base compartilhado com replay do último valor conhecido.
+  // pending_badge, binomio_header e pending_screen consomem
+  // getOpenActionCount/getVisibleNotifications, que derivam de getAllNotifications.
+  // Sem replay, ouvintes tardios (ex.: PendingScreen ao abrir após a badge já ter
+  // consumido o snapshot inicial) ficam em espera infinita por nova alteração.
+  // O replay entrega o snapshot mais recente imediatamente ao novo ouvinte.
   String? _cachedUserId;
-  Stream<List<NotificationItem>>? _cachedAllStream;
+  StreamController<List<NotificationItem>>? _cachedController;
+  StreamSubscription<List<NotificationItem>>? _firestoreSubscription;
+  List<NotificationItem>? _lastKnownNotifications;
 
   /// Cria uma nova notificação para um usuário.
   Future<String> createNotification({
@@ -316,13 +322,20 @@ class NotificationService {
 
   /// Obtém todas as notificações de um usuário.
   ///
-  /// O stream é cacheado como broadcast por userId: pending_badge,
-  /// binomio_header e pending_screen derivam daqui, então um único listener
-  /// Firestore serve a todos. limit(200) evita crescimento ilimitado de leitura.
+  /// O stream é cacheado como broadcast compartilhado por userId com replay do
+  /// último valor conhecido. pending_badge, binomio_header e pending_screen
+  /// derivam daqui, consumindo um único listener Firestore simultâneo.
+  /// Ouvintes subsequentes recebem imediatamente o snapshot em memória,
+  /// evitando starvation/loading infinito em telas abertas tardiamente.
   Stream<List<NotificationItem>> getAllNotifications({required String userId}) {
-    if (_cachedUserId != userId || _cachedAllStream == null) {
+    if (_cachedUserId != userId) {
+      invalidateCache();
       _cachedUserId = userId;
-      _cachedAllStream = _notificationsCollection
+    }
+
+    if (_cachedController == null) {
+      _cachedController = StreamController<List<NotificationItem>>.broadcast();
+      _firestoreSubscription = _notificationsCollection
           .doc(userId)
           .collection('items')
           .orderBy('created_at', descending: true)
@@ -333,15 +346,63 @@ class NotificationService {
                 .map((doc) => NotificationItem.fromJson(doc.data(), doc.id))
                 .toList(),
           )
-          .asBroadcastStream();
+          .listen(
+            (items) {
+              _lastKnownNotifications = items;
+              if (_cachedController != null && !_cachedController!.isClosed) {
+                _cachedController!.add(items);
+              }
+            },
+            onError: (err, stack) {
+              if (_cachedController != null && !_cachedController!.isClosed) {
+                _cachedController!.addError(err, stack);
+              }
+            },
+          );
     }
-    return _cachedAllStream!;
+
+    late final StreamController<List<NotificationItem>> subscriberController;
+    StreamSubscription<List<NotificationItem>>? liveSubscription;
+
+    subscriberController = StreamController<List<NotificationItem>>(
+      onListen: () {
+        if (_lastKnownNotifications != null) {
+          subscriberController.add(_lastKnownNotifications!);
+        }
+        liveSubscription = _cachedController!.stream.listen(
+          (items) {
+            if (!subscriberController.isClosed) {
+              subscriberController.add(items);
+            }
+          },
+          onError: (err, stack) {
+            if (!subscriberController.isClosed) {
+              subscriberController.addError(err, stack);
+            }
+          },
+          onDone: () {
+            if (!subscriberController.isClosed) {
+              subscriberController.close();
+            }
+          },
+        );
+      },
+      onCancel: () async {
+        await liveSubscription?.cancel();
+      },
+    );
+
+    return subscriberController.stream;
   }
 
   /// Invalida o cache ao trocar de usuário (ex: logout/login).
   void invalidateCache() {
     _cachedUserId = null;
-    _cachedAllStream = null;
+    _lastKnownNotifications = null;
+    _firestoreSubscription?.cancel();
+    _firestoreSubscription = null;
+    _cachedController?.close();
+    _cachedController = null;
   }
 
   /// Conta notificações não lidas.

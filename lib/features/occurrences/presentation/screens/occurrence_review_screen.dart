@@ -398,6 +398,18 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
+                      if (occurrence.status.isClosed) ...[
+                        _SectionCard(
+                          icon: Icons.lock_outline,
+                          title: 'Ocorrência selada',
+                          children: const [
+                            Text(
+                              'Esta ocorrência foi finalizada e selada pelo encarregado. Não há ações pendentes de resposta ou assinatura.',
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       _SectionCard(
                         icon: Icons.groups_outlined,
                         title: 'Equipe e assinaturas',
@@ -452,6 +464,10 @@ class _ActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!canRespondParticipation && !canSign && !canRequestCorrection) {
+      return const SizedBox.shrink();
+    }
+
     return SafeArea(
       top: false,
       child: Container(

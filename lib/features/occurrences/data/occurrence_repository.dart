@@ -916,6 +916,20 @@ class OccurrenceRepository {
     return occ;
   }
 
+  /// Observa reativamente uma ocorrência específica por ID.
+  ///
+  /// Garante que alterações em campos do documento pai (endereço, natureza,
+  /// observação inicial, etc.) reflitam em tempo real nos observadores
+  /// em múltiplos dispositivos conectados à mesma ocorrência.
+  Stream<Occurrence?> watchById(String id) {
+    return _collection.doc(id).snapshots().map((snap) {
+      if (!snap.exists || snap.data() == null) return null;
+      final occ = Occurrence.fromMap(snap.data()!, snap.id);
+      if (occ.isDeleted) return null;
+      return occ;
+    });
+  }
+
   Stream<List<Occurrence>> watchByDog(String dogId) {
     return _collection.where('dog_id', isEqualTo: dogId).snapshots().map((
       snap,
