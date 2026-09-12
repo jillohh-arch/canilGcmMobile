@@ -312,12 +312,30 @@ class NotificationService {
   ///
   /// Este stream é propositalmente derivado do modelo em memória, sem query
   /// composta, para evitar depender de índice enquanto a migração/backfill roda.
+  ///
+  /// D3: Ocorrências seladas não podem reter solicitações impossíveis de ciência
+  /// sob contagem acionável. Se o feed já possui `occurrenceFinalized` daquela
+  /// ocorrência, a pendência de participação é desqualificada de ação aberta.
   Stream<List<NotificationItem>> getOpenActionNotifications({
     required String userId,
   }) {
     return getVisibleNotifications(
       userId: userId,
-    ).map((items) => items.where((item) => item.isOpenAction).toList());
+    ).map((items) {
+      final finalizedOccurrenceIds = items
+          .where((item) =>
+              item.type == NotificationType.occurrenceFinalized &&
+              item.occurrenceId.isNotEmpty)
+          .map((item) => item.occurrenceId)
+          .toSet();
+
+      return items
+          .where((item) =>
+              item.isOpenAction &&
+              !(item.type == NotificationType.occurrenceParticipationRequested &&
+                  finalizedOccurrenceIds.contains(item.occurrenceId)))
+          .toList();
+    });
   }
 
   /// Obtém todas as notificações de um usuário.

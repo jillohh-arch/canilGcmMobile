@@ -45,12 +45,27 @@ class _PendingScreenState extends State<PendingScreen> {
       stream: _notificationsStream,
       builder: (context, snapshot) {
         final notifications = snapshot.data ?? const <NotificationItem>[];
-        final actionItems =
-            notifications.where((item) => item.isOpenAction).toList()
-              ..sort(_compareActionItems);
-        final notices =
-            notifications.where((item) => !item.isOpenAction).toList()
-              ..sort(_compareByCreatedAtDesc);
+        final finalizedOccurrenceIds = notifications
+            .where((item) =>
+                item.type == NotificationType.occurrenceFinalized &&
+                item.occurrenceId.isNotEmpty)
+            .map((item) => item.occurrenceId)
+            .toSet();
+
+        final actionItems = notifications
+            .where((item) =>
+                item.isOpenAction &&
+                !(item.type == NotificationType.occurrenceParticipationRequested &&
+                    finalizedOccurrenceIds.contains(item.occurrenceId)))
+            .toList()
+          ..sort(_compareActionItems);
+        final notices = notifications
+            .where((item) =>
+                !item.isOpenAction ||
+                (item.type == NotificationType.occurrenceParticipationRequested &&
+                    finalizedOccurrenceIds.contains(item.occurrenceId)))
+            .toList()
+          ..sort(_compareByCreatedAtDesc);
         final hasUnread = notifications.any((item) => item.isUnread);
 
         return Scaffold(

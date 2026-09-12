@@ -172,5 +172,53 @@ void main() {
       await subA.cancel();
       await subB.cancel();
     });
+
+    test('D3 — participation request for sealed occurrence is excluded from open action count and items', () async {
+      const userId = '990002';
+      const occurrenceId = 'occ_sealed_123';
+
+      // Seed unsealed participation request
+      await fakeFirestore
+          .collection('notifications')
+          .doc(userId)
+          .collection('items')
+          .doc('opened_${occurrenceId}_$userId')
+          .set({
+        'title': 'Ocorrência Geral',
+        'type': 'occurrence_participation_requested',
+        'occurrence_id': occurrenceId,
+        'action_required': true,
+        'resolved_at': null,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      // While open: getOpenActionCount is 1
+      final openItems = await notificationService.getOpenActionNotifications(userId: userId).first;
+      expect(openItems.length, equals(1));
+      expect(openItems.first.id, equals('opened_${occurrenceId}_$userId'));
+
+      // Now occurrence is sealed by primary handler -> occurrence_finalized arrives
+      await fakeFirestore
+          .collection('notifications')
+          .doc(userId)
+          .collection('items')
+          .doc('finalized_${occurrenceId}_$userId')
+          .set({
+        'title': 'Ocorrência Finalizada',
+        'type': 'occurrence_finalized',
+        'occurrence_id': occurrenceId,
+        'action_required': false,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      // Re-read open actions: participation request is now superseded/excluded from open action count
+      final updatedOpenItems = await notificationService.getOpenActionNotifications(userId: userId).first;
+      expect(updatedOpenItems.isEmpty, isTrue,
+          reason: 'Sealed occurrence participation request must not count as open action');
+
+      // Still visible in overall feed as notice
+      final visibleItems = await notificationService.getVisibleNotifications(userId: userId).first;
+      expect(visibleItems.length, equals(2));
+    });
   });
 }

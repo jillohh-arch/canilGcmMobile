@@ -804,17 +804,7 @@ class ShiftService {
       return;
     }
 
-    // Ler doc da guarnição para checar se é titular antes de mutar doc pai
-    final crewDoc = await _vehicleCrews.doc(previousCrewId).get();
-    final crewData = crewDoc.data();
-    final titularHandlerId =
-        crewData?['titular_handler_id']?.toString().trim();
-    final bool isTitular = titularHandlerId != null &&
-        titularHandlerId.toLowerCase() == handlerId.toLowerCase();
-
     return _db.runTransaction((transaction) async {
-      await transaction.get(activeRef);
-
       // ── 1) Marcar membro como saiu ──
       // dog_id limpo junto na saída (rule exige dog_id no affectedKeys).
       //
@@ -835,12 +825,13 @@ class ShiftService {
         SetOptions(merge: true),
       );
 
-      // ── 1b) Limpar service_dog_id do doc pai SE o saindo era o condutor K9 titular ──
-      // Apenas o titular tem permissão para alterar o documento raiz da guarnição.
-      if (isTitular && dogId != null && dogId.isNotEmpty) {
+      // ── 1b) Limpar service_dog_id do doc pai SE o saindo era o condutor K9 ──
+      // dogId lido antes da transaction (activeData já contém o dog_id do member).
+      // Se o member não tinha cão (dogId vazio/nulo), não limpa — outro membro
+      // pode ser o condutor K9 ativo na guarnição.
+      if (dogId != null && dogId.isNotEmpty) {
         transaction.set(_vehicleCrews.doc(previousCrewId), {
           'service_dog_id': FieldValue.delete(),
-          'updated_at': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       }
 
