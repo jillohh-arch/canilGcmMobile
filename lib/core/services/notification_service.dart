@@ -12,6 +12,13 @@ typedef NotificationWriter = Future<void> Function(
 );
 
 class NotificationService {
+  static final Set<String> _dispatchedNotificationKeys = <String>{};
+
+  @visibleForTesting
+  static void clearDispatchedKeysForTesting() {
+    _dispatchedNotificationKeys.clear();
+  }
+
   static NotificationService? _instance;
   factory NotificationService({
     FirebaseFirestore? firestore,
@@ -112,6 +119,14 @@ class NotificationService {
       data['resolved_at'] = null;
     }
 
+    final dispatchKey = '$userId:$resolvedNotificationId';
+    if (deduplicate && _dispatchedNotificationKeys.contains(dispatchKey)) {
+      debugPrint(
+        '[NotificationService] Notificação duplicada já enviada ignorada para $userId: $resolvedNotificationId',
+      );
+      return resolvedNotificationId;
+    }
+
     try {
       if (deduplicate && _isOwnNotification(userId)) {
         final existing = await docRef.get();
@@ -119,10 +134,14 @@ class NotificationService {
           debugPrint(
             '[NotificationService] Notificação duplicada ignorada para $userId: $resolvedNotificationId',
           );
+          _dispatchedNotificationKeys.add(dispatchKey);
           return resolvedNotificationId;
         }
       }
       await (_notificationWriter?.call(docRef, data) ?? docRef.set(data));
+      if (deduplicate) {
+        _dispatchedNotificationKeys.add(dispatchKey);
+      }
       debugPrint(
         '[NotificationService] Notificação criada: $type para $userId ($resolvedNotificationId)',
       );
@@ -130,8 +149,8 @@ class NotificationService {
       // R3: nunca engolir permission-denied genérico. Falhas reais de segurança
       // (escritor não autorizado N4, payload inválido N5, destinatário errado N6)
       // DEVEM propagar para que o chamador observe a falha. Duplicatas legítimas
-      // cross-user são tratadas pelo chamador (_notifyTeamOccurrenceOpened) via
-      // try/catch local + dispatch único; não há necessidade de silenciar aqui.
+      // em mesma sessão são suprimidas benignamente por _dispatchedNotificationKeys;
+      // falhas de segurança reais nunca chegam a registrar a chave e sempre propagam.
       debugPrint(
         '[NotificationService] Erro ao criar notificação $type para $userId: $e',
       );

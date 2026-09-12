@@ -39,8 +39,12 @@ const ctxHandlerA = testEnv.authenticatedContext('uid_990001', {
 const ctxHandlerB = testEnv.authenticatedContext('uid_990002', {
   email: `${HANDLER_B_RA}@gcm.com.br`,
 });
+const ctxHandlerC = testEnv.authenticatedContext('uid_990003', {
+  email: '990003@gcm.com.br',
+});
 const dbA = ctxHandlerA.firestore();
 const dbB = ctxHandlerB.firestore();
+const dbC = ctxHandlerC.firestore();
 
 // Setup occurrence first so canCreateNotification can validate occurrence and participants
 const occId = `occ_test_team_query_${Date.now()}`;
@@ -136,6 +140,56 @@ const testNotifId = `opened_${occId}_${HANDLER_B_RA}`;
   console.log('[PASS] T1.5: Occurrence discovery via team_handler_ids SUCCEEDS without new composite index');
 }
 
-console.log('--- ALL F40.TC1 Rules Tests PASSED Successfully ---');
+// Test 6: N4 - Unauthorized writer (Handler C is not participant in occId) creating notification is DENIED by rules
+{
+  const notifIdC = `opened_${occId}_c_attack`;
+  const targetDoc = doc(dbC, `notifications/${HANDLER_B_RA}/items/${notifIdC}`);
+  await assertFails(
+    setDoc(targetDoc, {
+      type: 'occurrence_participation_requested',
+      occurrence_id: occId,
+      occurrence_title: 'Ocorrência Geral',
+      created_at: new Date(),
+      read_at: null,
+    })
+  );
+  console.log('[PASS] T1.6: N4 - Unauthorized writer (non-participant) creating notification is DENIED by rules');
+}
+
+// Test 7: N5 - Invalid payload (illegal schema field) is DENIED by rules
+{
+  const notifIdInvalidPayload = `opened_${occId}_invalid_payload`;
+  const targetDoc = doc(dbA, `notifications/${HANDLER_B_RA}/items/${notifIdInvalidPayload}`);
+  await assertFails(
+    setDoc(targetDoc, {
+      type: 'occurrence_participation_requested',
+      occurrence_id: occId,
+      occurrence_title: 'Ocorrência Geral',
+      created_at: new Date(),
+      read_at: null,
+      illegal_field: 'unauthorized_payload_mutation',
+    })
+  );
+  console.log('[PASS] T1.7: N5 - Handler creating notification with invalid payload is DENIED by rules');
+}
+
+// Test 8: N6 - Invalid recipient (Handler D 990099 is not in team_handler_ids) is DENIED by rules
+{
+  const INVALID_RECIPIENT_RA = '990099';
+  const notifIdInvalidRecipient = `opened_${occId}_invalid_recipient`;
+  const targetDoc = doc(dbA, `notifications/${INVALID_RECIPIENT_RA}/items/${notifIdInvalidRecipient}`);
+  await assertFails(
+    setDoc(targetDoc, {
+      type: 'occurrence_participation_requested',
+      occurrence_id: occId,
+      occurrence_title: 'Ocorrência Geral',
+      created_at: new Date(),
+      read_at: null,
+    })
+  );
+  console.log('[PASS] T1.8: N6 - Handler creating notification for non-team recipient is DENIED by rules');
+}
+
+console.log('--- ALL F40.TC1 Rules Tests (8/8) PASSED Successfully ---');
 await testEnv.cleanup();
 process.exit(0);

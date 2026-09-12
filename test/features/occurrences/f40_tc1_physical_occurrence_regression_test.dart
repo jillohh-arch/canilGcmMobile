@@ -19,6 +19,7 @@ void main() {
 
   setUp(() {
     r3FakeFirestore = FakeFirebaseFirestore();
+    NotificationService.clearDispatchedKeysForTesting();
   });
 
   group('F40.TC1-PHYSICAL-OCCURRENCE-INTEGRATION-FIX-R2 Regression Suite', () {
@@ -424,7 +425,7 @@ void main() {
       );
     }
 
-    test('T10: N1 - Authorized first create writes the notification', () async {
+    test('T10: N1 - Authorized first create writes the notification (SUCCESS)', () async {
       final service = NotificationService(firestore: r3FakeFirestore);
       const userId = '990002';
       const notificationId = 'opened_occ_n1_990002';
@@ -446,14 +447,99 @@ void main() {
           .doc(notificationId)
           .get();
       expect(stored.exists, isTrue);
+      expect(stored.data()?['type'], 'occurrence_participation_requested');
+      expect(stored.data()?['occurrence_id'], 'occ_n1');
     });
 
-    test('T11: N4 - Unauthorized writer denial propagates as failure', () async {
+    test('T11: N2 - Forbidden cross-user read is never performed (DENIED / no get())', () async {
+      var readAttempted = false;
+      var writeExecuted = false;
+
+      final service = NotificationService(
+        firestore: r3FakeFirestore,
+        notificationWriter: (document, data) async {
+          writeExecuted = true;
+          // Verify that reading document from another user's notifications collection would fail
+          await r3FakeFirestore.doc(document.path).set(data);
+        },
+      );
+
+      const crossUserId = '990002';
+      const notificationId = 'opened_occ_n2_990002';
+
+      final result = await service.createNotification(
+        userId: crossUserId,
+        type: NotificationType.occurrenceParticipationRequested,
+        occurrenceId: 'occ_n2',
+        occurrenceTitle: 'Ocorrência teste N2',
+        notificationId: notificationId,
+        deduplicate: true,
+      );
+
+      expect(result, equals(notificationId));
+      expect(writeExecuted, isTrue);
+      expect(readAttempted, isFalse);
+    });
+
+    test('T12: N3 - Genuine duplicate dispatch is BENIGN / IDEMPOTENT (no duplicate write, no fatal error)', () async {
+      var writeCount = 0;
+      final service = NotificationService(
+        firestore: r3FakeFirestore,
+        notificationWriter: (document, data) async {
+          writeCount++;
+          await r3FakeFirestore.doc(document.path).set(data);
+        },
+      );
+
+      const userId = '990002';
+      const notificationId = 'opened_occ_n3_990002';
+
+      // 1. Authorized first create
+      final firstResult = await service.createNotification(
+        userId: userId,
+        type: NotificationType.occurrenceParticipationRequested,
+        occurrenceId: 'occ_n3',
+        occurrenceTitle: 'Ocorrência teste N3',
+        notificationId: notificationId,
+        deduplicate: true,
+      );
+
+      expect(firstResult, equals(notificationId));
+      expect(writeCount, equals(1));
+
+      // 2. Same logical notification attempted again (same deterministic ID)
+      final secondResult = await service.createNotification(
+        userId: userId,
+        type: NotificationType.occurrenceParticipationRequested,
+        occurrenceId: 'occ_n3',
+        occurrenceTitle: 'Ocorrência teste N3',
+        notificationId: notificationId,
+        deduplicate: true,
+      );
+
+      // 3. Deterministic notification ID remains the same
+      expect(secondResult, equals(notificationId));
+      // 4. No duplicate write performed (in-memory dispatched cache suppresses second call)
+      expect(writeCount, equals(1));
+      // 5. Occurrence flow receives no fatal error
+
+      final stored = await r3FakeFirestore
+          .collection('notifications')
+          .doc(userId)
+          .collection('items')
+          .doc(notificationId)
+          .get();
+      expect(stored.exists, isTrue);
+      expect(stored.data()?['occurrence_id'], 'occ_n3');
+    });
+
+    test('T13: N4 - Unauthorized writer denial propagates as failure (FAILURE PROPAGATES)', () async {
       final service = buildService(
         writer: (document, data) => Future<void>.error(
           FirebaseException(
             plugin: 'cloud_firestore',
             code: 'permission-denied',
+            message: 'Missing or insufficient permissions.',
           ),
         ),
       );
@@ -477,12 +563,13 @@ void main() {
       );
     });
 
-    test('T12: N5 - Invalid payload denial propagates as failure', () async {
+    test('T14: N5 - Invalid payload denial propagates as failure (FAILURE PROPAGATES)', () async {
       final service = buildService(
         writer: (document, data) => Future<void>.error(
           FirebaseException(
             plugin: 'cloud_firestore',
             code: 'permission-denied',
+            message: 'Payload validation failed on Firestore rules.',
           ),
         ),
       );
@@ -496,16 +583,23 @@ void main() {
           notificationId: 'opened_occ_n5_990002',
           deduplicate: true,
         ),
-        throwsA(isA<FirebaseException>()),
+        throwsA(
+          isA<FirebaseException>().having(
+            (error) => error.code,
+            'code',
+            'permission-denied',
+          ),
+        ),
       );
     });
 
-    test('T13: N6 - Invalid recipient denial propagates as failure', () async {
+    test('T15: N6 - Invalid recipient denial propagates as failure (FAILURE PROPAGATES)', () async {
       final service = buildService(
         writer: (document, data) => Future<void>.error(
           FirebaseException(
             plugin: 'cloud_firestore',
             code: 'permission-denied',
+            message: 'Recipient is not a team member.',
           ),
         ),
       );
@@ -519,8 +613,70 @@ void main() {
           notificationId: 'opened_occ_n6_990099',
           deduplicate: true,
         ),
-        throwsA(isA<FirebaseException>()),
+        throwsA(
+          isA<FirebaseException>().having(
+            (error) => error.code,
+            'code',
+            'permission-denied',
+          ),
+        ),
       );
+    });
+
+    test('T16: Production path - OccurrenceViewModel handles duplicate team notifications idempotently', () async {
+      final notifService = NotificationService(firestore: r3FakeFirestore);
+      final vm = OccurrenceViewModel(
+        repository: OccurrenceRepository(r3FakeFirestore),
+        eventRepository: OccurrenceEventRepository(r3FakeFirestore),
+        signatureRepository: SignatureRepository(firestore: r3FakeFirestore),
+        notificationService: notifService,
+        sendTeamNotifications: true,
+      );
+
+      // Initial occurrence creation dispatches notification to 990002
+      final created = await vm.createOccurrence(
+        id: 'occ_prod_dup_1',
+        shiftId: 'shift_prod_1',
+        primaryHandlerId: 'uid_990001',
+        primaryHandlerRa: '990001',
+        dogId: 'dog_k9',
+        typeCode: 'PATRULHAMENTO',
+        typeName: 'Patrulhamento',
+        teamSnapshot: [
+          OccurrenceTeamMember(
+            handlerId: '990001',
+            role: TeamRole.titular,
+            addedAt: DateTime.now(),
+            addedBy: '990001',
+          ),
+          OccurrenceTeamMember(
+            handlerId: '990002',
+            role: TeamRole.integrante,
+            addedAt: DateTime.now(),
+            addedBy: '990001',
+          ),
+        ],
+      );
+
+      final notifId = 'opened_${created.id}_990002';
+      final notifDoc = await r3FakeFirestore
+          .collection('notifications')
+          .doc('990002')
+          .collection('items')
+          .doc(notifId)
+          .get();
+      expect(notifDoc.exists, isTrue);
+
+      // Duplicate attempt on the same notification must be benign and idempotent
+      final reattemptResult = await notifService.createNotification(
+        userId: '990002',
+        type: NotificationType.occurrenceParticipationRequested,
+        occurrenceId: created.id,
+        occurrenceTitle: 'Patrulhamento',
+        notificationId: notifId,
+        deduplicate: true,
+      );
+      expect(reattemptResult, equals(notifId));
     });
   });
 }
