@@ -7,69 +7,78 @@ extension _HistoryDataLoader on _HistoryScreenState {
     if (!shiftVM.hasActiveShift) return;
 
     final effectiveDogId = shiftVM.activeDogId ?? shiftVM.serviceDogId;
-    if (effectiveDogId == null || effectiveDogId.isEmpty) return;
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    final currentRa = HandlerIdentityService.raFromUser(authVM.user);
 
-    final dogId = effectiveDogId;
+    if (effectiveDogId != null && effectiveDogId.isNotEmpty) {
+      final dogId = effectiveDogId;
 
-    debugPrint(
-      '[History] _loadAllData chamado para dogId=$dogId (force=$forceReload)',
-    );
+      debugPrint(
+        '[History] _loadAllData chamado para dogId=$dogId (force=$forceReload)',
+      );
 
-    // Buscar treinos
-    final trainingVM = Provider.of<TrainingViewModel>(context, listen: false);
-    trainingVM
-        .fetchTrainingsForDog(dogId)
-        .then((_) {
-          final count = trainingVM.trainings.length;
-          debugPrint('[History] Treinos carregados: $count');
-        })
-        .catchError((e) {
-          debugPrint('[History] ERRO ao carregar treinos: $e');
-        });
+      // Buscar treinos
+      final trainingVM = Provider.of<TrainingViewModel>(context, listen: false);
+      trainingVM
+          .fetchTrainingsForDog(dogId)
+          .then((_) {
+            final count = trainingVM.trainings.length;
+            debugPrint('[History] Treinos carregados: $count');
+          })
+          .catchError((e) {
+            debugPrint('[History] ERRO ao carregar treinos: $e');
+          });
 
-    // Buscar registros de saúde
-    final healthVM = Provider.of<HealthViewModel>(context, listen: false);
-    healthVM
-        .fetchHealthLogsForDog(dogId)
-        .then((_) {
-          final count = healthVM.healthLogs.length;
-          debugPrint('[History] Saúde carregados: $count');
-        })
-        .catchError((e) {
-          debugPrint('[History] ERRO ao carregar saúde: $e');
-        });
+      // Buscar registros de saúde
+      final healthVM = Provider.of<HealthViewModel>(context, listen: false);
+      healthVM
+          .fetchHealthLogsForDog(dogId)
+          .then((_) {
+            final count = healthVM.healthLogs.length;
+            debugPrint('[History] Saúde carregados: $count');
+          })
+          .catchError((e) {
+            debugPrint('[History] ERRO ao carregar saúde: $e');
+          });
 
-    // Buscar nutrição
-    final nutritionVM = Provider.of<NutritionViewModel>(context, listen: false);
-    nutritionVM.loadForDog(dogId, forceReload: forceReload).catchError((e) {
-      debugPrint('[History] ERRO ao carregar nutrição: $e');
-    });
-    nutritionVM
-        .loadFullHistory(dogId)
-        .then((_) {
-          debugPrint(
-            '[History] Nutrição carregados: ${nutritionVM.historyFeedings.length}',
-          );
-        })
-        .catchError((e) {
-          debugPrint('[History] ERRO ao carregar histórico nutrição: $e');
-        });
+      // Buscar nutrição
+      final nutritionVM = Provider.of<NutritionViewModel>(context, listen: false);
+      nutritionVM.loadForDog(dogId, forceReload: forceReload).catchError((e) {
+        debugPrint('[History] ERRO ao carregar nutrição: $e');
+      });
+      nutritionVM
+          .loadFullHistory(dogId)
+          .then((_) {
+            debugPrint(
+              '[History] Nutrição carregados: ${nutritionVM.historyFeedings.length}',
+            );
+          })
+          .catchError((e) {
+            debugPrint('[History] ERRO ao carregar histórico nutrição: $e');
+          });
 
-    WeightHistoryService()
-        .getHistory(dogId, limit: 200)
-        .then((records) {
-          _replaceWeightRecords(records);
-          debugPrint(
-            '[History] Pesagens canônicas carregadas: ${records.length}',
-          );
-        })
-        .catchError((e) {
-          _replaceWeightRecords(const []);
-          debugPrint('[History] ERRO ao carregar pesagens canônicas: $e');
-        });
-    // Observar ocorrências (stream real-time)
-    Provider.of<OccurrenceViewModel>(context, listen: false).watchByDog(dogId);
-    debugPrint('[History] watchByDog iniciado para dogId=$dogId');
+      WeightHistoryService()
+          .getHistory(dogId, limit: 200)
+          .then((records) {
+            _replaceWeightRecords(records);
+            debugPrint(
+              '[History] Pesagens canônicas carregadas: ${records.length}',
+            );
+          })
+          .catchError((e) {
+            _replaceWeightRecords(const []);
+            debugPrint('[History] ERRO ao carregar pesagens canônicas: $e');
+          });
+      // Observar ocorrências (stream real-time)
+      Provider.of<OccurrenceViewModel>(context, listen: false).watchByDog(dogId);
+      debugPrint('[History] watchByDog iniciado para dogId=$dogId');
+    } else if (currentRa != null && currentRa.isNotEmpty) {
+      debugPrint(
+        '[History] _loadAllData chamado para handlerRa=$currentRa (force=$forceReload)',
+      );
+      Provider.of<OccurrenceViewModel>(context, listen: false).watchByHandler(currentRa);
+      debugPrint('[History] watchByHandler iniciado para handlerRa=$currentRa');
+    }
   }
 
   List<HistoryEntry> _buildAllEntries(String? dogId) {
@@ -94,59 +103,57 @@ extension _HistoryDataLoader on _HistoryScreenState {
         entries.add(_buildWeightRecordEntry(record, dogName));
       }
 
-      for (final occ in occurrenceVM.occurrences) {
-        if (occ.dogId == dogId) {
-          final isPersonalDog =
-              shiftVM.activeDogId != null && shiftVM.activeDogId == occ.dogId;
-          final isPrimary =
-              currentRa != null &&
-              (occ.primaryHandlerRa == currentRa ||
-                  occ.primaryHandlerId == currentRa);
-          final isTeamMember =
-              currentRa != null &&
-              (occ.teamHandlerIds.contains(currentRa) ||
-                  occ.acceptedHandlerIds.contains(currentRa));
-
-          if (isPersonalDog || isPrimary || isTeamMember) {
-            entries.add(_buildOccurrenceEntry(occ));
-          }
+      for (final training in trainingVM.trainings) {
+        if (training.dogId == dogId || training.dogId.isEmpty) {
+          entries.add(_buildTrainingEntry(training));
         }
       }
-    }
 
-    for (final training in trainingVM.trainings) {
-      if (training.dogId == dogId || training.dogId.isEmpty) {
-        entries.add(_buildTrainingEntry(training));
+      final feedings = nutritionVM.historyFeedings.isNotEmpty
+          ? nutritionVM.historyFeedings
+          : nutritionVM.todayFeedings;
+      for (final feeding in feedings) {
+        entries.add(
+          HistoryEntry(
+            id: feeding.id ?? 'nutrition_${feeding.fedAt.millisecondsSinceEpoch}',
+            type: HistoryEntryType.nutrition,
+            title: 'Alimentação registrada',
+            subtitle: 'Ração: ${feeding.amountGrams}g',
+            time: feeding.fedAt,
+            author: _resolveAuthorName(feeding.fedBy),
+            authorId: feeding.fedBy,
+            tag: 'NUTRIÇÃO',
+            icon: Icons.rice_bowl_rounded,
+            color: _hYellow,
+            originalModel: feeding,
+            details: {
+              'Período': _periodLabel(feeding.period),
+              'Quantidade': '${feeding.amountGrams}g',
+              'Prescrição': '${feeding.prescriptionAtTime}g',
+              'Divergência': '${feeding.divergencePercent.toStringAsFixed(1)}%',
+              if (feeding.observations?.trim().isNotEmpty == true)
+                'Observações': feeding.observations,
+            },
+          ),
+        );
       }
     }
 
-    final feedings = nutritionVM.historyFeedings.isNotEmpty
-        ? nutritionVM.historyFeedings
-        : nutritionVM.todayFeedings;
-    for (final feeding in feedings) {
-      entries.add(
-        HistoryEntry(
-          id: feeding.id ?? 'nutrition_${feeding.fedAt.millisecondsSinceEpoch}',
-          type: HistoryEntryType.nutrition,
-          title: 'Alimentação registrada',
-          subtitle: 'Ração: ${feeding.amountGrams}g',
-          time: feeding.fedAt,
-          author: _resolveAuthorName(feeding.fedBy),
-          authorId: feeding.fedBy,
-          tag: 'NUTRIÇÃO',
-          icon: Icons.rice_bowl_rounded,
-          color: _hYellow,
-          originalModel: feeding,
-          details: {
-            'Período': _periodLabel(feeding.period),
-            'Quantidade': '${feeding.amountGrams}g',
-            'Prescrição': '${feeding.prescriptionAtTime}g',
-            'Divergência': '${feeding.divergencePercent.toStringAsFixed(1)}%',
-            if (feeding.observations?.trim().isNotEmpty == true)
-              'Observações': feeding.observations,
-          },
-        ),
-      );
+    for (final occ in occurrenceVM.occurrences) {
+      final isPersonalDog =
+          shiftVM.activeDogId != null && shiftVM.activeDogId == occ.dogId;
+      final isPrimary =
+          currentRa != null &&
+          (occ.primaryHandlerRa == currentRa ||
+              occ.primaryHandlerId == currentRa);
+      final isTeamMember =
+          currentRa != null &&
+          (occ.teamHandlerIds.contains(currentRa) ||
+              occ.acceptedHandlerIds.contains(currentRa));
+
+      if (isPersonalDog || isPrimary || isTeamMember) {
+        entries.add(_buildOccurrenceEntry(occ));
+      }
     }
 
     entries.sort((a, b) => b.time.compareTo(a.time));

@@ -199,11 +199,14 @@ extension _MainRootActions on _MainRootScreenState {
       context,
       listen: false,
     );
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    final currentRa = HandlerIdentityService.raFromUser(authVM.user);
     final openOccurrence =
         occurrenceVM.openOccurrence ??
-        (effectiveDogId != null && effectiveDogId.isNotEmpty
-            ? await occurrenceVM.findOpen(effectiveDogId)
-            : null);
+        await occurrenceVM.findOpenForContext(
+          dogId: effectiveDogId,
+          handlerRa: currentRa,
+        );
     if (!context.mounted) return;
 
     await routeRootOccurrenceEntrypoint(

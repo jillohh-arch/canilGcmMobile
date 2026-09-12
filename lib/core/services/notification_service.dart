@@ -1,20 +1,58 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import 'package:canil_gcm/core/domain/notification_item.dart';
+import 'package:canil_gcm/core/services/handler_identity_service.dart';
 
 class NotificationService {
-  static final NotificationService _instance = NotificationService._internal();
-  factory NotificationService() => _instance;
-  NotificationService._internal();
+  static NotificationService? _instance;
+  factory NotificationService({
+    FirebaseFirestore? firestore,
+    FirebaseFunctions? functions,
+    FirebaseAuth? auth,
+  }) {
+    if (firestore != null || functions != null || auth != null) {
+      return NotificationService._custom(
+        firestore: firestore,
+        functions: functions,
+        auth: auth,
+      );
+    }
+    return _instance ??= NotificationService._internal();
+  }
 
-  final CollectionReference _notificationsCollection = FirebaseFirestore
-      .instance
-      .collection('notifications');
-  final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(
-    region: 'southamerica-east1',
-  );
+  NotificationService._internal()
+    : _firestore = null,
+      _functions = null,
+      _auth = null;
+
+  NotificationService._custom({
+    FirebaseFirestore? firestore,
+    FirebaseFunctions? functions,
+    FirebaseAuth? auth,
+  }) : _firestore = firestore,
+       _functions = functions,
+       _auth = auth;
+
+  final FirebaseFirestore? _firestore;
+  final FirebaseFunctions? _functions;
+  final FirebaseAuth? _auth;
+
+  CollectionReference get _notificationsCollection =>
+      (_firestore ?? FirebaseFirestore.instance).collection('notifications');
+
+  bool _isOwnNotification(String userId) {
+    try {
+      final auth = _auth ?? FirebaseAuth.instance;
+      final currentRa = HandlerIdentityService.raFromUser(auth.currentUser);
+      if (currentRa != null && currentRa.isNotEmpty) {
+        return currentRa.toLowerCase() == userId.trim().toLowerCase();
+      }
+    } catch (_) {}
+    return false;
+  }
 
   // Cache do stream base compartilhado. pending_badge, binomio_header e
   // pending_screen consomem getOpenActionCount/getVisibleNotifications, que
@@ -60,16 +98,46 @@ class NotificationService {
       data['resolved_at'] = null;
     }
 
-    if (deduplicate) {
-      final existing = await docRef.get();
-      if (!existing.exists) {
-        await docRef.set(data);
+    try {
+      if (deduplicate && _isOwnNotification(userId)) {
+        final existing = await docRef.get();
+        if (existing.exists) {
+          debugPrint(
+            '[NotificationService] Notificação duplicada ignorada para $userId: $resolvedNotificationId',
+          );
+          return resolvedNotificationId;
+        }
       }
-    } else {
       await docRef.set(data);
+      debugPrint(
+        '[NotificationService] Notificação criada: $type para $userId ($resolvedNotificationId)',
+      );
+    } on FirebaseException catch (e) {
+      if (deduplicate &&
+          e.code == 'permission-denied' &&
+          !_isOwnNotification(userId)) {
+        // Notificação cross-user: sob firestore.rules, integrantes da equipe possuem
+        // permissão 'create', mas 'update' é restrito ao próprio dono da coleção.
+        // Quando um ID determinístico já existe, o set() é avaliado pelas regras como 'update'
+        // e retorna permission-denied. Em modo deduplicate, se o doc já foi criado por chamada
+        // anterior, trata-se de duplicata idempotente esperada.
+        debugPrint(
+          '[NotificationService] Aviso idempotente: gravação cross-user para $userId '
+          '($resolvedNotificationId) já existe ou foi negada por regras: ${e.message}',
+        );
+        return resolvedNotificationId;
+      }
+      debugPrint(
+        '[NotificationService] Erro ao criar notificação $type para $userId: $e',
+      );
+      rethrow;
+    } catch (e) {
+      debugPrint(
+        '[NotificationService] Erro inesperado ao criar notificação $type para $userId: $e',
+      );
+      rethrow;
     }
 
-    debugPrint('[NotificationService] Notificação criada: $type para $userId');
     return resolvedNotificationId;
   }
 
@@ -147,7 +215,7 @@ class NotificationService {
     const batchSize = 400;
 
     for (var i = 0; i < toArchive.length; i += batchSize) {
-      final batch = FirebaseFirestore.instance.batch();
+      final batch = (_firestore ?? FirebaseFirestore.instance).batch();
       final chunk = toArchive.skip(i).take(batchSize);
 
       for (final notice in chunk) {
@@ -173,7 +241,10 @@ class NotificationService {
   Future<void> resolveShiftReminderNotification({
     required String notificationId,
   }) async {
-    final callable = _functions.httpsCallable(
+    final functions =
+        _functions ??
+        FirebaseFunctions.instanceFor(region: 'southamerica-east1');
+    final callable = functions.httpsCallable(
       'resolveShiftReminderNotification',
     );
     await callable.call<void>({'notification_id': notificationId});

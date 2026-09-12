@@ -67,7 +67,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   String _periodFilter = 'Esta semana';
   String _typeFilter = 'Tudo';
   DateTimeRange? _customRange;
-  String? _lastLoadedDogId;
+  String? _lastLoadedTarget;
   int _visibleCount = 30;
   List<WeightRecord> _weightRecords = const [];
 
@@ -97,7 +97,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Recarregar dados quando o app volta do background
     if (state == AppLifecycleState.resumed) {
-      _lastLoadedDogId = null; // Forçar reload
+      _lastLoadedTarget = null; // Forçar reload
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _loadAllData(forceReload: true);
@@ -117,8 +117,16 @@ class _HistoryScreenState extends State<HistoryScreen>
     }
 
     final effectiveDogId = shiftVM.activeDogId ?? shiftVM.serviceDogId;
-    if (effectiveDogId != null && _lastLoadedDogId != effectiveDogId) {
-      _lastLoadedDogId = effectiveDogId;
+    final fbUser = authVM.user;
+    final currentRa = HandlerIdentityService.raFromUser(fbUser);
+    final currentTarget = (effectiveDogId != null && effectiveDogId.isNotEmpty)
+        ? 'dog:$effectiveDogId'
+        : (currentRa != null && currentRa.isNotEmpty)
+            ? 'handler:$currentRa'
+            : null;
+
+    if (currentTarget != null && _lastLoadedTarget != currentTarget) {
+      _lastLoadedTarget = currentTarget;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _loadAllData();
@@ -132,8 +140,6 @@ class _HistoryScreenState extends State<HistoryScreen>
           )
         : null;
 
-    final fbUser = authVM.user;
-    final currentRa = HandlerIdentityService.raFromUser(fbUser);
     final callsign = userVM.displayNameFor(ra: currentRa, firebaseUser: fbUser);
     final handlerUser = userVM.findByRa(currentRa);
     final handlerPhoto = handlerUser?.photoUrl?.trim();

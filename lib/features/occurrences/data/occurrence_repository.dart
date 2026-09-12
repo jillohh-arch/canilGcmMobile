@@ -945,6 +945,43 @@ class OccurrenceRepository {
     });
   }
 
+  Stream<Occurrence?> watchOpenForHandler(String handlerRa) {
+    final cleanRa = handlerRa.trim();
+    if (cleanRa.isEmpty) return Stream.value(null);
+
+    return _collection
+        .where('team_handler_ids', arrayContains: cleanRa)
+        .snapshots()
+        .map((snap) {
+          final open =
+              snap.docs
+                  .map((doc) => Occurrence.fromMap(doc.data(), doc.id))
+                  .where((occ) => !occ.isDeleted && occ.status.isOpen)
+                  .toList()
+                ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+          if (open.isEmpty) return null;
+          return open.first;
+        });
+  }
+
+  Stream<List<Occurrence>> watchByHandler(String handlerRa) {
+    final cleanRa = handlerRa.trim();
+    if (cleanRa.isEmpty) return Stream.value(const []);
+
+    return _collection
+        .where('team_handler_ids', arrayContains: cleanRa)
+        .snapshots()
+        .map((snap) {
+          final occurrences =
+              snap.docs
+                  .map((doc) => Occurrence.fromMap(doc.data(), doc.id))
+                  .where((occ) => !occ.isDeleted)
+                  .toList()
+                ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
+          return occurrences;
+        });
+  }
+
   Future<Occurrence?> findOpen(String dogId) async {
     final snap = await _collection.where('dog_id', isEqualTo: dogId).get();
     final open =
@@ -955,6 +992,54 @@ class OccurrenceRepository {
           ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     if (open.isEmpty) return null;
     return open.first;
+  }
+
+  Future<Occurrence?> findOpenForHandler(String handlerRa) async {
+    final cleanRa = handlerRa.trim();
+    if (cleanRa.isEmpty) return null;
+
+    final snap = await _collection
+        .where('team_handler_ids', arrayContains: cleanRa)
+        .get();
+    final open =
+        snap.docs
+            .map((doc) => Occurrence.fromMap(doc.data(), doc.id))
+            .where((occ) => !occ.isDeleted && occ.status.isOpen)
+            .toList();
+
+    // Compatibilidade reversa com registros legados indexados apenas por primary_handler_ra
+    final primarySnap = await _collection
+        .where('primary_handler_ra', isEqualTo: cleanRa)
+        .get();
+    for (final doc in primarySnap.docs) {
+      final occ = Occurrence.fromMap(doc.data(), doc.id);
+      if (!occ.isDeleted &&
+          occ.status.isOpen &&
+          !open.any((o) => o.id == occ.id)) {
+        open.add(occ);
+      }
+    }
+
+    if (open.isEmpty) return null;
+    open.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return open.first;
+  }
+
+  Future<Occurrence?> findOpenForContext({
+    String? dogId,
+    String? handlerRa,
+  }) async {
+    final cleanDogId = dogId?.trim();
+    final cleanRa = handlerRa?.trim();
+
+    Occurrence? open;
+    if (cleanDogId != null && cleanDogId.isNotEmpty) {
+      open = await findOpen(cleanDogId);
+    }
+    if (open == null && cleanRa != null && cleanRa.isNotEmpty) {
+      open = await findOpenForHandler(cleanRa);
+    }
+    return open;
   }
 
   Future<List<Occurrence>> getExpiredOccurrences(DateTime now) async {

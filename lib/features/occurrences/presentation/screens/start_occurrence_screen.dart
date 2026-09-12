@@ -24,11 +24,78 @@ import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurr
 import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurrence_time_chips.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/active_occurrence_screen.dart';
 import 'package:canil_gcm/features/shifts/data/vehicle_crew_service.dart';
+import 'package:canil_gcm/features/shifts/domain/vehicle_crew.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 
 class StartOccurrenceScreen extends StatefulWidget {
-  const StartOccurrenceScreen({super.key});
+  final VehicleCrewService? crewService;
+
+  const StartOccurrenceScreen({super.key, this.crewService});
+
+  static Dog? findDogForId(DogViewModel? dogVM, String? dogId) {
+    if (dogVM == null || dogId == null || dogId.isEmpty) return null;
+    for (final dog in dogVM.dogs) {
+      if (dog.id == dogId) return dog;
+    }
+    return null;
+  }
+
+  static List<OccurrenceTeamMember> buildGuarnicaoSnapshotMembers({
+    required List<VehicleCrewMember> activeMembers,
+    required String currentRa,
+    String? handlerAuthUid,
+    String? handlerEmail,
+    String? currentHandlerActiveDogId,
+    DogViewModel? dogVM,
+    UserViewModel? userVM,
+    DateTime? now,
+  }) {
+    final effectiveNow = now ?? DateTime.now();
+    final members = <OccurrenceTeamMember>[];
+    final seenHandlers = <String>{};
+
+    for (final member in activeMembers) {
+      final ra = member.handlerId.trim();
+      if (ra.isEmpty || !seenHandlers.add(ra)) continue;
+      final isCurrentHandler = ra == currentRa;
+
+      final rawMemberDogId = member.dogId?.trim();
+      final assignedDogId = (rawMemberDogId != null && rawMemberDogId.isNotEmpty)
+          ? rawMemberDogId
+          : (isCurrentHandler &&
+                  currentHandlerActiveDogId != null &&
+                  currentHandlerActiveDogId.trim().isNotEmpty)
+              ? currentHandlerActiveDogId.trim()
+              : null;
+      final assignedDog = findDogForId(dogVM, assignedDogId);
+
+      members.add(
+        OccurrenceTeamMember(
+          handlerId: ra,
+          authUid: member.authUid ?? (isCurrentHandler ? handlerAuthUid : null),
+          handlerEmail:
+              member.handlerEmail ??
+              (isCurrentHandler ? handlerEmail : null) ??
+              HandlerIdentityService.emailFromRa(ra),
+          displayName: userVM?.displayNameFor(ra: ra) ?? ra,
+          dogId: assignedDog?.id ?? assignedDogId,
+          dogName: assignedDog?.name,
+          dogMatricula: assignedDog?.registrationNumber,
+          dogBreed: assignedDog?.breed,
+          role: isCurrentHandler ? TeamRole.titular : TeamRole.integrante,
+          addedAt: effectiveNow,
+          addedBy: currentRa,
+        ),
+      );
+    }
+
+    members.sort((a, b) {
+      if (a.role != b.role) return a.role == TeamRole.titular ? -1 : 1;
+      return a.handlerId.compareTo(b.handlerId);
+    });
+    return members;
+  }
 
   @override
   State<StartOccurrenceScreen> createState() => _StartOccurrenceScreenState();
@@ -36,7 +103,7 @@ class StartOccurrenceScreen extends StatefulWidget {
 
 class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
   final _locationService = const LocationResolutionService();
-  final _crewService = VehicleCrewService();
+  late final VehicleCrewService _crewService;
   final _natureController = TextEditingController();
   final _natureFocusNode = FocusNode();
   final _observationController = TextEditingController();
@@ -65,6 +132,7 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
   @override
   void initState() {
     super.initState();
+    _crewService = widget.crewService ?? VehicleCrewService();
     _captureGps();
     _loadNatures();
     _checkOpenOccurrence();
@@ -443,50 +511,16 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
       );
     }
 
-    final serviceDog =
-        _dogForId(dogVM, crew.serviceDogId) ??
-        _dogForId(dogVM, shiftVM.serviceDogId) ??
-        _dogForId(dogVM, shiftVM.activeDogId);
-    final members = <OccurrenceTeamMember>[];
-    final seenHandlers = <String>{};
-
-    for (final member in activeMembers) {
-      final ra = member.handlerId.trim();
-      if (ra.isEmpty || !seenHandlers.add(ra)) continue;
-      final isCurrentHandler = ra == currentRa;
-      members.add(
-        OccurrenceTeamMember(
-          handlerId: ra,
-          authUid: member.authUid ?? (isCurrentHandler ? handlerAuthUid : null),
-          handlerEmail:
-              member.handlerEmail ??
-              (isCurrentHandler ? handlerEmail : null) ??
-              HandlerIdentityService.emailFromRa(ra),
-          displayName: userVM.displayNameFor(ra: ra),
-          dogId: serviceDog?.id ?? crew.serviceDogId,
-          dogName: serviceDog?.name,
-          dogMatricula: serviceDog?.registrationNumber,
-          dogBreed: serviceDog?.breed,
-          role: isCurrentHandler ? TeamRole.titular : TeamRole.integrante,
-          addedAt: now,
-          addedBy: currentRa,
-        ),
-      );
-    }
-
-    members.sort((a, b) {
-      if (a.role != b.role) return a.role == TeamRole.titular ? -1 : 1;
-      return a.handlerId.compareTo(b.handlerId);
-    });
-    return members;
-  }
-
-  Dog? _dogForId(DogViewModel dogVM, String? dogId) {
-    if (dogId == null || dogId.isEmpty) return null;
-    for (final dog in dogVM.dogs) {
-      if (dog.id == dogId) return dog;
-    }
-    return null;
+    return StartOccurrenceScreen.buildGuarnicaoSnapshotMembers(
+      activeMembers: activeMembers,
+      currentRa: currentRa,
+      handlerAuthUid: handlerAuthUid,
+      handlerEmail: handlerEmail,
+      currentHandlerActiveDogId: shiftVM.activeDogId,
+      dogVM: dogVM,
+      userVM: userVM,
+      now: now,
+    );
   }
 
   // ─── Create ─────────────────────────────────────────────────────────

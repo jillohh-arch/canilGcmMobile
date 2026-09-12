@@ -56,7 +56,7 @@ class MainRootScreen extends StatefulWidget {
 
 class _MainRootScreenState extends State<MainRootScreen> {
   int _currentIndex = 0;
-  String? _lastOccurrenceWatchDogId;
+  String? _lastOccurrenceWatchTarget;
   DateTime? _lastBackPress;
   late final List<Widget> _screens;
 
@@ -147,24 +147,37 @@ class _MainRootScreenState extends State<MainRootScreen> {
         (openOccurrence?.acceptedHandlerIds.contains(currentRa) ?? false);
     final bool isPersonalDogOccurrence =
         activeDogId != null && openOccurrence?.dogId == activeDogId;
+    final bool isTeamMember =
+        currentRa != null &&
+        (openOccurrence?.team.any((m) => m.handlerId.trim() == currentRa) ?? false);
 
     final activeOccurrence =
         (openOccurrence != null &&
-            (isPersonalDogOccurrence || isAcceptedParticipant))
+            (isPersonalDogOccurrence || isAcceptedParticipant || isTeamMember))
         ? openOccurrence
         : null;
 
-    if (effectiveDogId != null &&
-        effectiveDogId.isNotEmpty &&
-        (effectiveDogId != _lastOccurrenceWatchDogId ||
+    final watchTarget = (effectiveDogId != null && effectiveDogId.isNotEmpty)
+        ? 'dog:$effectiveDogId'
+        : (currentRa != null && currentRa.isNotEmpty)
+            ? 'handler:$currentRa'
+            : null;
+
+    if (watchTarget != null &&
+        (watchTarget != _lastOccurrenceWatchTarget ||
             !occurrenceVM.isWatchingOpen)) {
-      _lastOccurrenceWatchDogId = effectiveDogId;
+      _lastOccurrenceWatchTarget = watchTarget;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        Provider.of<OccurrenceViewModel>(
+        final vm = Provider.of<OccurrenceViewModel>(
           context,
           listen: false,
-        ).watchOpen(effectiveDogId);
+        );
+        if (watchTarget.startsWith('dog:')) {
+          vm.watchOpen(watchTarget.substring(4));
+        } else {
+          vm.watchOpenForHandler(watchTarget.substring(8));
+        }
       });
     }
 
