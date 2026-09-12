@@ -6,18 +6,28 @@ import 'package:flutter/foundation.dart';
 import 'package:canil_gcm/core/domain/notification_item.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 
+typedef NotificationWriter = Future<void> Function(
+  DocumentReference document,
+  Map<String, dynamic> data,
+);
+
 class NotificationService {
   static NotificationService? _instance;
   factory NotificationService({
     FirebaseFirestore? firestore,
     FirebaseFunctions? functions,
     FirebaseAuth? auth,
+    NotificationWriter? notificationWriter,
   }) {
-    if (firestore != null || functions != null || auth != null) {
+    if (firestore != null ||
+        functions != null ||
+        auth != null ||
+        notificationWriter != null) {
       return NotificationService._custom(
         firestore: firestore,
         functions: functions,
         auth: auth,
+        notificationWriter: notificationWriter,
       );
     }
     return _instance ??= NotificationService._internal();
@@ -26,19 +36,23 @@ class NotificationService {
   NotificationService._internal()
     : _firestore = null,
       _functions = null,
-      _auth = null;
+      _auth = null,
+      _notificationWriter = null;
 
   NotificationService._custom({
     FirebaseFirestore? firestore,
     FirebaseFunctions? functions,
     FirebaseAuth? auth,
+    NotificationWriter? notificationWriter,
   }) : _firestore = firestore,
        _functions = functions,
-       _auth = auth;
+       _auth = auth,
+       _notificationWriter = notificationWriter;
 
   final FirebaseFirestore? _firestore;
   final FirebaseFunctions? _functions;
   final FirebaseAuth? _auth;
+  final NotificationWriter? _notificationWriter;
 
   CollectionReference get _notificationsCollection =>
       (_firestore ?? FirebaseFirestore.instance).collection('notifications');
@@ -108,25 +122,16 @@ class NotificationService {
           return resolvedNotificationId;
         }
       }
-      await docRef.set(data);
+      await (_notificationWriter?.call(docRef, data) ?? docRef.set(data));
       debugPrint(
         '[NotificationService] Notificação criada: $type para $userId ($resolvedNotificationId)',
       );
     } on FirebaseException catch (e) {
-      if (deduplicate &&
-          e.code == 'permission-denied' &&
-          !_isOwnNotification(userId)) {
-        // Notificação cross-user: sob firestore.rules, integrantes da equipe possuem
-        // permissão 'create', mas 'update' é restrito ao próprio dono da coleção.
-        // Quando um ID determinístico já existe, o set() é avaliado pelas regras como 'update'
-        // e retorna permission-denied. Em modo deduplicate, se o doc já foi criado por chamada
-        // anterior, trata-se de duplicata idempotente esperada.
-        debugPrint(
-          '[NotificationService] Aviso idempotente: gravação cross-user para $userId '
-          '($resolvedNotificationId) já existe ou foi negada por regras: ${e.message}',
-        );
-        return resolvedNotificationId;
-      }
+      // R3: nunca engolir permission-denied genérico. Falhas reais de segurança
+      // (escritor não autorizado N4, payload inválido N5, destinatário errado N6)
+      // DEVEM propagar para que o chamador observe a falha. Duplicatas legítimas
+      // cross-user são tratadas pelo chamador (_notifyTeamOccurrenceOpened) via
+      // try/catch local + dispatch único; não há necessidade de silenciar aqui.
       debugPrint(
         '[NotificationService] Erro ao criar notificação $type para $userId: $e',
       );

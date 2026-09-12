@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -14,6 +15,12 @@ import 'package:canil_gcm/features/occurrences/presentation/view_models/occurren
 import 'package:canil_gcm/features/shifts/domain/vehicle_crew.dart';
 
 void main() {
+  late FakeFirebaseFirestore r3FakeFirestore;
+
+  setUp(() {
+    r3FakeFirestore = FakeFirebaseFirestore();
+  });
+
   group('F40.TC1-PHYSICAL-OCCURRENCE-INTEGRATION-FIX-R2 Regression Suite', () {
     late FakeFirebaseFirestore fakeFirestore;
     late OccurrenceRepository occurrenceRepo;
@@ -401,6 +408,119 @@ void main() {
 
       expect(titular.dogId, equals('dog_alpha'));
       expect(aux.dogId, equals('dog_bravo'));
+    });
+  });
+
+  group('R3 Notification Idempotency & Security (N1-N6)', () {
+    NotificationService buildService({
+      required Future<void> Function(
+        DocumentReference document,
+        Map<String, dynamic> data,
+      ) writer,
+    }) {
+      return NotificationService(
+        firestore: r3FakeFirestore,
+        notificationWriter: writer,
+      );
+    }
+
+    test('T10: N1 - Authorized first create writes the notification', () async {
+      final service = NotificationService(firestore: r3FakeFirestore);
+      const userId = '990002';
+      const notificationId = 'opened_occ_n1_990002';
+
+      final result = await service.createNotification(
+        userId: userId,
+        type: NotificationType.occurrenceParticipationRequested,
+        occurrenceId: 'occ_n1',
+        occurrenceTitle: 'Ocorrência teste N1',
+        notificationId: notificationId,
+        deduplicate: true,
+      );
+
+      expect(result, notificationId);
+      final stored = await r3FakeFirestore
+          .collection('notifications')
+          .doc(userId)
+          .collection('items')
+          .doc(notificationId)
+          .get();
+      expect(stored.exists, isTrue);
+    });
+
+    test('T11: N4 - Unauthorized writer denial propagates as failure', () async {
+      final service = buildService(
+        writer: (document, data) => Future<void>.error(
+          FirebaseException(
+            plugin: 'cloud_firestore',
+            code: 'permission-denied',
+          ),
+        ),
+      );
+
+      expect(
+        service.createNotification(
+          userId: '990002',
+          type: NotificationType.occurrenceParticipationRequested,
+          occurrenceId: 'occ_n4',
+          occurrenceTitle: 'Ocorrência teste N4',
+          notificationId: 'opened_occ_n4_990002',
+          deduplicate: true,
+        ),
+        throwsA(
+          isA<FirebaseException>().having(
+            (error) => error.code,
+            'code',
+            'permission-denied',
+          ),
+        ),
+      );
+    });
+
+    test('T12: N5 - Invalid payload denial propagates as failure', () async {
+      final service = buildService(
+        writer: (document, data) => Future<void>.error(
+          FirebaseException(
+            plugin: 'cloud_firestore',
+            code: 'permission-denied',
+          ),
+        ),
+      );
+
+      expect(
+        service.createNotification(
+          userId: '990002',
+          type: NotificationType.occurrenceParticipationRequested,
+          occurrenceId: 'occ_n5',
+          occurrenceTitle: 'Ocorrência teste N5',
+          notificationId: 'opened_occ_n5_990002',
+          deduplicate: true,
+        ),
+        throwsA(isA<FirebaseException>()),
+      );
+    });
+
+    test('T13: N6 - Invalid recipient denial propagates as failure', () async {
+      final service = buildService(
+        writer: (document, data) => Future<void>.error(
+          FirebaseException(
+            plugin: 'cloud_firestore',
+            code: 'permission-denied',
+          ),
+        ),
+      );
+
+      expect(
+        service.createNotification(
+          userId: '990099',
+          type: NotificationType.occurrenceParticipationRequested,
+          occurrenceId: 'occ_n6',
+          occurrenceTitle: 'Ocorrência teste N6',
+          notificationId: 'opened_occ_n6_990099',
+          deduplicate: true,
+        ),
+        throwsA(isA<FirebaseException>()),
+      );
     });
   });
 }
