@@ -262,16 +262,13 @@ class RecordDetail {
       if (entry.type != HistoryEntryType.occurrence) entry.subtitle,
     ]);
 
-    var duration = _firstNonEmpty([
+    final duration = _firstNonEmpty([
       _detailValue(details, const ['Duração', 'Duracao', 'DuraÃÂ§ÃÂ£o']),
       _occurrenceDuration(entry),
       entry.type == HistoryEntryType.occurrence
           ? (entry.isInProgress ? 'Em andamento' : 'Não informado')
           : 'Não informado',
     ]);
-    if (duration == '0 min') {
-      duration = '< 1 min';
-    }
 
     return RecordDetail(
       id: entry.id,
@@ -398,18 +395,21 @@ class RecordDetail {
       end = end.add(const Duration(days: 1));
     }
 
+    final diffSeconds = end.difference(start).inSeconds;
+    if (diffSeconds == 0) return '0 min';
+    if (diffSeconds < 60) return '< 1 min';
     final minutes = end.difference(start).inMinutes;
-    if (minutes <= 0) return '< 1 min';
     return '$minutes min';
   }
 
   static DateTime? _parseTimeOnDate(String raw, DateTime date) {
-    final match = RegExp(r'(\d{1,2}):(\d{2})').firstMatch(raw);
+    final match = RegExp(r'(\d{1,2}):(\d{2})(?::(\d{2}))?').firstMatch(raw);
     if (match == null) return null;
     final hour = int.tryParse(match.group(1)!);
     final minute = int.tryParse(match.group(2)!);
-    if (hour == null || minute == null) return null;
-    return DateTime(date.year, date.month, date.day, hour, minute);
+    final second = match.group(3) != null ? int.tryParse(match.group(3)!) : 0;
+    if (hour == null || minute == null || second == null) return null;
+    return DateTime(date.year, date.month, date.day, hour, minute, second);
   }
 
   static List<InternalEvent> _internalEventsFor(HistoryEntry entry) {
@@ -683,6 +683,22 @@ class AuditEvent {
 }
 
 class OccurrenceHistoryBuilder {
+  static String formatDuration(DateTime start, DateTime end) {
+    var normalizedEnd = end;
+    if (normalizedEnd.isBefore(start)) {
+      normalizedEnd = normalizedEnd.add(const Duration(days: 1));
+    }
+    final diffSeconds = normalizedEnd.difference(start).inSeconds;
+    if (diffSeconds == 0) {
+      return '0 min';
+    }
+    if (diffSeconds < 60) {
+      return '< 1 min';
+    }
+    final diffMinutes = normalizedEnd.difference(start).inMinutes;
+    return '$diffMinutes min';
+  }
+
   static HistoryEntry buildEntry(
     Occurrence occ, {
     String resolvedDogName = 'Sem cão',
@@ -694,16 +710,10 @@ class OccurrenceHistoryBuilder {
         occ.status == OccurrenceStatus.finalizing;
 
     String? duration;
-    if (occ.durationTotal != null && occ.durationTotal! > 0) {
+    if (occ.finalizedAt != null) {
+      duration = formatDuration(occ.startedAt, occ.finalizedAt!);
+    } else if (occ.durationTotal != null && occ.durationTotal! > 0) {
       duration = '${occ.durationTotal} min';
-    } else if (occ.finalizedAt != null) {
-      final diffMinutes = occ.finalizedAt!.difference(occ.startedAt).inMinutes;
-      final diffSeconds = occ.finalizedAt!.difference(occ.startedAt).inSeconds;
-      if (diffMinutes > 0) {
-        duration = '$diffMinutes min';
-      } else if (diffSeconds >= 0) {
-        duration = '< 1 min';
-      }
     } else if (isOpen) {
       duration = 'Em andamento';
     }

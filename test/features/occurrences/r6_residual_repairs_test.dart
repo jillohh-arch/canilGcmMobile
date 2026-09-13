@@ -1,4 +1,6 @@
 // ignore_for_file: depend_on_referenced_packages
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_core_platform_interface/firebase_core_platform_interface.dart';
@@ -485,6 +487,7 @@ void main() {
     testWidgets('Exact physical-equivalent async race ordering (10 steps) succeeds without false duplicate emission', (tester) async {
       int writeCallCount = 0;
       bool dialogSuccessTriggered = false;
+      final successCompleter = Completer<void>();
 
       when(() => mockOccurrenceRepo.addSignature(
         occurrenceId: any(named: 'occurrenceId'),
@@ -492,7 +495,7 @@ void main() {
       )).thenAnswer((invocation) async {
         writeCallCount++;
         final signature = invocation.namedArguments[#signature] as OccurrenceSignature;
-        // Step 4: Stream/Repo publishes the newly created signature
+        // Step 3: Stream/Repo publishes the newly created signature
         when(() => mockSignatureRepo.getSignatures('occ-r6-3'))
             .thenAnswer((_) async => [signature]);
       });
@@ -505,7 +508,9 @@ void main() {
               viewModel: teamVM,
               localAuth: mockLocalAuth,
               currentHandlerRa: '990002',
-              onSuccess: () {
+              onSuccess: () async {
+                // Step 4: High-level success completion is held pending by Completer
+                await successCompleter.future;
                 dialogSuccessTriggered = true;
               },
             ),
@@ -514,43 +519,46 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Step 1: Local signing begins - tap biometric button
+      // Step 1: Biometric signing starts - tap biometric button
       final biometricButton = find.text('Assinar com biometria');
       expect(biometricButton, findsOneWidget);
 
-      // Step 2 & 3: Tap triggers biometric authenticate (returns true) and write begins
+      // Step 2: Tap triggers biometric authenticate (returns true) and write begins
       await tester.tap(biometricButton);
 
-      // Step 4: Stream publishes newly created signature
-      // Step 5: High-level onSuccess has NOT completed yet
+      // Step 3: Newly created signature becomes visible in the ViewModel/state
+      // Step 4: High-level success completion is STILL PENDING (held by successCompleter)
+      // Step 5: Rebuild occurs while onSuccess is pending and signature is in ViewModel state
       await tester.pump();
 
-      // Step 6: UI MUST NOT emit "já assinada" or "Você já assinou"
+      // Step 6: Verify NO duplicate warning emissions:
+      // "já assinou", "já assinada", "Esta ocorrência já foi assinada"
       expect(find.textContaining('já assinou'), findsNothing);
       expect(find.textContaining('já assinada'), findsNothing);
       expect(find.textContaining('Esta ocorrência já foi assinada'), findsNothing);
+      expect(find.text('Assinatura realizada'), findsNothing);
+      expect(dialogSuccessTriggered, isFalse);
 
-      // Step 7: onSuccess completes
+      // Step 7: Release the success Completer
+      successCompleter.complete();
+
+      // Step 8: Exactly one success feedback appears
       await tester.pumpAndSettle();
-
-      // Step 8: Exactly one success
+      expect(dialogSuccessTriggered, isTrue);
       expect(find.text('Assinatura realizada'), findsOneWidget);
       expect(find.text('Assinatura adicionada com sucesso'), findsOneWidget);
 
-      // Step 9: No duplicate error
-      expect(find.textContaining('já assinada'), findsNothing);
-
-      // Step 10: Exactly one write was performed
+      // Step 9: Exactly one write was performed
       expect(writeCallCount, equals(1));
       verify(() => mockOccurrenceRepo.addSignature(
         occurrenceId: 'occ-r6-3',
         signature: any(named: 'signature'),
       )).called(1);
 
-      // Tap OK to complete dialog flow
+      // Step 10: Deterministic completion
       await tester.tap(find.text('OK'));
       await tester.pumpAndSettle();
-      expect(dialogSuccessTriggered, isTrue);
+      expect(find.byType(SignatureConfirmationDialog), findsNothing);
     });
 
     testWidgets('Pre-existing signed state before operation provides deterministic duplicate protection', (tester) async {
@@ -664,7 +672,7 @@ void main() {
           'end': DateTime(2026, 3, 30, 10, 0, 0),
           'status': OccurrenceStatus.finalized,
           'durationTotal': 0,
-          'expectedDuration': '< 1 min',
+          'expectedDuration': '0 min',
           'expectedInterval': '10:00 → 10:00',
         },
         {
@@ -764,6 +772,143 @@ void main() {
       final startStr = entry.details['Início']?.toString();
       final endStr = entry.details['Fim']?.toString();
       expect('$startStr → $endStr', equals('13:33 → 13:40'));
+    });
+
+    test('Canonical Done Check matrix A through F verifies exact duration semantics and unified timestamp pair', () {
+      // A. 10:00:00 -> 10:00:00 => 0 min (delta == 0)
+      final startA = DateTime(2026, 3, 30, 10, 0, 0);
+      final endA = DateTime(2026, 3, 30, 10, 0, 0);
+      final occA = Occurrence(
+        id: 'occ-a',
+        shiftId: 's-1',
+        primaryHandlerId: '990001',
+        dogId: 'dog-1',
+        typeCode: 'apoio',
+        typeName: 'Apoio',
+        status: OccurrenceStatus.finalized,
+        startedAt: startA,
+        createdAt: startA,
+        updatedAt: endA,
+        finalizedAt: endA,
+      );
+      final entryA = OccurrenceHistoryBuilder.buildEntry(occA);
+      final detailA = RecordDetail.fromEntry(entryA);
+      expect(OccurrenceHistoryBuilder.formatDuration(startA, endA), equals('0 min'));
+      expect(detailA.duration, equals('0 min'));
+      expect(entryA.details['Início'], equals('10:00'));
+      expect(entryA.details['Fim'], equals('10:00'));
+
+      // B. 10:00:00 -> 10:00:45 => < 1 min (0 < delta < 60s)
+      final startB = DateTime(2026, 3, 30, 10, 0, 0);
+      final endB = DateTime(2026, 3, 30, 10, 0, 45);
+      final occB = Occurrence(
+        id: 'occ-b',
+        shiftId: 's-1',
+        primaryHandlerId: '990001',
+        dogId: 'dog-1',
+        typeCode: 'apoio',
+        typeName: 'Apoio',
+        status: OccurrenceStatus.finalized,
+        startedAt: startB,
+        createdAt: startB,
+        updatedAt: endB,
+        finalizedAt: endB,
+      );
+      final entryB = OccurrenceHistoryBuilder.buildEntry(occB);
+      final detailB = RecordDetail.fromEntry(entryB);
+      expect(OccurrenceHistoryBuilder.formatDuration(startB, endB), equals('< 1 min'));
+      expect(detailB.duration, equals('< 1 min'));
+      expect(entryB.details['Início'], equals('10:00'));
+      expect(entryB.details['Fim'], equals('10:00'));
+
+      // C. 13:33 -> 13:40 => 7 min (delta >= 60s)
+      final startC = DateTime(2026, 3, 30, 13, 33, 0);
+      final endC = DateTime(2026, 3, 30, 13, 40, 0);
+      final occC = Occurrence(
+        id: 'occ-c',
+        shiftId: 's-1',
+        primaryHandlerId: '990001',
+        dogId: 'dog-1',
+        typeCode: 'apoio',
+        typeName: 'Apoio',
+        status: OccurrenceStatus.finalized,
+        startedAt: startC,
+        createdAt: startC,
+        updatedAt: endC,
+        finalizedAt: endC,
+        durationTotal: 0,
+      );
+      final entryC = OccurrenceHistoryBuilder.buildEntry(occC);
+      final detailC = RecordDetail.fromEntry(entryC);
+      expect(OccurrenceHistoryBuilder.formatDuration(startC, endC), equals('7 min'));
+      expect(detailC.duration, equals('7 min'));
+      expect(entryC.details['Início'], equals('13:33'));
+      expect(entryC.details['Fim'], equals('13:40'));
+
+      // D. cross-hour: 13:58 -> 14:12 => 14 min
+      final startD = DateTime(2026, 3, 30, 13, 58, 0);
+      final endD = DateTime(2026, 3, 30, 14, 12, 0);
+      final occD = Occurrence(
+        id: 'occ-d',
+        shiftId: 's-1',
+        primaryHandlerId: '990001',
+        dogId: 'dog-1',
+        typeCode: 'apoio',
+        typeName: 'Apoio',
+        status: OccurrenceStatus.finalized,
+        startedAt: startD,
+        createdAt: startD,
+        updatedAt: endD,
+        finalizedAt: endD,
+      );
+      final entryD = OccurrenceHistoryBuilder.buildEntry(occD);
+      final detailD = RecordDetail.fromEntry(entryD);
+      expect(OccurrenceHistoryBuilder.formatDuration(startD, endD), equals('14 min'));
+      expect(detailD.duration, equals('14 min'));
+      expect(entryD.details['Início'], equals('13:58'));
+      expect(entryD.details['Fim'], equals('14:12'));
+
+      // E. cross-midnight: 23:50 -> 00:15 => 25 min
+      final startE = DateTime(2026, 3, 30, 23, 50, 0);
+      final endE = DateTime(2026, 3, 31, 0, 15, 0);
+      final occE = Occurrence(
+        id: 'occ-e',
+        shiftId: 's-1',
+        primaryHandlerId: '990001',
+        dogId: 'dog-1',
+        typeCode: 'apoio',
+        typeName: 'Apoio',
+        status: OccurrenceStatus.finalized,
+        startedAt: startE,
+        createdAt: startE,
+        updatedAt: endE,
+        finalizedAt: endE,
+      );
+      final entryE = OccurrenceHistoryBuilder.buildEntry(occE);
+      final detailE = RecordDetail.fromEntry(entryE);
+      expect(OccurrenceHistoryBuilder.formatDuration(startE, endE), equals('25 min'));
+      expect(detailE.duration, equals('25 min'));
+      expect(entryE.details['Início'], equals('23:50'));
+      expect(entryE.details['Fim'], equals('00:15'));
+
+      // F. Firestore Timestamp case
+      final occF = Occurrence.fromMap({
+        'shift_id': 's-1',
+        'primary_handler_id': '990001',
+        'dog_id': 'dog-1',
+        'type_code': 'apoio',
+        'type_name': 'Apoio',
+        'status': 'finalized',
+        'started_at': Timestamp.fromDate(startC),
+        'finalized_at': Timestamp.fromDate(endC),
+        'duration_total': 0,
+      }, 'occ-f');
+      final entryF = OccurrenceHistoryBuilder.buildEntry(occF);
+      final detailF = RecordDetail.fromEntry(entryF);
+      expect(detailF.duration, equals('7 min'));
+      expect(entryF.details['Início'], equals('13:33'));
+      expect(entryF.details['Fim'], equals('13:40'));
+      expect('${entryF.details['Início']} → ${entryF.details['Fim']}', equals('13:33 → 13:40'));
     });
   });
 }

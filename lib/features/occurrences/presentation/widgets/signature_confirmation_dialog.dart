@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
@@ -18,7 +19,7 @@ import 'package:canil_gcm/features/occurrences/presentation/view_models/occurren
 class SignatureConfirmationDialog extends StatefulWidget {
   final Occurrence occurrence;
   final OccurrenceTeamViewModel viewModel;
-  final VoidCallback onSuccess;
+  final FutureOr<void> Function() onSuccess;
   final LocalAuthentication? localAuth;
   final String? currentHandlerRa;
 
@@ -53,13 +54,19 @@ class _SignatureConfirmationDialogState
   void initState() {
     super.initState();
     _localAuth = widget.localAuth ?? LocalAuthentication();
+    widget.viewModel.addListener(_onViewModelChanged);
     _checkBiometricAvailability();
   }
 
   @override
   void dispose() {
+    widget.viewModel.removeListener(_onViewModelChanged);
     _passwordController.dispose();
     super.dispose();
+  }
+
+  void _onViewModelChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _checkBiometricAvailability() async {
@@ -204,7 +211,8 @@ class _SignatureConfirmationDialogState
 
     await widget.viewModel.addSignature(
       signature: signature,
-      onSuccess: (message) {
+      onSuccess: (message) async {
+        await widget.onSuccess();
         if (!mounted) return;
         setState(() {
           _isSignatureSuccess = true;
@@ -232,7 +240,6 @@ class _SignatureConfirmationDialogState
             onPressed: () {
               Navigator.pop(dialogCtx);
               if (mounted) Navigator.of(context).pop();
-              widget.onSuccess();
             },
             child: const Text('OK'),
           ),
