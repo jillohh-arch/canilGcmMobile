@@ -208,7 +208,7 @@ class NotificationService {
     }
   }
 
-  /// Obtém as notificações não lidas de um usuário.
+  /// Arquiva um aviso da caixa de entrada do usuário.
   Future<void> archiveNotice({
     required String userId,
     required NotificationItem notification,
@@ -313,21 +313,21 @@ class NotificationService {
   /// Este stream é propositalmente derivado do modelo em memória, sem query
   /// composta, para evitar depender de índice enquanto a migração/backfill roda.
   ///
-  /// D3: Ocorrências seladas não podem reter solicitações impossíveis de ciência
-  /// sob contagem acionável. O conjunto de ocorrências finalizadas é derivado
-  /// de TODAS as notificações conhecidas do usuário (incluindo avisos arquivados
-  /// ou lidos), garantindo que arquivar a notificação de finalização não
-  /// ressuscite uma solicitação de participação pendente (actionRequired).
+  /// D3/R5.4: Ocorrências seladas ou com fluxo avançado (assinaturas solicitadas/
+  /// realizadas, ciência respondida) não podem reter solicitações de ciência
+  /// sob contagem acionável. O conjunto é derivado de TODAS as notificações
+  /// conhecidas do usuário (incluindo avisos arquivados ou lidos), garantindo
+  /// que arquivar um aviso não ressuscite a solicitação como ação pendente.
   Stream<List<NotificationItem>> getOpenActionNotifications({
     required String userId,
   }) {
     return getAllNotifications(
       userId: userId,
     ).map((allItems) {
-      final finalizedOccurrenceIds = allItems
+      final supersededOccurrenceIds = allItems
           .where((item) =>
-              item.type == NotificationType.occurrenceFinalized &&
-              item.occurrenceId.isNotEmpty)
+              item.occurrenceId.isNotEmpty &&
+              NotificationItem.supersedesParticipationRequest(item.type))
           .map((item) => item.occurrenceId)
           .toSet();
 
@@ -336,7 +336,7 @@ class NotificationService {
               !item.isArchived &&
               item.isOpenAction &&
               !(item.type == NotificationType.occurrenceParticipationRequested &&
-                  finalizedOccurrenceIds.contains(item.occurrenceId)))
+                  supersededOccurrenceIds.contains(item.occurrenceId)))
           .toList();
     });
   }

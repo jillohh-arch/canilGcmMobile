@@ -291,7 +291,7 @@ class OccurrenceMediaUploader {
             );
             itemSuccess = true;
           } else {
-            throw StateError('O serviço de upload retornou resultado nulo.');
+            throw Exception('O serviço de upload não retornou o resultado do arquivo.');
           }
         } catch (e) {
           if (cancelToken?.isCancelled == true ||

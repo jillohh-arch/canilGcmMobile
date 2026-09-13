@@ -108,9 +108,7 @@ class StorageService {
       }
 
       if (snapshot.state == TaskState.success) {
-        final String downloadUrl = await snapshot.ref.getDownloadURL().timeout(
-          _downloadUrlTimeout,
-        );
+        final String downloadUrl = await _getDownloadUrlWithRetry(snapshot.ref);
         return downloadUrl;
       } else {
         if (snapshot.state == TaskState.canceled ||
@@ -131,14 +129,8 @@ class StorageService {
           e.code == 'cancelled') {
         throw const UploadCancelledException();
       }
-      if (e.code == 'object-not-found') {
-        debugPrint(
-          '[StorageService] Aviso object-not-found (ignorado): ${e.message}',
-        );
-        return null;
-      }
       debugPrint('[StorageService] Erro Firebase: ${e.code} - ${e.message}');
-      throw Exception('Falha ao subir arquivo: ${e.message}');
+      rethrow;
     } catch (e) {
       if (cancelToken?.isCancelled == true) {
         throw const UploadCancelledException();
@@ -199,9 +191,7 @@ class StorageService {
       }
 
       if (snapshot.state == TaskState.success) {
-        final String downloadUrl = await snapshot.ref.getDownloadURL().timeout(
-          _downloadUrlTimeout,
-        );
+        final String downloadUrl = await _getDownloadUrlWithRetry(snapshot.ref);
         return UploadResult(url: downloadUrl, sha256Hash: hash);
       } else {
         if (snapshot.state == TaskState.canceled ||
@@ -222,14 +212,8 @@ class StorageService {
           e.code == 'cancelled') {
         throw const UploadCancelledException();
       }
-      if (e.code == 'object-not-found') {
-        debugPrint(
-          '[StorageService] Aviso object-not-found (ignorado): ${e.message}',
-        );
-        return null;
-      }
       debugPrint('[StorageService] Erro Firebase: ${e.code} - ${e.message}');
-      throw Exception('Falha ao subir arquivo: ${e.message}');
+      rethrow;
     } catch (e) {
       if (cancelToken?.isCancelled == true) {
         throw const UploadCancelledException();
@@ -288,7 +272,7 @@ class StorageService {
 
       final TaskSnapshot snapshot = await _awaitUpload(uploadTask);
       if (snapshot.state == TaskState.success) {
-        return snapshot.ref.getDownloadURL().timeout(_downloadUrlTimeout);
+        return _getDownloadUrlWithRetry(snapshot.ref);
       }
       throw Exception('O upload não foi concluído com sucesso.');
     } on TimeoutException {
@@ -296,14 +280,8 @@ class StorageService {
         'Tempo excedido ao enviar arquivo. Verifique o sinal e tente novamente.',
       );
     } on FirebaseException catch (e) {
-      if (e.code == 'object-not-found') {
-        debugPrint(
-          '[StorageService] Aviso object-not-found (ignorado): ${e.message}',
-        );
-        return null;
-      }
       debugPrint('[StorageService] Erro Firebase: ${e.code} - ${e.message}');
-      throw Exception('Falha ao subir arquivo: ${e.message}');
+      rethrow;
     } catch (e) {
       debugPrint('[StorageService] Erro genérico: $e');
       throw Exception('Falha ao subir arquivo. Verifique sua conexão.');
@@ -323,6 +301,26 @@ class StorageService {
         throw TimeoutException('Tempo excedido ao enviar arquivo.');
       },
     );
+  }
+
+  Future<String> _getDownloadUrlWithRetry(Reference ref) async {
+    int attempts = 0;
+    const maxAttempts = 3;
+    while (true) {
+      attempts++;
+      try {
+        return await ref.getDownloadURL().timeout(_downloadUrlTimeout);
+      } on FirebaseException catch (e) {
+        if (e.code == 'object-not-found' && attempts < maxAttempts) {
+          debugPrint(
+            '[StorageService] getDownloadURL retornou object-not-found (tentativa $attempts/$maxAttempts). Aguardando propagação...',
+          );
+          await Future<void>.delayed(Duration(milliseconds: 300 * attempts));
+          continue;
+        }
+        rethrow;
+      }
+    }
   }
 
   String _mimeTypeFromExtension(String ext) {

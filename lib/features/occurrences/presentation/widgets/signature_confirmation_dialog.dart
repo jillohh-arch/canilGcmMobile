@@ -40,6 +40,7 @@ class _SignatureConfirmationDialogState
   bool _isBiometricAvailable = false;
   bool _isBiometricAuthenticating = false;
   bool _isPasswordAuthenticating = false;
+  bool _isSignatureSuccess = false;
   String? _errorMessage;
   String? _signatureHash;
 
@@ -196,6 +197,10 @@ class _SignatureConfirmationDialogState
       signature: signature,
       onSuccess: (message) {
         if (!mounted) return;
+        setState(() {
+          _isSignatureSuccess = true;
+          _errorMessage = null;
+        });
         _showSuccess(message);
       },
       onError: (error) {
@@ -323,7 +328,8 @@ class _SignatureConfirmationDialogState
   @override
   Widget build(BuildContext context) {
     final handlerRa = _currentHandlerRaOrNull();
-    final signerError = _signatureGuardMessage(handlerRa);
+    final signerError =
+        _isSignatureSuccess ? null : _signatureGuardMessage(handlerRa);
     final isSubmitting =
         _isBiometricAuthenticating || _isPasswordAuthenticating;
     final media = MediaQuery.of(context);

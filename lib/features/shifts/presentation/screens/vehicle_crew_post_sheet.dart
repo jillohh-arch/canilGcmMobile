@@ -321,7 +321,7 @@ class _VehicleCrewSummaryCardState extends State<_VehicleCrewSummaryCard> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                _OccupancyBadge(
+                OccupancyBadge(
                   occupancy: occupancy,
                   crewSize: widget.vehicle.crewSize,
                 ),
@@ -335,11 +335,12 @@ class _VehicleCrewSummaryCardState extends State<_VehicleCrewSummaryCard> {
 }
 
 /// Badge de ocupação da guarnição.
-class _OccupancyBadge extends StatelessWidget {
+class OccupancyBadge extends StatelessWidget {
   final int occupancy;
   final int crewSize;
 
-  const _OccupancyBadge({
+  const OccupancyBadge({
+    super.key,
     required this.occupancy,
     required this.crewSize,
   });
@@ -764,7 +765,8 @@ class VehicleCrewPostBoard extends StatelessWidget {
     required this.onLeaveVehicle,
   });
 
-  static const _roles = ['motorista', 'encarregado', 'auxiliar_1', 'auxiliar_2'];
+  static const roles = ['motorista', 'encarregado', 'auxiliar_1', 'auxiliar_2'];
+  static const _roles = roles;
 
   @override
   Widget build(BuildContext context) {

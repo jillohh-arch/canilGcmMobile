@@ -152,7 +152,7 @@ extension _HistoryDataLoader on _HistoryScreenState {
               occ.acceptedHandlerIds.contains(currentRa));
 
       if (isPersonalDog || isPrimary || isTeamMember) {
-        entries.add(_buildOccurrenceEntry(occ));
+        entries.add(_buildOccurrenceEntry(occ, dogVM));
       }
     }
 
@@ -170,7 +170,7 @@ extension _HistoryDataLoader on _HistoryScreenState {
         : _healthSubtitle(log);
     final author = log.vetName?.trim().isNotEmpty == true
         ? log.vetName!.trim()
-        : 'Ragonha';
+        : 'Não informado';
 
     return HistoryEntry(
       id: log.id ?? 'health_${log.date.millisecondsSinceEpoch}',
@@ -266,11 +266,41 @@ extension _HistoryDataLoader on _HistoryScreenState {
     );
   }
 
-  HistoryEntry _buildOccurrenceEntry(Occurrence occ) {
+  HistoryEntry _buildOccurrenceEntry(Occurrence occ, DogViewModel dogVM) {
     final isYou = _isCurrentUser(occ.primaryHandlerId);
     final isOpen =
         occ.status == OccurrenceStatus.inProgress ||
         occ.status == OccurrenceStatus.finalizing;
+
+    String resolvedDogName = 'Sem cão';
+    if (occ.dogId.isNotEmpty) {
+      final name = _resolveDogName(occ.dogId, dogVM);
+      if (name != 'K9') {
+        resolvedDogName = name;
+      }
+    }
+    if (resolvedDogName == 'Sem cão') {
+      for (final member in occ.team) {
+        if (member.dogName != null && member.dogName!.trim().isNotEmpty) {
+          resolvedDogName = member.dogName!.trim();
+          break;
+        }
+      }
+    }
+
+    String? duration;
+    if (occ.durationTotal != null && occ.durationTotal! > 0) {
+      duration = '${occ.durationTotal} min';
+    } else if (occ.finalizedAt != null) {
+      final diff = occ.finalizedAt!.difference(occ.startedAt).inMinutes;
+      if (diff >= 0) duration = '$diff min';
+    }
+
+    String teamSummary = 'Não informada';
+    if (occ.team.isNotEmpty) {
+      final count = occ.team.length;
+      teamSummary = '$count integrante${count > 1 ? 's' : ''}';
+    }
 
     return HistoryEntry(
       id: occ.id,
@@ -292,12 +322,15 @@ extension _HistoryDataLoader on _HistoryScreenState {
       details: {
         'Tipo': occ.typeName,
         'Status': occ.status.toMap(),
+        'Cão': resolvedDogName,
         if (occ.locationAddress?.isNotEmpty == true)
           'Local': occ.locationAddress,
         'Condutor': _resolveAuthorName(occ.primaryHandlerId),
         'Início': DateFormat('HH:mm').format(occ.startedAt),
         if (occ.finalizedAt != null)
           'Fim': DateFormat('HH:mm').format(occ.finalizedAt!),
+        if (duration != null && duration.isNotEmpty) 'Duração': duration,
+        'Equipe': teamSummary,
         if (occ.finalReport?.isNotEmpty == true) 'Descrição': occ.finalReport,
         if (occ.results.isNotEmpty)
           '_outcomes': occ.results.map((r) => r.toMap()).toList(),
@@ -314,7 +347,7 @@ extension _HistoryDataLoader on _HistoryScreenState {
   }
 
   String _resolveAuthorName(String handlerId) {
-    if (handlerId.trim().isEmpty) return 'Ragonha';
+    if (handlerId.trim().isEmpty) return 'Não informado';
     if (_isCurrentUser(handlerId)) return 'Você';
 
     final userVM = Provider.of<UserViewModel>(context, listen: false);

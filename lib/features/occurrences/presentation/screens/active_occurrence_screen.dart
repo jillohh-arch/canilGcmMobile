@@ -890,6 +890,7 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
                   const SizedBox(height: 24),
                   ActiveOccurrenceTimeline(
                     events: vm.events,
+                    canEdit: canEditOccurrence && !isAwaitingSignatures,
                     onEventTap: isAwaitingSignatures
                         ? (_) => _showLockedForSignaturesMessage()
                         : canEditOccurrence

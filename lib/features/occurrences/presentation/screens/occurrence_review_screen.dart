@@ -149,95 +149,126 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
           await _load();
           if (!mounted) return;
           AppFeedback.success(context, 'Assinatura registrada.');
+          if (_occurrence != null && _occurrence!.status.isClosed) {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop('signed_and_sealed');
+            }
+          }
         },
       ),
     );
   }
 
-  void _showCorrectionDialog() {
+  Future<void> _showCorrectionDialog() async {
     final reasonController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Devolver para correção'),
-        content: TextField(
-          controller: reasonController,
-          autofocus: true,
-          minLines: 3,
-          maxLines: 6,
-          decoration: const InputDecoration(
-            labelText: 'Motivo',
-            hintText: 'Explique o que precisa ser corrigido',
+    String? validationError;
+    try {
+      final reason = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('Devolver para correção'),
+            content: TextField(
+              controller: reasonController,
+              autofocus: true,
+              minLines: 3,
+              maxLines: 6,
+              onChanged: (_) {
+                if (validationError != null) {
+                  setDialogState(() => validationError = null);
+                }
+              },
+              decoration: InputDecoration(
+                labelText: 'Motivo',
+                hintText: 'Explique o que precisa ser corrigido',
+                errorText: validationError,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                onPressed: _isRequestingCorrection
+                    ? null
+                    : () {
+                        final text = reasonController.text.trim();
+                        if (text.isEmpty) {
+                          setDialogState(() => validationError = 'Informe o motivo da devolução.');
+                          return;
+                        }
+                        Navigator.pop(dialogContext, text);
+                      },
+                child: const Text('Devolver'),
+              ),
+            ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: _isRequestingCorrection
-                ? null
-                : () {
-                    final reason = reasonController.text.trim();
-                    if (reason.isEmpty) {
-                      AppFeedback.warning(
-                        context,
-                        'Informe o motivo da devolução.',
-                      );
-                      return;
-                    }
-                    Navigator.pop(dialogContext);
-                    _requestCorrection(reason);
-                  },
-            child: const Text('Devolver'),
-          ),
-        ],
-      ),
-    ).whenComplete(reasonController.dispose);
+      );
+
+      if (reason != null && mounted) {
+        await _requestCorrection(reason);
+      }
+    } finally {
+      reasonController.dispose();
+    }
   }
 
-  void _showDeclineParticipationDialog() {
+  Future<void> _showDeclineParticipationDialog() async {
     final reasonController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Recusar participação'),
-        content: TextField(
-          controller: reasonController,
-          autofocus: true,
-          minLines: 3,
-          maxLines: 6,
-          decoration: const InputDecoration(
-            labelText: 'Motivo da recusa',
-            hintText: 'Explique por que não participou desta ocorrência',
+    String? validationError;
+    try {
+      final reason = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('Recusar participação'),
+            content: TextField(
+              controller: reasonController,
+              autofocus: true,
+              minLines: 3,
+              maxLines: 6,
+              onChanged: (_) {
+                if (validationError != null) {
+                  setDialogState(() => validationError = null);
+                }
+              },
+              decoration: InputDecoration(
+                labelText: 'Motivo da recusa',
+                hintText: 'Explique por que não participou desta ocorrência',
+                errorText: validationError,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                onPressed: _isRespondingParticipation
+                    ? null
+                    : () {
+                        final text = reasonController.text.trim();
+                        if (text.isEmpty) {
+                          setDialogState(() => validationError = 'Informe o motivo da recusa.');
+                          return;
+                        }
+                        Navigator.pop(dialogContext, text);
+                      },
+                child: const Text('Recusar'),
+              ),
+            ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: _isRespondingParticipation
-                ? null
-                : () {
-                    final reason = reasonController.text.trim();
-                    if (reason.isEmpty) {
-                      AppFeedback.warning(
-                        context,
-                        'Informe o motivo da recusa.',
-                      );
-                      return;
-                    }
-                    Navigator.pop(dialogContext);
-                    _declineParticipation(reason);
-                  },
-            child: const Text('Recusar'),
-          ),
-        ],
-      ),
-    ).whenComplete(reasonController.dispose);
+      );
+
+      if (reason != null && mounted) {
+        await _declineParticipation(reason);
+      }
+    } finally {
+      reasonController.dispose();
+    }
   }
 
   Future<void> _acceptParticipation() async {
@@ -289,12 +320,11 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
       );
       if (!mounted) return;
       AppFeedback.success(context, 'Ocorrência devolvida para correção.');
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) =>
-              ActiveOccurrenceScreen(occurrenceId: widget.occurrenceId),
-        ),
-      );
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      } else {
+        await _load();
+      }
     } catch (error) {
       if (!mounted) return;
       AppFeedback.error(context, error);

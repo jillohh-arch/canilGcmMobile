@@ -213,8 +213,13 @@ class RecordDetail {
     // ('Ragonha'/'GCM ...'), não inventar condutor nem responsável técnico.
     final isAuthorlessWeight =
         details['_healthKind'] == 'weight' && entry.author.trim().isEmpty;
+    final isOccurrence = entry.type == HistoryEntryType.occurrence;
 
-    final author = isAuthorlessWeight ? '' : _normalizeAuthor(entry.author);
+    final author = isAuthorlessWeight
+        ? ''
+        : isOccurrence
+            ? _normalizeOccurrenceAuthor(entry.author)
+            : _normalizeAuthor(entry.author);
     final handlerName = isAuthorlessWeight
         ? _detailValue(details, const [
             'Condutor',
@@ -228,11 +233,11 @@ class RecordDetail {
               'Responsavel',
             ]),
             author.replaceFirst('GCM ', ''),
-            'Ragonha',
+            isOccurrence ? 'Não informado' : 'Ragonha',
           ]);
     final dogName = _firstNonEmpty([
       _detailValue(details, const ['Cão', 'Cao', 'Dog', 'dogName']),
-      'Bono',
+      isOccurrence ? 'Sem cão' : 'Bono',
     ]);
 
     final rawStatus = _firstNonEmpty([
@@ -260,7 +265,9 @@ class RecordDetail {
     final duration = _firstNonEmpty([
       _detailValue(details, const ['Duração', 'Duracao', 'DuraÃÂ§ÃÂ£o']),
       _occurrenceDuration(entry),
-      entry.type == HistoryEntryType.occurrence ? '42 min' : 'Não informado',
+      entry.type == HistoryEntryType.occurrence
+          ? (entry.isInProgress ? 'Em andamento' : 'Não informado')
+          : 'Não informado',
     ]);
 
     return RecordDetail(
@@ -280,7 +287,7 @@ class RecordDetail {
       team: _firstNonEmpty([
         _detailValue(details, const ['Equipe', 'team']),
         entry.type == HistoryEntryType.occurrence
-            ? '2 GCMs'
+            ? 'Não informada'
             : 'Equipe não informada',
       ]),
       notes: notes,
@@ -342,6 +349,16 @@ class RecordDetail {
     final cleaned = _cleanText(author).trim();
     if (cleaned.isEmpty) return 'GCM Ragonha';
     if (cleaned == 'Você') return 'GCM Ragonha';
+    if (cleaned.startsWith('GCM ') || cleaned.startsWith('Veterinário')) {
+      return cleaned;
+    }
+    return 'GCM $cleaned';
+  }
+
+  static String _normalizeOccurrenceAuthor(String author) {
+    final cleaned = _cleanText(author).trim();
+    if (cleaned.isEmpty) return 'Não informado';
+    if (cleaned == 'Você') return 'Você';
     if (cleaned.startsWith('GCM ') || cleaned.startsWith('Veterinário')) {
       return cleaned;
     }
