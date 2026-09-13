@@ -262,13 +262,16 @@ class RecordDetail {
       if (entry.type != HistoryEntryType.occurrence) entry.subtitle,
     ]);
 
-    final duration = _firstNonEmpty([
+    var duration = _firstNonEmpty([
       _detailValue(details, const ['Duração', 'Duracao', 'DuraÃÂ§ÃÂ£o']),
       _occurrenceDuration(entry),
       entry.type == HistoryEntryType.occurrence
           ? (entry.isInProgress ? 'Em andamento' : 'Não informado')
           : 'Não informado',
     ]);
+    if (duration == '0 min') {
+      duration = '< 1 min';
+    }
 
     return RecordDetail(
       id: entry.id,
@@ -393,7 +396,7 @@ class RecordDetail {
     if (start == null || end == null || end.isBefore(start)) return '';
 
     final minutes = end.difference(start).inMinutes;
-    if (minutes <= 0) return '';
+    if (minutes <= 0) return '< 1 min';
     return '$minutes min';
   }
 

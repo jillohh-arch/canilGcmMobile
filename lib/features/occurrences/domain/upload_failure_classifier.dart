@@ -117,6 +117,9 @@ class UploadFailureClassifier {
         if (error is FirebaseException && error.code == 'permission-denied') {
           return 'Permissão negada para envio de fotos. Contate o administrador.';
         }
+        if (error is FirebaseException && error.code == 'object-not-found') {
+          return 'Repositório de arquivos não encontrado no servidor de nuvem. Contate o suporte.';
+        }
         if (error is FileSystemException) {
           return 'Arquivo de foto não encontrado ou corrompido no dispositivo.';
         }

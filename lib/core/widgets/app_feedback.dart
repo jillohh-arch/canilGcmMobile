@@ -1,3 +1,4 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -227,6 +228,9 @@ class AppFeedbackText {
   const AppFeedbackText._();
 
   static String fromError(Object error, {required String fallback}) {
+    if (error is FirebaseFunctionsException) {
+      return _firebaseFunctionsMessage(error, fallback: fallback);
+    }
     if (error is FirebaseException) {
       return _firebaseMessage(error.code, fallback: fallback);
     }
@@ -239,6 +243,11 @@ class AppFeedbackText {
 
     final raw = error.toString();
     final normalized = raw.toLowerCase();
+    if (normalized.contains('functions/not-found') ||
+        normalized.contains('firebasefunctionsexception') &&
+            normalized.contains('not-found')) {
+      return 'Serviço remoto não encontrado ou função não implantada. Tente novamente mais tarde.';
+    }
     if (normalized.contains('permission-denied') ||
         normalized.contains('missing or insufficient permissions') ||
         normalized.contains('does not have permission')) {
@@ -266,8 +275,10 @@ class AppFeedbackText {
     message = message.replaceFirst(RegExp(r'^StateError:\s*'), '');
     message = message.replaceFirst(RegExp(r'^Invalid argument\(s\):\s*'), '');
     message = message.replaceFirst(RegExp(r'^FirebaseException:\s*'), '');
+    message = message.replaceFirst(RegExp(r'^FirebaseFunctionsException:\s*'), '');
     message = message.replaceAll(RegExp(r'\[cloud_firestore/[^]]+\]\s*'), '');
     message = message.replaceAll(RegExp(r'\[firebase_auth/[^]]+\]\s*'), '');
+    message = message.replaceAll(RegExp(r'\[firebase_functions/[^]]+\]\s*'), '');
     message = message.replaceAll(
       'The caller does not have permission to execute the specified operation.',
       '',
@@ -275,6 +286,32 @@ class AppFeedbackText {
     message = message.replaceAll('Missing or insufficient permissions.', '');
     message = message.replaceAll(RegExp(r'\s+'), ' ').trim();
     return message;
+  }
+
+  static String _firebaseFunctionsMessage(
+    FirebaseFunctionsException error, {
+    required String fallback,
+  }) {
+    final code = error.code.toLowerCase();
+    switch (code) {
+      case 'not-found':
+        return 'Serviço remoto não encontrado ou função não implantada. Tente novamente mais tarde.';
+      case 'unauthenticated':
+        return 'Sua sessão precisa ser renovada. Saia e entre novamente.';
+      case 'permission-denied':
+        return 'Você não tem permissão para essa ação. Atualize o login ou procure o administrador.';
+      case 'unavailable':
+      case 'deadline-exceeded':
+        return 'Serviço remoto temporariamente indisponível. Verifique a conexão e tente novamente.';
+      default:
+        if (error.message?.trim().isNotEmpty == true) {
+          final cleaned = clean(error.message!);
+          if (cleaned.isNotEmpty && !_looksTechnical(cleaned)) {
+            return cleaned;
+          }
+        }
+        return fallback;
+    }
   }
 
   static String _firebaseMessage(String code, {required String fallback}) {
@@ -290,6 +327,8 @@ class AppFeedbackText {
         return 'Não foi possível sincronizar agora. Verifique a conexão e tente novamente.';
       case 'not-found':
         return 'O registro não foi encontrado. Atualize a tela e tente novamente.';
+      case 'object-not-found':
+        return 'O recurso ou arquivo no armazenamento em nuvem não foi encontrado.';
       case 'already-exists':
         return 'Esse registro já existe.';
       case 'cancelled':

@@ -43,6 +43,7 @@ class _SignatureConfirmationDialogState
   bool _isSignatureSuccess = false;
   String? _errorMessage;
   String? _signatureHash;
+  String? _submittedSignatureHash;
 
   @override
   void initState() {
@@ -183,7 +184,10 @@ class _SignatureConfirmationDialogState
         '$occurrenceHashPreview|$handlerId|${now.toIso8601String()}|${method.toMap()}';
     final hash = sha256.convert(utf8.encode(dataToHash)).toString();
 
-    setState(() => _signatureHash = hash);
+    setState(() {
+      _signatureHash = hash;
+      _submittedSignatureHash = hash;
+    });
 
     final signature = OccurrenceSignature(
       handlerId: handlerId,
@@ -247,11 +251,13 @@ class _SignatureConfirmationDialogState
     return widget.viewModel.signatures.any(
       (signature) =>
           signature.handlerId == handlerRa &&
-          signature.status == SignatureStatus.signed,
+          signature.status == SignatureStatus.signed &&
+          signature.signatureHash != _submittedSignatureHash,
     );
   }
 
   String? _signatureGuardMessage(String? handlerRa) {
+    if (_isSignatureSuccess) return null;
     if (widget.occurrence.status != OccurrenceStatus.awaitingSignatures) {
       return 'A ocorrência não está aguardando assinaturas';
     }

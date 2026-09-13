@@ -292,8 +292,15 @@ extension _HistoryDataLoader on _HistoryScreenState {
     if (occ.durationTotal != null && occ.durationTotal! > 0) {
       duration = '${occ.durationTotal} min';
     } else if (occ.finalizedAt != null) {
-      final diff = occ.finalizedAt!.difference(occ.startedAt).inMinutes;
-      if (diff >= 0) duration = '$diff min';
+      final diffMinutes = occ.finalizedAt!.difference(occ.startedAt).inMinutes;
+      final diffSeconds = occ.finalizedAt!.difference(occ.startedAt).inSeconds;
+      if (diffMinutes > 0) {
+        duration = '$diffMinutes min';
+      } else if (diffSeconds >= 0) {
+        duration = '< 1 min';
+      }
+    } else if (isOpen) {
+      duration = 'Em andamento';
     }
 
     String teamSummary = 'Não informada';

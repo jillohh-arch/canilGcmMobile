@@ -168,125 +168,49 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
   }
 
   Future<void> _showCorrectionDialog() async {
-    final reasonController = TextEditingController();
-    String? validationError;
-    try {
-      final reason = await showDialog<String>(
-        context: context,
-        builder: (dialogContext) => StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
-            title: const Text('Devolver para correção'),
-            content: TextField(
-              controller: reasonController,
-              autofocus: true,
-              minLines: 3,
-              maxLines: 6,
-              onChanged: (_) {
-                if (validationError != null) {
-                  setDialogState(() => validationError = null);
-                }
-              },
-              decoration: InputDecoration(
-                labelText: 'Motivo',
-                hintText: 'Explique o que precisa ser corrigido',
-                errorText: validationError,
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('Cancelar'),
-              ),
-              FilledButton(
-                onPressed: _isRequestingCorrection
-                    ? null
-                    : () {
-                        final text = reasonController.text.trim();
-                        if (text.isEmpty) {
-                          setDialogState(() => validationError = 'Informe o motivo da devolução.');
-                          return;
-                        }
-                        Navigator.pop(dialogContext, text);
-                      },
-                child: const Text('Devolver'),
-              ),
-            ],
-          ),
-        ),
-      );
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => const _ReasonInputDialog(
+        title: 'Devolver para correção',
+        labelText: 'Motivo',
+        hintText: 'Explique o que precisa ser corrigido',
+        actionLabel: 'Devolver',
+        validationErrorMessage: 'Informe o motivo da devolução.',
+      ),
+    );
 
-      if (reason != null && mounted) {
-        await _requestCorrection(reason);
-      }
-    } finally {
-      reasonController.dispose();
+    if (reason != null && mounted) {
+      await _requestCorrection(reason);
     }
   }
 
   Future<void> _showDeclineParticipationDialog() async {
-    final reasonController = TextEditingController();
-    String? validationError;
-    try {
-      final reason = await showDialog<String>(
-        context: context,
-        builder: (dialogContext) => StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
-            title: const Text('Recusar participação'),
-            content: TextField(
-              controller: reasonController,
-              autofocus: true,
-              minLines: 3,
-              maxLines: 6,
-              onChanged: (_) {
-                if (validationError != null) {
-                  setDialogState(() => validationError = null);
-                }
-              },
-              decoration: InputDecoration(
-                labelText: 'Motivo da recusa',
-                hintText: 'Explique por que não participou desta ocorrência',
-                errorText: validationError,
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('Cancelar'),
-              ),
-              FilledButton(
-                onPressed: _isRespondingParticipation
-                    ? null
-                    : () {
-                        final text = reasonController.text.trim();
-                        if (text.isEmpty) {
-                          setDialogState(() => validationError = 'Informe o motivo da recusa.');
-                          return;
-                        }
-                        Navigator.pop(dialogContext, text);
-                      },
-                child: const Text('Recusar'),
-              ),
-            ],
-          ),
-        ),
-      );
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => const _ReasonInputDialog(
+        title: 'Recusar participação',
+        labelText: 'Motivo da recusa',
+        hintText: 'Explique por que não participou desta ocorrência',
+        actionLabel: 'Recusar',
+        validationErrorMessage: 'Informe o motivo da recusa.',
+      ),
+    );
 
-      if (reason != null && mounted) {
-        await _declineParticipation(reason);
-      }
-    } finally {
-      reasonController.dispose();
+    if (reason != null && mounted) {
+      await _declineParticipation(reason);
     }
   }
 
   Future<void> _acceptParticipation() async {
     setState(() => _isRespondingParticipation = true);
+    var didNavigate = false;
     try {
       await _occurrenceRepository.acceptParticipation(
         occurrenceId: widget.occurrenceId,
       );
       if (!mounted) return;
       AppFeedback.success(context, 'Participação confirmada.');
+      didNavigate = true;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) =>
@@ -297,7 +221,9 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
       if (!mounted) return;
       AppFeedback.error(context, error);
     } finally {
-      if (mounted) setState(() => _isRespondingParticipation = false);
+      if (mounted && !didNavigate) {
+        setState(() => _isRespondingParticipation = false);
+      }
     }
   }
 
@@ -321,6 +247,7 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
 
   Future<void> _requestCorrection(String reason) async {
     setState(() => _isRequestingCorrection = true);
+    var didPop = false;
     try {
       await OccurrenceTransitionService().requestCorrection(
         occurrenceId: widget.occurrenceId,
@@ -329,7 +256,8 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
       if (!mounted) return;
       AppFeedback.success(context, 'Ocorrência devolvida para correção.');
       if (Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
+        didPop = true;
+        Navigator.of(context).pop('returned_for_correction');
       } else {
         await _load();
       }
@@ -337,7 +265,9 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
       if (!mounted) return;
       AppFeedback.error(context, error);
     } finally {
-      if (mounted) setState(() => _isRequestingCorrection = false);
+      if (mounted && !didPop) {
+        setState(() => _isRequestingCorrection = false);
+      }
     }
   }
 
@@ -729,6 +659,84 @@ class _ErrorState extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ReasonInputDialog extends StatefulWidget {
+  final String title;
+  final String labelText;
+  final String hintText;
+  final String actionLabel;
+  final String validationErrorMessage;
+
+  const _ReasonInputDialog({
+    required this.title,
+    required this.labelText,
+    required this.hintText,
+    required this.actionLabel,
+    required this.validationErrorMessage,
+  });
+
+  @override
+  State<_ReasonInputDialog> createState() => _ReasonInputDialogState();
+}
+
+class _ReasonInputDialogState extends State<_ReasonInputDialog> {
+  late final TextEditingController _controller;
+  String? _validationError;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final text = _controller.text.trim();
+    if (text.isEmpty) {
+      setState(() => _validationError = widget.validationErrorMessage);
+      return;
+    }
+    Navigator.of(context).pop(text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        minLines: 3,
+        maxLines: 6,
+        onChanged: (_) {
+          if (_validationError != null) {
+            setState(() => _validationError = null);
+          }
+        },
+        decoration: InputDecoration(
+          labelText: widget.labelText,
+          hintText: widget.hintText,
+          errorText: _validationError,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: Text(widget.actionLabel),
+        ),
+      ],
     );
   }
 }

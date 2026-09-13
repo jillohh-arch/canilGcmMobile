@@ -415,8 +415,19 @@ class HistoryDetailScaffold extends StatelessWidget {
 
     // Secondary line representation
     String secondInfoLabel = 'OPERAÇÃO';
-    String secondInfoValue = '13:33 → 13:40';
-    if (detail.type == HistoryEntryType.training) {
+    String secondInfoValue = 'Não informado';
+    if (detail.type == HistoryEntryType.occurrence) {
+      secondInfoLabel = 'OPERAÇÃO';
+      final startStr = detail.source.details['Início']?.toString() ??
+          DateFormat('HH:mm').format(detail.dateTime);
+      final endStr = detail.source.details['Fim']?.toString();
+      if (endStr != null && endStr.isNotEmpty) {
+        secondInfoValue = '$startStr → $endStr';
+      } else {
+        secondInfoValue =
+            detail.source.isInProgress ? '$startStr → Em andamento' : startStr;
+      }
+    } else if (detail.type == HistoryEntryType.training) {
       secondInfoLabel = 'LINHA';
       secondInfoValue =
           detail.source.details['Linha'] ??
