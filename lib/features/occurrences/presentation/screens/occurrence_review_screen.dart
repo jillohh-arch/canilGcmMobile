@@ -116,9 +116,17 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
         occurrence.status != OccurrenceStatus.awaitingSignatures) {
       return false;
     }
-    return occurrence.team.any((member) => member.handlerId == currentRa) ||
-        occurrence.primaryHandlerRa == currentRa ||
-        occurrence.primaryHandlerId == currentRa;
+    final member = occurrence.team.where((item) => item.handlerId == currentRa);
+    if (member.isEmpty || member.first.role == TeamRole.titular) return false;
+    final hasAlreadySigned = _teamViewModel.signatures.any(
+      (signature) =>
+          signature.handlerId == currentRa &&
+          signature.status == SignatureStatus.signed,
+    );
+    if (hasAlreadySigned) {
+      return false;
+    }
+    return true;
   }
 
   bool get _canRespondParticipation {

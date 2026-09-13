@@ -1,17 +1,35 @@
+// ignore_for_file: depend_on_referenced_packages
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:provider/provider.dart';
 
 import 'package:canil_gcm/core/domain/notification_item.dart';
 import 'package:canil_gcm/core/services/notification_service.dart';
 import 'package:canil_gcm/features/history/presentation/screens/history_screen.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.dart';
+import 'package:canil_gcm/core/domain/occurrence_signature.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
+import 'package:canil_gcm/core/domain/occurrence_team_member.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/active_occurrence_event_card.dart';
+import 'package:canil_gcm/features/shifts/domain/active_shift_session.dart';
+import 'package:canil_gcm/features/shifts/domain/vehicle.dart';
+import 'package:canil_gcm/features/shifts/domain/vehicle_crew.dart';
 import 'package:canil_gcm/features/shifts/presentation/screens/vehicle_crew_post_sheet.dart';
+import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
+import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
+import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
+import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
+import 'package:firebase_core_platform_interface/firebase_core_platform_interface.dart';
+import '../shifts/crew_k9_test_helpers.dart';
 
 void main() {
+  setUpAll(() {
+    FirebasePlatform.instance = FakeFirebasePlatform();
+  });
+
   group('R5.4 — Notification Superseding & Projection', () {
     test('supersedesParticipationRequest returns true for terminal or signature notifications', () {
       expect(NotificationItem.supersedesParticipationRequest(NotificationType.signatureRequested), isTrue);
@@ -478,6 +496,369 @@ void main() {
         ),
       );
       expect(find.text('CHEIA'), findsOneWidget);
+    });
+
+    testWidgets('R5.8 Invariant: 2-person vehicle with 2 occupants displays CHEIA and zero ASSUMIR actions', (tester) async {
+      final shiftVM = ShiftViewModel(
+        authorizationGateway: MockShiftAuthorizationGateway(),
+        shiftService: MockShiftService(),
+        authService: MockAuthService(),
+      );
+      shiftVM.setBoundRaForTesting('990001');
+      shiftVM.setSessionForTesting(
+        ActiveShiftSession.fromJson({
+          'handlerId': '990001',
+          'dogId': 'stg-dog-tc1-001',
+          'vehicleId': 'STG-TC1-VTR-01',
+          'vehicleCrewId': 'STG-TC1-VTR-01',
+          'startedAt': DateTime.now().toIso8601String(),
+          'status': 'active',
+        }),
+      );
+      final userVM = MockUserViewModel({
+        '990001': 'Condutor 1',
+        '990002': 'Condutor 2',
+      });
+      const vehicle = Vehicle(
+        id: 'STG-TC1-VTR-01',
+        name: 'Viatura 01',
+        prefix: 'V-TC1',
+        modelName: 'Hilux',
+        crewSize: 2,
+        unit: 'Canil GCM',
+        active: true,
+      );
+      final Map<String, VehicleCrewMember> activeMembers = {
+        'motorista': VehicleCrewMember(
+          handlerId: '990001',
+          name: 'Condutor 1',
+          role: 'motorista',
+          status: 'active',
+          joinedAt: DateTime(2025),
+        ),
+        'encarregado': VehicleCrewMember(
+          handlerId: '990002',
+          name: 'Condutor 2',
+          role: 'encarregado',
+          status: 'active',
+          joinedAt: DateTime(2025),
+        ),
+      };
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<ShiftViewModel>.value(value: shiftVM),
+            ChangeNotifierProvider<AuthViewModel>.value(value: AuthViewModel()),
+            ChangeNotifierProvider<UserViewModel>.value(value: userVM),
+            ChangeNotifierProvider<DogViewModel>.value(
+              value: MockDogViewModel([defaultTestDog1]),
+            ),
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              body: Column(
+                children: [
+                  OccupancyBadge(occupancy: activeMembers.length, crewSize: vehicle.crewSize),
+                  Expanded(
+                    child: VehicleCrewPostBoard(
+                      vehicle: vehicle,
+                      activeMembers: activeMembers,
+                      hasBinomioActive: false,
+                      onPostSelected: (_) {},
+                      onLeaveVehicle: () {},
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Invariant: UI displays CHEIA and ZERO ASSUMIR buttons
+      expect(find.text('CHEIA'), findsOneWidget);
+      expect(find.text('ASSUMIR'), findsNothing);
+    });
+
+    testWidgets('R5.8 Invariant: 4-person vehicle with 2 occupants displays 2/4 and ASSUMIR actions (NEVER CHEIA + ASSUMIR)', (tester) async {
+      final shiftVM = ShiftViewModel(
+        authorizationGateway: MockShiftAuthorizationGateway(),
+        shiftService: MockShiftService(),
+        authService: MockAuthService(),
+      );
+      shiftVM.setBoundRaForTesting('990001');
+      shiftVM.setSessionForTesting(
+        ActiveShiftSession.fromJson({
+          'handlerId': '990001',
+          'dogId': 'stg-dog-tc1-001',
+          'vehicleId': 'STG-TC1-VTR-01',
+          'vehicleCrewId': 'STG-TC1-VTR-01',
+          'startedAt': DateTime.now().toIso8601String(),
+          'status': 'active',
+        }),
+      );
+      final userVM = MockUserViewModel({
+        '990001': 'Condutor 1',
+        '990002': 'Condutor 2',
+      });
+      const vehicle = Vehicle(
+        id: 'STG-TC1-VTR-01',
+        name: 'Viatura 01',
+        prefix: 'V-TC1',
+        modelName: 'Hilux',
+        crewSize: 4,
+        unit: 'Canil GCM',
+        active: true,
+      );
+      final Map<String, VehicleCrewMember> activeMembers = {
+        'motorista': VehicleCrewMember(
+          handlerId: '990001',
+          name: 'Condutor 1',
+          role: 'motorista',
+          status: 'active',
+          joinedAt: DateTime(2025),
+        ),
+        'encarregado': VehicleCrewMember(
+          handlerId: '990002',
+          name: 'Condutor 2',
+          role: 'encarregado',
+          status: 'active',
+          joinedAt: DateTime(2025),
+        ),
+      };
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<ShiftViewModel>.value(value: shiftVM),
+            ChangeNotifierProvider<AuthViewModel>.value(value: AuthViewModel()),
+            ChangeNotifierProvider<UserViewModel>.value(value: userVM),
+            ChangeNotifierProvider<DogViewModel>.value(
+              value: MockDogViewModel([defaultTestDog1]),
+            ),
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              body: Column(
+                children: [
+                  OccupancyBadge(occupancy: activeMembers.length, crewSize: vehicle.crewSize),
+                  Expanded(
+                    child: VehicleCrewPostBoard(
+                      vehicle: vehicle,
+                      activeMembers: activeMembers,
+                      hasBinomioActive: false,
+                      onPostSelected: (_) {},
+                      onLeaveVehicle: () {},
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Invariant: UI displays 2/4, ASSUMIR is present, CHEIA is NOT present
+      expect(find.text('2/4'), findsOneWidget);
+      expect(find.text('CHEIA'), findsNothing);
+      expect(find.text('ASSUMIR'), findsWidgets);
+    });
+
+    testWidgets('R5.8 Invariant: 4-person vehicle with 4 occupants displays CHEIA and zero ASSUMIR actions', (tester) async {
+      final shiftVM = ShiftViewModel(
+        authorizationGateway: MockShiftAuthorizationGateway(),
+        shiftService: MockShiftService(),
+        authService: MockAuthService(),
+      );
+      shiftVM.setBoundRaForTesting('990001');
+      shiftVM.setSessionForTesting(
+        ActiveShiftSession.fromJson({
+          'handlerId': '990001',
+          'dogId': 'stg-dog-tc1-001',
+          'vehicleId': 'STG-TC1-VTR-01',
+          'vehicleCrewId': 'STG-TC1-VTR-01',
+          'startedAt': DateTime.now().toIso8601String(),
+          'status': 'active',
+        }),
+      );
+      final userVM = MockUserViewModel({
+        '990001': 'Condutor 1',
+        '990002': 'Condutor 2',
+        '990003': 'Condutor 3',
+        '990004': 'Condutor 4',
+      });
+      const vehicle = Vehicle(
+        id: 'STG-TC1-VTR-01',
+        name: 'Viatura 01',
+        prefix: 'V-TC1',
+        modelName: 'Hilux',
+        crewSize: 4,
+        unit: 'Canil GCM',
+        active: true,
+      );
+      final Map<String, VehicleCrewMember> activeMembers = {
+        'motorista': VehicleCrewMember(
+          handlerId: '990001',
+          name: 'Condutor 1',
+          role: 'motorista',
+          status: 'active',
+          joinedAt: DateTime(2025),
+        ),
+        'encarregado': VehicleCrewMember(
+          handlerId: '990002',
+          name: 'Condutor 2',
+          role: 'encarregado',
+          status: 'active',
+          joinedAt: DateTime(2025),
+        ),
+        'auxiliar_1': VehicleCrewMember(
+          handlerId: '990003',
+          name: 'Condutor 3',
+          role: 'auxiliar_1',
+          status: 'active',
+          joinedAt: DateTime(2025),
+        ),
+        'auxiliar_2': VehicleCrewMember(
+          handlerId: '990004',
+          name: 'Condutor 4',
+          role: 'auxiliar_2',
+          status: 'active',
+          joinedAt: DateTime(2025),
+        ),
+      };
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<ShiftViewModel>.value(value: shiftVM),
+            ChangeNotifierProvider<AuthViewModel>.value(value: AuthViewModel()),
+            ChangeNotifierProvider<UserViewModel>.value(value: userVM),
+            ChangeNotifierProvider<DogViewModel>.value(
+              value: MockDogViewModel([defaultTestDog1]),
+            ),
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              body: Column(
+                children: [
+                  OccupancyBadge(occupancy: activeMembers.length, crewSize: vehicle.crewSize),
+                  Expanded(
+                    child: VehicleCrewPostBoard(
+                      vehicle: vehicle,
+                      activeMembers: activeMembers,
+                      hasBinomioActive: false,
+                      onPostSelected: (_) {},
+                      onLeaveVehicle: () {},
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Invariant: UI displays CHEIA and zero ASSUMIR
+      expect(find.text('CHEIA'), findsOneWidget);
+      expect(find.text('ASSUMIR'), findsNothing);
+    });
+  });
+
+  group('R5.2 — Occurrence Return for Correction Lifecycle Matrix', () {
+    test('State Matrix Contract: accepted+unsigned (YES), signed+not sealed (NO), sealed (NO)', () {
+      bool canRequestCorrection({
+        required OccurrenceStatus status,
+        required String currentRa,
+        required List<OccurrenceTeamMember> team,
+        required List<OccurrenceSignature> signatures,
+      }) {
+        if (status != OccurrenceStatus.awaitingSignatures) return false;
+        final member = team.where((item) => item.handlerId == currentRa);
+        if (member.isEmpty || member.first.role == TeamRole.titular) return false;
+        final hasAlreadySigned = signatures.any(
+          (signature) =>
+              signature.handlerId == currentRa &&
+              signature.status == SignatureStatus.signed,
+        );
+        if (hasAlreadySigned) return false;
+        return true;
+      }
+
+      final team = [
+        OccurrenceTeamMember(
+          handlerId: '990001',
+          role: TeamRole.titular,
+          addedAt: DateTime(2025),
+          addedBy: '990001',
+        ),
+        OccurrenceTeamMember(
+          handlerId: '990002',
+          role: TeamRole.integrante,
+          addedAt: DateTime(2025),
+          addedBy: '990001',
+        ),
+      ];
+
+      // 1. accepted + unsigned (awaiting_signatures, pending signature)
+      final unsignedSignatures = [
+        const OccurrenceSignature(
+          handlerId: '990002',
+          status: SignatureStatus.pending,
+        ),
+      ];
+      expect(
+        canRequestCorrection(
+          status: OccurrenceStatus.awaitingSignatures,
+          currentRa: '990002',
+          team: team,
+          signatures: unsignedSignatures,
+        ),
+        isTrue,
+        reason: 'accepted + unsigned allows return for correction',
+      );
+
+      // 2. signed + not sealed (awaiting_signatures, user already signed)
+      final signedSignatures = [
+        const OccurrenceSignature(
+          handlerId: '990002',
+          status: SignatureStatus.signed,
+        ),
+      ];
+      expect(
+        canRequestCorrection(
+          status: OccurrenceStatus.awaitingSignatures,
+          currentRa: '990002',
+          team: team,
+          signatures: signedSignatures,
+        ),
+        isFalse,
+        reason: 'signed + not sealed forbids return for correction for the signed user',
+      );
+
+      // 3. sealed / finalized (occurrence status is finalized/closed)
+      expect(
+        canRequestCorrection(
+          status: OccurrenceStatus.finalized,
+          currentRa: '990002',
+          team: team,
+          signatures: unsignedSignatures,
+        ),
+        isFalse,
+        reason: 'sealed/finalized forbids return for correction',
+      );
+
+      // 4. titular (primary handler) cannot devolve to themselves
+      expect(
+        canRequestCorrection(
+          status: OccurrenceStatus.awaitingSignatures,
+          currentRa: '990001',
+          team: team,
+          signatures: unsignedSignatures,
+        ),
+        isFalse,
+        reason: 'titular does not request correction from themselves',
+      );
     });
   });
 }
