@@ -268,9 +268,6 @@ extension _HistoryDataLoader on _HistoryScreenState {
 
   HistoryEntry _buildOccurrenceEntry(Occurrence occ, DogViewModel dogVM) {
     final isYou = _isCurrentUser(occ.primaryHandlerId);
-    final isOpen =
-        occ.status == OccurrenceStatus.inProgress ||
-        occ.status == OccurrenceStatus.finalizing;
 
     String resolvedDogName = 'Sem cão';
     if (occ.dogId.isNotEmpty) {
@@ -288,61 +285,11 @@ extension _HistoryDataLoader on _HistoryScreenState {
       }
     }
 
-    String? duration;
-    if (occ.durationTotal != null && occ.durationTotal! > 0) {
-      duration = '${occ.durationTotal} min';
-    } else if (occ.finalizedAt != null) {
-      final diffMinutes = occ.finalizedAt!.difference(occ.startedAt).inMinutes;
-      final diffSeconds = occ.finalizedAt!.difference(occ.startedAt).inSeconds;
-      if (diffMinutes > 0) {
-        duration = '$diffMinutes min';
-      } else if (diffSeconds >= 0) {
-        duration = '< 1 min';
-      }
-    } else if (isOpen) {
-      duration = 'Em andamento';
-    }
-
-    String teamSummary = 'Não informada';
-    if (occ.team.isNotEmpty) {
-      final count = occ.team.length;
-      teamSummary = '$count integrante${count > 1 ? 's' : ''}';
-    }
-
-    return HistoryEntry(
-      id: occ.id,
-      type: HistoryEntryType.occurrence,
-      title: 'Ocorrência · ${occ.typeName}',
-      subtitle: occ.locationAddress?.trim().isNotEmpty == true
-          ? occ.locationAddress!.trim()
-          : 'Local não informado',
-      time: occ.startedAt,
+    return OccurrenceHistoryBuilder.buildEntry(
+      occ,
+      resolvedDogName: resolvedDogName,
+      isYou: isYou,
       author: isYou ? 'Você' : _resolveAuthorName(occ.primaryHandlerId),
-      authorId: occ.primaryHandlerId,
-      tag: isYou ? 'VOCÊ' : 'OCORRÊNCIA',
-      icon: Icons.assignment_outlined,
-      color: isYou ? _hYellow : _hCyan,
-      location: occ.locationAddress ?? '',
-      isInProgress: isOpen,
-      editedAt: occ.auditTrail.length > 1 ? occ.updatedAt : null,
-      originalModel: occ,
-      details: {
-        'Tipo': occ.typeName,
-        'Status': occ.status.toMap(),
-        'Cão': resolvedDogName,
-        if (occ.locationAddress?.isNotEmpty == true)
-          'Local': occ.locationAddress,
-        'Condutor': _resolveAuthorName(occ.primaryHandlerId),
-        'Início': DateFormat('HH:mm').format(occ.startedAt),
-        if (occ.finalizedAt != null)
-          'Fim': DateFormat('HH:mm').format(occ.finalizedAt!),
-        if (duration != null && duration.isNotEmpty) 'Duração': duration,
-        'Equipe': teamSummary,
-        if (occ.finalReport?.isNotEmpty == true) 'Descrição': occ.finalReport,
-        if (occ.results.isNotEmpty)
-          '_outcomes': occ.results.map((r) => r.toMap()).toList(),
-        if (occ.auditTrail.isNotEmpty) '_auditTrail': occ.auditTrail,
-      },
     );
   }
 

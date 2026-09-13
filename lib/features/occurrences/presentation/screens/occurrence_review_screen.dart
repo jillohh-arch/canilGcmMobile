@@ -20,20 +20,32 @@ import 'package:canil_gcm/features/occurrences/presentation/widgets/signature_co
 
 class OccurrenceReviewScreen extends StatefulWidget {
   final String occurrenceId;
+  final OccurrenceRepository? occurrenceRepository;
+  final OccurrenceEventRepository? eventRepository;
+  final SignatureRepository? signatureRepository;
+  final OccurrenceTransitionService? transitionService;
+  final String? currentHandlerRa;
+  final OccurrenceFinalizationViewModel? teamViewModel;
 
-  const OccurrenceReviewScreen({super.key, required this.occurrenceId});
+  const OccurrenceReviewScreen({
+    super.key,
+    required this.occurrenceId,
+    this.occurrenceRepository,
+    this.eventRepository,
+    this.signatureRepository,
+    this.transitionService,
+    this.currentHandlerRa,
+    this.teamViewModel,
+  });
 
   @override
   State<OccurrenceReviewScreen> createState() => _OccurrenceReviewScreenState();
 }
 
 class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
-  final _occurrenceRepository = OccurrenceRepository(
-    FirebaseFirestore.instance,
-  );
-  final _eventRepository = OccurrenceEventRepository(
-    FirebaseFirestore.instance,
-  );
+  late final OccurrenceRepository _occurrenceRepository;
+  late final OccurrenceEventRepository _eventRepository;
+  late final OccurrenceTransitionService _transitionService;
   late final OccurrenceFinalizationViewModel _teamViewModel;
 
   bool _isLoading = true;
@@ -46,17 +58,32 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
   @override
   void initState() {
     super.initState();
-    _teamViewModel = OccurrenceFinalizationViewModel(
-      occurrenceRepository: _occurrenceRepository,
-      signatureRepository: SignatureRepository(),
-    );
+    _occurrenceRepository = widget.occurrenceRepository ??
+        OccurrenceRepository(FirebaseFirestore.instance);
+    _eventRepository = widget.eventRepository ??
+        OccurrenceEventRepository(FirebaseFirestore.instance);
+    _transitionService =
+        widget.transitionService ?? OccurrenceTransitionService();
+    _teamViewModel = widget.teamViewModel ??
+        OccurrenceFinalizationViewModel(
+          occurrenceRepository: _occurrenceRepository,
+          signatureRepository:
+              widget.signatureRepository ?? SignatureRepository(),
+        );
     _load();
   }
 
   @override
   void dispose() {
-    _teamViewModel.dispose();
+    if (widget.teamViewModel == null) {
+      _teamViewModel.dispose();
+    }
     super.dispose();
+  }
+
+  String? _currentHandlerRa() {
+    return widget.currentHandlerRa ??
+        HandlerIdentityService.raFromUser(FirebaseAuth.instance.currentUser);
   }
 
   Future<void> _load() async {
@@ -89,9 +116,7 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
 
   bool get _canSign {
     final occurrence = _occurrence;
-    final currentRa = HandlerIdentityService.raFromUser(
-      FirebaseAuth.instance.currentUser,
-    );
+    final currentRa = _currentHandlerRa();
     if (occurrence == null ||
         currentRa == null ||
         occurrence.status != OccurrenceStatus.awaitingSignatures) {
@@ -108,9 +133,7 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
 
   bool get _canRequestCorrection {
     final occurrence = _occurrence;
-    final currentRa = HandlerIdentityService.raFromUser(
-      FirebaseAuth.instance.currentUser,
-    );
+    final currentRa = _currentHandlerRa();
     if (occurrence == null ||
         currentRa == null ||
         occurrence.status != OccurrenceStatus.awaitingSignatures) {
@@ -131,9 +154,7 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
 
   bool get _canRespondParticipation {
     final occurrence = _occurrence;
-    final currentRa = HandlerIdentityService.raFromUser(
-      FirebaseAuth.instance.currentUser,
-    );
+    final currentRa = _currentHandlerRa();
     if (occurrence == null || currentRa == null || !occurrence.status.isOpen) {
       return false;
     }
@@ -153,6 +174,7 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
       builder: (dialogContext) => SignatureConfirmationDialog(
         occurrence: occurrence,
         viewModel: _teamViewModel,
+        currentHandlerRa: _currentHandlerRa(),
         onSuccess: () async {
           await _load();
           if (!mounted) return;
@@ -230,7 +252,7 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
   Future<void> _declineParticipation(String reason) async {
     setState(() => _isRespondingParticipation = true);
     try {
-      await OccurrenceTransitionService().declineParticipation(
+      await _transitionService.declineParticipation(
         occurrenceId: widget.occurrenceId,
         reason: reason,
       );
@@ -249,7 +271,7 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
     setState(() => _isRequestingCorrection = true);
     var didPop = false;
     try {
-      await OccurrenceTransitionService().requestCorrection(
+      await _transitionService.requestCorrection(
         occurrenceId: widget.occurrenceId,
         reason: reason,
       );

@@ -392,8 +392,11 @@ class RecordDetail {
     if (startRaw.isEmpty || endRaw.isEmpty) return '';
 
     final start = _parseTimeOnDate(startRaw, entry.time);
-    final end = _parseTimeOnDate(endRaw, entry.time);
-    if (start == null || end == null || end.isBefore(start)) return '';
+    var end = _parseTimeOnDate(endRaw, entry.time);
+    if (start == null || end == null) return '';
+    if (end.isBefore(start)) {
+      end = end.add(const Duration(days: 1));
+    }
 
     final minutes = end.difference(start).inMinutes;
     if (minutes <= 0) return '< 1 min';
@@ -677,4 +680,74 @@ class AuditEvent {
     required this.action,
     this.user = '',
   });
+}
+
+class OccurrenceHistoryBuilder {
+  static HistoryEntry buildEntry(
+    Occurrence occ, {
+    String resolvedDogName = 'Sem cão',
+    bool isYou = true,
+    String author = 'Você',
+  }) {
+    final isOpen =
+        occ.status == OccurrenceStatus.inProgress ||
+        occ.status == OccurrenceStatus.finalizing;
+
+    String? duration;
+    if (occ.durationTotal != null && occ.durationTotal! > 0) {
+      duration = '${occ.durationTotal} min';
+    } else if (occ.finalizedAt != null) {
+      final diffMinutes = occ.finalizedAt!.difference(occ.startedAt).inMinutes;
+      final diffSeconds = occ.finalizedAt!.difference(occ.startedAt).inSeconds;
+      if (diffMinutes > 0) {
+        duration = '$diffMinutes min';
+      } else if (diffSeconds >= 0) {
+        duration = '< 1 min';
+      }
+    } else if (isOpen) {
+      duration = 'Em andamento';
+    }
+
+    String teamSummary = 'Não informada';
+    if (occ.team.isNotEmpty) {
+      final count = occ.team.length;
+      teamSummary = '$count integrante${count > 1 ? 's' : ''}';
+    }
+
+    return HistoryEntry(
+      id: occ.id,
+      type: HistoryEntryType.occurrence,
+      title: 'Ocorrência · ${occ.typeName}',
+      subtitle: occ.locationAddress?.trim().isNotEmpty == true
+          ? occ.locationAddress!.trim()
+          : 'Local não informado',
+      time: occ.startedAt,
+      author: isYou ? 'Você' : author,
+      authorId: occ.primaryHandlerId,
+      tag: isYou ? 'VOCÊ' : 'OCORRÊNCIA',
+      icon: Icons.assignment_outlined,
+      color: isYou ? _hYellow : _hCyan,
+      location: occ.locationAddress ?? '',
+      isInProgress: isOpen,
+      editedAt: occ.auditTrail.length > 1 ? occ.updatedAt : null,
+      originalModel: occ,
+      details: {
+        'Tipo': occ.typeName,
+        'Status': occ.status.toMap(),
+        'Cão': resolvedDogName,
+        if (occ.locationAddress?.isNotEmpty == true)
+          'Local': occ.locationAddress,
+        'Condutor': author,
+        'Início': DateFormat('HH:mm').format(occ.startedAt),
+        if (occ.finalizedAt != null)
+          'Fim': DateFormat('HH:mm').format(occ.finalizedAt!),
+        if (duration != null && duration.isNotEmpty) 'Duração': duration,
+        'Equipe': teamSummary,
+        if (occ.finalReport?.isNotEmpty == true) 'Descrição': occ.finalReport,
+        if (occ.results.isNotEmpty)
+          '_outcomes': occ.results.map((r) => r.toMap()).toList(),
+        if (occ.auditTrail.isNotEmpty) '_auditTrail': occ.auditTrail,
+      },
+    );
+  }
 }

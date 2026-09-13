@@ -19,12 +19,16 @@ class SignatureConfirmationDialog extends StatefulWidget {
   final Occurrence occurrence;
   final OccurrenceTeamViewModel viewModel;
   final VoidCallback onSuccess;
+  final LocalAuthentication? localAuth;
+  final String? currentHandlerRa;
 
   const SignatureConfirmationDialog({
     super.key,
     required this.occurrence,
     required this.viewModel,
     required this.onSuccess,
+    this.localAuth,
+    this.currentHandlerRa,
   });
 
   @override
@@ -34,7 +38,7 @@ class SignatureConfirmationDialog extends StatefulWidget {
 
 class _SignatureConfirmationDialogState
     extends State<SignatureConfirmationDialog> {
-  final LocalAuthentication _localAuth = LocalAuthentication();
+  late final LocalAuthentication _localAuth;
   final TextEditingController _passwordController = TextEditingController();
 
   bool _isBiometricAvailable = false;
@@ -48,6 +52,7 @@ class _SignatureConfirmationDialogState
   @override
   void initState() {
     super.initState();
+    _localAuth = widget.localAuth ?? LocalAuthentication();
     _checkBiometricAvailability();
   }
 
@@ -237,7 +242,8 @@ class _SignatureConfirmationDialogState
   }
 
   String? _currentHandlerRaOrNull() {
-    return HandlerIdentityService.raFromUser(FirebaseAuth.instance.currentUser);
+    return widget.currentHandlerRa ??
+        HandlerIdentityService.raFromUser(FirebaseAuth.instance.currentUser);
   }
 
   OccurrenceTeamMember? _teamMemberFor(String handlerRa) {
