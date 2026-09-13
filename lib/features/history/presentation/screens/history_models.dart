@@ -156,6 +156,52 @@ class RecordDetail {
     required this.source,
   });
 
+  RecordDetail copyWith({
+    String? id,
+    HistoryEntryType? type,
+    String? category,
+    String? title,
+    String? subtitle,
+    String? location,
+    DateTime? dateTime,
+    String? author,
+    String? dogName,
+    String? handlerName,
+    String? status,
+    String? syncStatus,
+    String? duration,
+    String? team,
+    String? notes,
+    IconData? icon,
+    Color? color,
+    List<InternalEvent>? internalEvents,
+    List<AuditEvent>? auditEvents,
+    HistoryEntry? source,
+  }) {
+    return RecordDetail(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      category: category ?? this.category,
+      title: title ?? this.title,
+      subtitle: subtitle ?? this.subtitle,
+      location: location ?? this.location,
+      dateTime: dateTime ?? this.dateTime,
+      author: author ?? this.author,
+      dogName: dogName ?? this.dogName,
+      handlerName: handlerName ?? this.handlerName,
+      status: status ?? this.status,
+      syncStatus: syncStatus ?? this.syncStatus,
+      duration: duration ?? this.duration,
+      team: team ?? this.team,
+      notes: notes ?? this.notes,
+      icon: icon ?? this.icon,
+      color: color ?? this.color,
+      internalEvents: internalEvents ?? this.internalEvents,
+      auditEvents: auditEvents ?? this.auditEvents,
+      source: source ?? this.source,
+    );
+  }
+
   String get typeLabel {
     switch (type) {
       case HistoryEntryType.health:
@@ -699,11 +745,119 @@ class OccurrenceHistoryBuilder {
     return '$diffMinutes min';
   }
 
+  static List<Map<String, dynamic>> aggregateMediaAttachments({
+    List<dynamic> baseAttachments = const [],
+    List<OccurrenceEvent> events = const [],
+    Occurrence? occurrence,
+  }) {
+    final seenUrls = <String>{};
+    final aggregated = <Map<String, dynamic>>[];
+
+    // 1. Process active-event media
+    for (final event in events) {
+      for (final rawUrl in event.photoUrls) {
+        final url = rawUrl.trim();
+        if (url.isEmpty) continue;
+        if (seenUrls.add(url)) {
+          final item = <String, dynamic>{
+            'url': url,
+            'timestamp': event.timestamp,
+            'category': 'evento',
+            'source': 'evento',
+          };
+          if (event.id.trim().isNotEmpty) {
+            item['eventId'] = event.id.trim();
+          }
+          if (event.title?.trim().isNotEmpty == true) {
+            item['title'] = event.title!.trim();
+          }
+          aggregated.add(item);
+        }
+      }
+    }
+
+    // 2. Process finalization media from root occurrence if available
+    if (occurrence != null && occurrence.finalizationPhotos.isNotEmpty) {
+      final finTimestamp = occurrence.finalizedAt ?? occurrence.updatedAt;
+      for (final rawUrl in occurrence.finalizationPhotos) {
+        final url = rawUrl.trim();
+        if (url.isEmpty) continue;
+        if (seenUrls.add(url)) {
+          aggregated.add({
+            'url': url,
+            'timestamp': finTimestamp,
+            'category': 'finalizacao',
+            'source': 'finalizacao',
+          });
+        }
+      }
+    }
+
+    // 3. Process base attachments (e.g. from existing details['_mediaAttachments'])
+    for (final item in baseAttachments) {
+      if (item is Map) {
+        final rawUrl = item['url']?.toString() ?? '';
+        final url = rawUrl.trim();
+        if (url.isEmpty) continue;
+        if (seenUrls.add(url)) {
+          final copy = Map<String, dynamic>.from(item);
+          copy['url'] = url;
+          copy.putIfAbsent('source', () => copy['category'] ?? 'finalizacao');
+          copy.putIfAbsent('category', () => 'finalizacao');
+          aggregated.add(copy);
+        }
+      } else if (item is String) {
+        final url = item.trim();
+        if (url.isEmpty) continue;
+        if (seenUrls.add(url)) {
+          aggregated.add({
+            'url': url,
+            'timestamp': occurrence?.finalizedAt ?? occurrence?.updatedAt,
+            'category': 'finalizacao',
+            'source': 'finalizacao',
+          });
+        }
+      }
+    }
+
+    return aggregated;
+  }
+
+  static RecordDetail enrichDetailWithEvents(
+    RecordDetail detail,
+    List<OccurrenceEvent> events,
+  ) {
+    if (events.isEmpty) {
+      return detail;
+    }
+
+    final occ = detail.source.originalModel is Occurrence
+        ? detail.source.originalModel as Occurrence
+        : null;
+
+    final baseAttachments =
+        detail.source.details['_mediaAttachments'] as List<dynamic>? ??
+        const [];
+
+    final aggregated = aggregateMediaAttachments(
+      baseAttachments: baseAttachments,
+      events: events,
+      occurrence: occ,
+    );
+
+    final updatedDetails = Map<String, dynamic>.from(detail.source.details);
+    updatedDetails['_mediaAttachments'] = aggregated;
+
+    final updatedSource = detail.source.copyWith(details: updatedDetails);
+    return detail.copyWith(source: updatedSource);
+  }
+
   static HistoryEntry buildEntry(
     Occurrence occ, {
     String resolvedDogName = 'Sem cão',
     bool isYou = true,
     String author = 'Você',
+    List<OccurrenceEvent>? events,
   }) {
     final isOpen =
         occ.status == OccurrenceStatus.inProgress ||
@@ -723,6 +877,11 @@ class OccurrenceHistoryBuilder {
       final count = occ.team.length;
       teamSummary = '$count integrante${count > 1 ? 's' : ''}';
     }
+
+    final mediaAttachments = aggregateMediaAttachments(
+      events: events ?? const [],
+      occurrence: occ,
+    );
 
     return HistoryEntry(
       id: occ.id,
@@ -757,14 +916,8 @@ class OccurrenceHistoryBuilder {
         if (occ.results.isNotEmpty)
           '_outcomes': occ.results.map((r) => r.toMap()).toList(),
         if (occ.auditTrail.isNotEmpty) '_auditTrail': occ.auditTrail,
-        if (occ.finalizationPhotos.isNotEmpty)
-          '_mediaAttachments': occ.finalizationPhotos
-              .map((url) => {
-                    'url': url,
-                    'timestamp': occ.finalizedAt ?? occ.updatedAt,
-                    'category': 'finalizacao',
-                  })
-              .toList(),
+        if (mediaAttachments.isNotEmpty)
+          '_mediaAttachments': mediaAttachments,
       },
     );
   }

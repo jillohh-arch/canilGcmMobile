@@ -23,6 +23,7 @@ import 'package:canil_gcm/features/health/presentation/viewmodels/health_viewmod
 import 'package:canil_gcm/features/history/presentation/screens/history_detail_screen.dart';
 import 'package:canil_gcm/features/nutrition/presentation/viewmodels/nutrition_viewmodel.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/active_occurrence_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';

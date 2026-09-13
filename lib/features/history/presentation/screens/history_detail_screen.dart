@@ -1361,13 +1361,93 @@ class _VerifiedOccurrenceIntegrityCardState
   }
 }
 
-class HistoryOccurrenceBody extends StatelessWidget {
+class HistoryOccurrenceBody extends StatefulWidget {
   final RecordDetail detail;
+  final List<OccurrenceEvent>? events;
+  final Future<List<OccurrenceEvent>>? eventsFuture;
 
-  const HistoryOccurrenceBody({super.key, required this.detail});
+  const HistoryOccurrenceBody({
+    super.key,
+    required this.detail,
+    this.events,
+    this.eventsFuture,
+  });
+
+  @override
+  State<HistoryOccurrenceBody> createState() => _HistoryOccurrenceBodyState();
+}
+
+class _HistoryOccurrenceBodyState extends State<HistoryOccurrenceBody> {
+  Future<List<OccurrenceEvent>>? _eventsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _initEventsFuture();
+  }
+
+  @override
+  void didUpdateWidget(covariant HistoryOccurrenceBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.detail.id != widget.detail.id ||
+        oldWidget.events != widget.events ||
+        oldWidget.eventsFuture != widget.eventsFuture) {
+      _initEventsFuture();
+    }
+  }
+
+  void _initEventsFuture() {
+    if (widget.events != null) {
+      _eventsFuture = null;
+    } else if (widget.eventsFuture != null) {
+      _eventsFuture = widget.eventsFuture;
+    } else {
+      _eventsFuture = _loadEvents();
+    }
+  }
+
+  Future<List<OccurrenceEvent>> _loadEvents() {
+    if (widget.detail.id.isEmpty) {
+      return Future.value(<OccurrenceEvent>[]);
+    }
+    try {
+      final occVM = Provider.of<OccurrenceViewModel>(context, listen: false);
+      return occVM.getEvents(widget.detail.id);
+    } catch (_) {
+      return Future.value(<OccurrenceEvent>[]);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (widget.events != null) {
+      final effectiveDetail = OccurrenceHistoryBuilder.enrichDetailWithEvents(
+        widget.detail,
+        widget.events!,
+      );
+      return _buildContent(context, effectiveDetail, widget.events);
+    }
+
+    return FutureBuilder<List<OccurrenceEvent>>(
+      future: _eventsFuture,
+      builder: (context, snapshot) {
+        final events = snapshot.data;
+        final effectiveDetail = (events != null && events.isNotEmpty)
+            ? OccurrenceHistoryBuilder.enrichDetailWithEvents(
+                widget.detail,
+                events,
+              )
+            : widget.detail;
+        return _buildContent(context, effectiveDetail, events);
+      },
+    );
+  }
+
+  Widget _buildContent(
+    BuildContext context,
+    RecordDetail detail,
+    List<OccurrenceEvent>? events,
+  ) {
     final outcomes = detail.source.details['_outcomes'] as List? ?? [];
     final mediaList = detail.source.details['_mediaAttachments'] as List? ?? [];
 
@@ -1461,7 +1541,11 @@ class HistoryOccurrenceBody extends StatelessWidget {
         const SizedBox(height: 16),
 
         // Timeline
-        _OccurrenceTimelineSection(occurrenceId: detail.id, fallback: detail),
+        _OccurrenceTimelineSection(
+          occurrenceId: detail.id,
+          fallback: detail,
+          events: events,
+        ),
         const SizedBox(height: 16),
 
         // Relato
@@ -3539,10 +3623,12 @@ class _OccurrenceDisplacementSectionState
 class _OccurrenceTimelineSection extends StatefulWidget {
   final String occurrenceId;
   final RecordDetail fallback;
+  final List<OccurrenceEvent>? events;
 
   const _OccurrenceTimelineSection({
     required this.occurrenceId,
     required this.fallback,
+    this.events,
   });
 
   @override
@@ -3579,6 +3665,29 @@ class _OccurrenceTimelineSectionState
 
   @override
   Widget build(BuildContext context) {
+    if (widget.events != null) {
+      final events = widget.events!;
+      if (events.isEmpty) {
+        return _buildTimelineList(
+          widget.fallback.internalEvents
+              .map(
+                (e) => OccurrenceEvent(
+                  id: '',
+                  occurrenceId: '',
+                  category: OccurrenceEventCategory.other,
+                  timestamp: e.time,
+                  title: e.title,
+                  description: e.subtitle,
+                  createdAt: e.time,
+                  updatedAt: e.time,
+                ),
+              )
+              .toList(),
+        );
+      }
+      return _buildTimelineList(events);
+    }
+
     if (widget.occurrenceId.isEmpty) {
       return _buildTimelineList(
         widget.fallback.internalEvents
