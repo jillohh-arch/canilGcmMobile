@@ -1044,7 +1044,12 @@ class OccurrencePdfGenerator {
             pw.SizedBox(width: 9),
             _statCard('EV', '${ctx.events.length}', 'Eventos registrados', f),
             pw.SizedBox(width: 9),
-            _statCard('MID', '${ctx.media.length}', 'Midias anexadas', f),
+            _statCard(
+              'MID',
+              '${ctx.media.length + ctx.finalizationMedia.length}',
+              'Midias anexadas',
+              f,
+            ),
             pw.SizedBox(width: 9),
             _statCard('BO', '${_boCount(ctx.occurrence)}', 'BO registrado', f),
           ],
@@ -2060,15 +2065,16 @@ class OccurrencePdfGenerator {
           ],
         ),
         pw.SizedBox(height: 18),
-        if (visibleMedia.isEmpty)
+        if (visibleMedia.isEmpty && finalizationMedia.isEmpty)
           _emptyBox('Nenhuma midia anexada aos eventos desta ocorrencia.', f)
-        else
-          ..._buildMediaGrid(visibleMedia, ctx),
-        if (finalizationMedia.isNotEmpty) ...[
-          pw.SizedBox(height: 16),
-          _sectionLabel('Fotos da finalizacao', f),
-          pw.SizedBox(height: 10),
-          ..._buildFinalizationMediaGrid(finalizationMedia, ctx),
+        else ...[
+          if (visibleMedia.isNotEmpty) ..._buildMediaGrid(visibleMedia, ctx),
+          if (finalizationMedia.isNotEmpty) ...[
+            if (visibleMedia.isNotEmpty) pw.SizedBox(height: 16),
+            _sectionLabel('Fotos da finalizacao', f),
+            pw.SizedBox(height: 10),
+            ..._buildFinalizationMediaGrid(finalizationMedia, ctx),
+          ],
         ],
         pw.SizedBox(height: 16),
         _sectionLabel('Anexos', f),
@@ -3300,6 +3306,20 @@ class OccurrencePdfGenerator {
     hasHash: hasHash,
     verdict: verdict,
   );
+
+  /// F40 R8: Expõe o cálculo do total de mídias para testes de cobertura e regressão.
+  @visibleForTesting
+  static int totalMediaCountForTest({
+    required int eventMediaCount,
+    required int finalizationMediaCount,
+  }) => eventMediaCount + finalizationMediaCount;
+
+  /// F40 R8: Expõe a condição de estado vazio de mídia para testes de regressão.
+  @visibleForTesting
+  static bool isEmptyMediaStateForTest({
+    required bool visibleMediaEmpty,
+    required bool finalizationMediaEmpty,
+  }) => visibleMediaEmpty && finalizationMediaEmpty;
 
   String _integrityStateText({
     required bool hasHash,

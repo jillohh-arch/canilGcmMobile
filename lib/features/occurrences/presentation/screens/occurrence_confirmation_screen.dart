@@ -432,16 +432,18 @@ class _OccurrenceConfirmationScreenState
     final dogVM = context.read<DogViewModel>();
     final authVM = context.read<AuthViewModel>();
 
-    // Buscar ocorrência: tenta na lista local, depois openOccurrence, depois Firestore
-    Occurrence? occ;
-    final localMatch = occVM.occurrences.where(
-      (o) => o.id == data.occurrenceId,
-    );
-    if (localMatch.isNotEmpty) {
-      occ = localMatch.first;
+    // Buscar ocorrência: prioriza fetch fresh por ID para garantir dados
+    // pós-finalização (fotos e hashes), recorrendo ao cache local apenas como fallback.
+    Occurrence? occ = await occVM.getById(data.occurrenceId);
+    if (occ == null) {
+      final localMatch = occVM.occurrences.where(
+        (o) => o.id == data.occurrenceId,
+      );
+      if (localMatch.isNotEmpty) {
+        occ = localMatch.first;
+      }
+      occ ??= occVM.openOccurrence;
     }
-    occ ??= occVM.openOccurrence;
-    occ ??= await occVM.getById(data.occurrenceId);
 
     if (occ == null) {
       throw Exception('Ocorrência não encontrada');

@@ -757,6 +757,14 @@ class OccurrenceHistoryBuilder {
         if (occ.results.isNotEmpty)
           '_outcomes': occ.results.map((r) => r.toMap()).toList(),
         if (occ.auditTrail.isNotEmpty) '_auditTrail': occ.auditTrail,
+        if (occ.finalizationPhotos.isNotEmpty)
+          '_mediaAttachments': occ.finalizationPhotos
+              .map((url) => {
+                    'url': url,
+                    'timestamp': occ.finalizedAt ?? occ.updatedAt,
+                    'category': 'finalizacao',
+                  })
+              .toList(),
       },
     );
   }

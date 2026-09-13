@@ -1499,11 +1499,20 @@ class HistoryOccurrenceBody extends StatelessWidget {
               itemBuilder: (context, idx) {
                 final map = mediaList[idx] as Map;
                 final url = map['url']?.toString() ?? '';
-                final timestampStr = map['timestamp'] != null
-                    ? DateFormat(
-                        'HH:mm',
-                      ).format((map['timestamp'] as Timestamp).toDate())
-                    : '13:38';
+                final rawTs = map['timestamp'];
+                final DateTime? parsedTs;
+                if (rawTs is Timestamp) {
+                  parsedTs = rawTs.toDate();
+                } else if (rawTs is DateTime) {
+                  parsedTs = rawTs;
+                } else if (rawTs is String) {
+                  parsedTs = DateTime.tryParse(rawTs);
+                } else {
+                  parsedTs = null;
+                }
+                final timestampStr = parsedTs != null
+                    ? DateFormat('HH:mm').format(parsedTs)
+                    : '';
                 return Container(
                   width: 96,
                   height: 96,
