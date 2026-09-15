@@ -22,6 +22,10 @@ import {
   patchHumanPersonnel,
 } from "./admin_patch_human_personnel";
 import {
+  HumanPhotoTransaction,
+  patchHumanPhoto,
+} from "./admin_patch_human_photo";
+import {
   deactivateHuman,
   HumanLifecycleTransaction,
   isCurrentlyActive,
@@ -3340,6 +3344,35 @@ export const adminPatchHumanPersonnel = onCall({region}, async (request) => {
       auditEntry: (action, caller) => auditEntry(action, caller),
       arrayUnion: (value) => admin.firestore.FieldValue.arrayUnion(value),
       deleteField: () => admin.firestore.FieldValue.delete(),
+    },
+    request.data,
+  );
+});
+
+export const adminPatchHumanPhoto = onCall({region}, async (request) => {
+  return patchHumanPhoto(
+    {
+      authorize: () => requireAccessPermission(request.auth, "humans", "edit"),
+      runTransaction: (handler) =>
+        db.runTransaction(async (transaction) => {
+          const tx: HumanPhotoTransaction = {
+            getUser: async (ra) => {
+              const snap = await transaction.get(
+                db.collection("users").doc(ra),
+              );
+              return {exists: snap.exists, data: snap.data() ?? null};
+            },
+            patchUser: (ra, patch) => {
+              transaction.set(db.collection("users").doc(ra), patch, {
+                merge: true,
+              });
+            },
+          };
+          return handler(tx);
+        }),
+      serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+      auditEntry: (action, caller) => auditEntry(action, caller),
+      arrayUnion: (value) => admin.firestore.FieldValue.arrayUnion(value),
     },
     request.data,
   );
