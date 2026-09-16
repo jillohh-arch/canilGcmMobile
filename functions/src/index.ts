@@ -37,6 +37,11 @@ import {
   ResetPasswordDeps,
 } from "./admin_reset_human_password";
 import {
+  defaultGenerateInitialPassword,
+  provisionHumanAuthLogic,
+  ProvisionHumanAuthDeps,
+} from "./admin_provision_human_auth";
+import {
   buildAdminGetAccessHomologationSnapshotHandler,
   createAdminAccessHomologationSnapshotDeps,
 } from "./admin_access_homologation_snapshot";
@@ -2255,6 +2260,91 @@ export function buildAdminResetHumanPasswordDeps(): ResetPasswordDeps {
 
 export const adminResetHumanPassword = onCall({region}, async (request) => {
   return resetHumanPasswordLogic({auth: request.auth, data: request.data}, buildAdminResetHumanPasswordDeps());
+});
+
+/**
+ * F10.AUTH-PROVISIONING-CREDENTIALS-R1 — PROVISIONAMENTO DEDICADO DE AUTENTICACAO.
+ *
+ * Callable administrativo dedicado para provisionar a credencial Auth de integrante (users/{ra}).
+ * - Autoridade administrativa canonica (access.edit com fallback humans.edit);
+ * - Validacao de cadastro existente e ativo;
+ * - Idempotencia segura e sem revelacao retroativa de senha;
+ * - Ciclo de vida seguro: disabled -> persistencia firestore -> enabled;
+ * - Senha inicial forte, unica e jamais registrada em Firestore/logs.
+ */
+export function buildAdminProvisionHumanAuthDeps(): ProvisionHumanAuthDeps {
+  return {
+    authorize: async (auth) => {
+      const typedAuth = auth as
+        | {uid: string; token: admin.auth.DecodedIdToken}
+        | undefined;
+      try {
+        return await requireAccessPermission(typedAuth, "access", "edit");
+      } catch {
+        return await requireAccessPermission(typedAuth, "humans", "edit");
+      }
+    },
+    createAuthUser: async (input) => {
+      const user = await admin.auth().createUser({
+        disabled: input.disabled,
+        displayName: input.displayName,
+        email: input.email,
+        password: input.password,
+      });
+      return {
+        disabled: user.disabled,
+        displayName: user.displayName,
+        email: user.email,
+        uid: user.uid,
+      };
+    },
+    deleteAuthUser: async (uid) => {
+      await admin.auth().deleteUser(uid);
+    },
+    generateInitialPassword: defaultGenerateInitialPassword,
+    getPersonnel: async (ra) => {
+      const snap = await db.collection("users").doc(ra).get();
+      return {exists: snap.exists, data: (snap.data() ?? {}) as JsonMap};
+    },
+    lookupAuthByEmail: async (email) => {
+      const user = await lookupAuthUserByEmail(email);
+      if (!user) return null;
+      return {disabled: user.disabled, displayName: user.displayName, email: user.email, uid: user.uid};
+    },
+    lookupAuthByUid: async (uid) => {
+      const user = await lookupAuthUserByUid(uid);
+      if (!user) return null;
+      return {disabled: user.disabled, displayName: user.displayName, email: user.email, uid: user.uid};
+    },
+    lookupPersonnelByAuthUid: async (uid) => {
+      const snap = await db.collection("users").where("auth_uid", "==", uid).limit(1).get();
+      if (!snap.empty) {
+        return snap.docs[0].id;
+      }
+      const snap2 = await db.collection("users").where("authUid", "==", uid).limit(1).get();
+      if (!snap2.empty) {
+        return snap2.docs[0].id;
+      }
+      return null;
+    },
+    serverTimestamp: () => admin.firestore.Timestamp.now(),
+    updateAuthUser: async (uid, patch) => {
+      await admin.auth().updateUser(uid, patch);
+    },
+    updatePersonnelAudit: async (ra, payload) => {
+      await db.collection("users").doc(ra).set({
+        ...payload,
+        audit_trail: admin.firestore.FieldValue.arrayUnion(payload.audit_trail),
+      }, {merge: true});
+    },
+  };
+}
+
+export const adminProvisionHumanAuth = onCall({region}, async (request) => {
+  return provisionHumanAuthLogic(
+    {auth: request.auth, data: request.data},
+    buildAdminProvisionHumanAuthDeps(),
+  );
 });
 
 export const adminSeedAccessProfiles = onCall({region}, async (request) => {
