@@ -115,6 +115,26 @@ HealthWeightMutationReceipt _parseReceipt(Map<String, dynamic> raw) {
 HealthWeightMutationFailure mapHealthWeightFunctionsError(
   FirebaseFunctionsException error,
 ) {
+  final details = error.details;
+  String? detailCode;
+  if (details is Map) {
+    detailCode = (details['code'] ?? details['error'])
+        ?.toString()
+        .trim()
+        .toLowerCase();
+  } else if (details is String) {
+    detailCode = details.trim().toLowerCase();
+  }
+
+  if (detailCode == 'dog-inactive' ||
+      detailCode == 'dog_inactive' ||
+      (error.message?.toLowerCase().contains('dog-inactive') ?? false)) {
+    return const HealthWeightMutationFailure(
+      HealthWeightMutationErrorCode.dogInactive,
+      'O K9 informado está inativo ou indisponível para registro de pesagem.',
+    );
+  }
+
   final code = error.code.trim().toLowerCase();
   return switch (code) {
     'unauthenticated' => const HealthWeightMutationFailure(
