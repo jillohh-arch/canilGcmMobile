@@ -88,6 +88,7 @@ export interface HealthDocumentStorageAdapter {
     sourceGeneration: string;
     destinationPath: string;
     sealMetadata: Record<string, string>;
+    contentType?: string;
   }) => Promise<{sealed: boolean}>;
   /** Metadata do objeto canônico já selado. */
   getSealedMetadata: (path: string) => Promise<StorageObjectMetadata>;
@@ -594,6 +595,7 @@ export async function runHealthDocumentFinalizeUpload(
         sourceGeneration: staged.generation,
         destinationPath: storagePath,
         sealMetadata: sealMetadata({sealFingerprint, documentId}),
+        contentType: staged.contentType,
       });
 
       canonicalMetadata = await deps.storage.getSealedMetadata(storagePath);
