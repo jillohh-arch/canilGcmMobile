@@ -121,6 +121,28 @@ function eventDoc(
   });
 }
 
+/** Canonical ClinicalEvent consultation writer shape. */
+function canonicalConsultationDoc(
+  id: string,
+  overrides: Record<string, unknown> = {},
+): RawDoc {
+  return doc(id, {
+    dog_id: "dog-1",
+    case_id: "case-1",
+    entity_kind: "clinical_event",
+    event_type: "consultation",
+    payload_type: "consultation_v1",
+    status: "final",
+    occurred_at: ts(daysAgo(5)),
+    revision: 1,
+    schema_version: 1,
+    created_at: ts(daysAgo(5)),
+    updated_at: ts(daysAgo(5)),
+    ...overrides,
+  });
+}
+
+
 let failures = 0;
 
 async function test(name: string, fn: () => void | Promise<void>): Promise<void> {
@@ -907,6 +929,143 @@ async function main(): Promise<void> {
 
   await test("CONSULTATION empty is absent", () => {
     assert.deepStrictEqual(resolveConsultationEvidence(EMPTY), {kind: "absent"});
+  });
+
+  // ── CANONICAL CLINICAL CONSULTATION (DIRECT CONSUMER) ──────────────────
+  await test("CANONICAL CONSULTATION draft is non-qualifying (ignored)", () => {
+    const evidence = resolveConsultationEvidence(
+      docs(canonicalConsultationDoc("c-draft", {status: "draft"})),
+      EMPTY,
+    );
+    assert.deepStrictEqual(evidence, {kind: "absent"});
+  });
+
+  await test("CANONICAL CONSULTATION cancelled is non-qualifying (ignored)", () => {
+    const evidence = resolveConsultationEvidence(
+      docs(canonicalConsultationDoc("c-canc", {status: "cancelled"})),
+      EMPTY,
+    );
+    assert.deepStrictEqual(evidence, {kind: "absent"});
+  });
+
+  await test("CANONICAL CONSULTATION incident/exam/other event_type is ignored", () => {
+    for (const evtType of ["incident", "exam", "reevaluation", "other"]) {
+      const evidence = resolveConsultationEvidence(
+        docs(canonicalConsultationDoc("c-other", {event_type: evtType})),
+        EMPTY,
+      );
+      assert.deepStrictEqual(evidence, {kind: "absent"}, `${evtType} must be ignored`);
+    }
+  });
+
+  await test("CANONICAL CONSULTATION non-consultation_v1 payload_type is ignored", () => {
+    const evidence = resolveConsultationEvidence(
+      docs(canonicalConsultationDoc("c-p", {payload_type: "incident_v1"})),
+      EMPTY,
+    );
+    assert.deepStrictEqual(evidence, {kind: "absent"});
+  });
+
+  await test("CANONICAL CONSULTATION final consultation with occurred_at is present", () => {
+    const evidence = resolveConsultationEvidence(
+      docs(canonicalConsultationDoc("c-1", {occurred_at: ts(daysAgo(10))})),
+      EMPTY,
+    );
+    assert.strictEqual(evidence.kind, "present");
+    if (evidence.kind === "present") {
+      assert.deepStrictEqual(evidence.value, daysAgo(10));
+    }
+  });
+
+  await test("CANONICAL CONSULTATION occurred_at defines factual date, NOT finalized_at", () => {
+    const evidence = resolveConsultationEvidence(
+      docs(
+        canonicalConsultationDoc("c-2", {
+          occurred_at: ts(daysAgo(15)),
+          finalized_at: ts(daysAgo(1)),
+        }),
+      ),
+      EMPTY,
+    );
+    assert.strictEqual(evidence.kind, "present");
+    if (evidence.kind === "present") {
+      assert.deepStrictEqual(evidence.value, daysAgo(15));
+      assert.notDeepStrictEqual(evidence.value, daysAgo(1));
+    }
+  });
+
+  await test("CANONICAL CONSULTATION missing/unparseable occurred_at is malformed", () => {
+    const evidence = resolveConsultationEvidence(
+      docs(canonicalConsultationDoc("c-bad", {occurred_at: null})),
+      EMPTY,
+    );
+    assert.strictEqual(evidence.kind, "unreliable");
+  });
+
+  await test("CANONICAL CONSULTATION soft-deleted record is ignored", () => {
+    const evidence = resolveConsultationEvidence(
+      docs(canonicalConsultationDoc("c-del", {deleted_at: ts(daysAgo(1))})),
+      EMPTY,
+    );
+    assert.deepStrictEqual(evidence, {kind: "absent"});
+  });
+
+  // ── COEXISTENCE RESOLUTION: max(canonicalLatest.at, legacyLatest.at) ───
+  await test("COEXISTENCE canonical newer than legacy -> canonical wins", () => {
+    const canonical = docs(canonicalConsultationDoc("c-new", {occurred_at: ts(daysAgo(5))}));
+    const legacy = docs(eventDoc("e-old", "consultation", {date: ts(daysAgo(20))}));
+    const evidence = resolveConsultationEvidence(canonical, legacy);
+    assert.strictEqual(evidence.kind, "present");
+    if (evidence.kind === "present") {
+      assert.deepStrictEqual(evidence.value, daysAgo(5));
+    }
+  });
+
+  await test("COEXISTENCE legacy newer than canonical -> legacy wins", () => {
+    const canonical = docs(canonicalConsultationDoc("c-old", {occurred_at: ts(daysAgo(30))}));
+    const legacy = docs(eventDoc("e-new", "consultation", {date: ts(daysAgo(2))}));
+    const evidence = resolveConsultationEvidence(canonical, legacy);
+    assert.strictEqual(evidence.kind, "present");
+    if (evidence.kind === "present") {
+      assert.deepStrictEqual(evidence.value, daysAgo(2));
+    }
+  });
+
+  await test("COEXISTENCE tie on date is handled deterministically", () => {
+    const sameDate = ts(daysAgo(7));
+    const canonical = docs(canonicalConsultationDoc("c-tie", {occurred_at: sameDate}));
+    const legacy = docs(eventDoc("e-tie", "consultation", {date: sameDate}));
+    const evidence = resolveConsultationEvidence(canonical, legacy);
+    assert.strictEqual(evidence.kind, "present");
+    if (evidence.kind === "present") {
+      assert.deepStrictEqual(evidence.value, daysAgo(7));
+    }
+  });
+
+  await test("COEXISTENCE canonical failed query returns unreliable", () => {
+    const legacy = docs(eventDoc("e-leg", "consultation", {date: ts(daysAgo(2))}));
+    const evidence = resolveConsultationEvidence(failed(), legacy);
+    assert.strictEqual(evidence.kind, "unreliable");
+  });
+
+  await test("COEXISTENCE legacy failed query returns unreliable", () => {
+    const canonical = docs(canonicalConsultationDoc("c-can", {occurred_at: ts(daysAgo(2))}));
+    const evidence = resolveConsultationEvidence(canonical, failed());
+    assert.strictEqual(evidence.kind, "unreliable");
+  });
+
+  await test("COEXISTENCE malformed canonical blocks even if valid legacy exists", () => {
+    const canonical = docs(canonicalConsultationDoc("c-bad", {occurred_at: null}));
+    const legacy = docs(eventDoc("e-leg", "consultation", {date: ts(daysAgo(2))}));
+    const evidence = resolveConsultationEvidence(canonical, legacy);
+    assert.strictEqual(evidence.kind, "unreliable");
+  });
+
+  await test("COEXISTENCE malformed legacy blocks even if valid canonical exists", () => {
+    const canonical = docs(canonicalConsultationDoc("c-good", {occurred_at: ts(daysAgo(2))}));
+    const legacy = docs(eventDoc("e-bad", "consultation", {date: null}));
+    const evidence = resolveConsultationEvidence(canonical, legacy);
+    assert.strictEqual(evidence.kind, "unreliable");
   });
 
   // ══ EXAM (informational only) ════════════════════════════════════════════

@@ -346,7 +346,7 @@ function storedProfile(overrides: JsonMap = {}): JsonMap {
     scope: "own_records",
     status: "active",
     seed_version: 6,
-    permissions: {health: {view: true, read: true}, k9: {view: true}},
+    permissions: {health: {view: true, create: true}, k9: {view: true}},
     updated_at: admin.firestore.Timestamp.fromMillis(STORED_T1),
     ...overrides,
   };
@@ -412,7 +412,7 @@ function lastWrite(db: ReturnType<typeof createFakeDb>): WriteRecord {
 async function testTriStateOmittedPreserves(): Promise<void> {
   const db = createFakeDb({[PATH]: storedProfile()});
   const deps = createDeps(db);
-  // `health.read` é OMITIDO e o módulo `k9` inteiro é omitido.
+  // `health.create` é OMITIDO e o módulo `k9` inteiro é omitido.
   await runAdminSaveAccessProfile(
     makeRequest({
       id: "perfil_teste",
@@ -424,7 +424,7 @@ async function testTriStateOmittedPreserves(): Promise<void> {
   const health = permissionsOf(db).health as JsonMap;
   assert.strictEqual(health.view, true, "true explícito deve permanecer true");
   assert.strictEqual(
-    health.read,
+    health.create,
     true,
     "ação OMITIDA deve ser preservada pelo merge (não revogada)",
   );
@@ -432,7 +432,7 @@ async function testTriStateOmittedPreserves(): Promise<void> {
   assert.strictEqual(k9.view, true, "módulo omitido inteiro deve ser preservado");
   // O payload enviado não pode nem mencionar a chave omitida.
   const written = (lastWrite(db).data.permissions as JsonMap).health as JsonMap;
-  assert.ok(!("read" in written), "ação omitida não pode aparecer no payload");
+  assert.ok(!("create" in written), "ação omitida não pode aparecer no payload");
 }
 
 async function testTriStateTrueStaysTrue(): Promise<void> {
@@ -441,12 +441,12 @@ async function testTriStateTrueStaysTrue(): Promise<void> {
   await runAdminSaveAccessProfile(
     makeRequest({
       expectedUpdatedAt: STORED_T1,
-      profile: sourceProfile({permissions: {health: {read: true}}}),
+      profile: sourceProfile({permissions: {health: {create: true}}}),
     }),
     deps,
   );
   assert.strictEqual(
-    (permissionsOf(db).health as JsonMap).read,
+    (permissionsOf(db).health as JsonMap).create,
     true,
     "true deve ser persistido como true",
   );
@@ -458,18 +458,18 @@ async function testTriStateFalseRevokesInMerge(): Promise<void> {
   await runAdminSaveAccessProfile(
     makeRequest({
       expectedUpdatedAt: STORED_T1,
-      profile: sourceProfile({permissions: {health: {read: false}}}),
+      profile: sourceProfile({permissions: {health: {create: false}}}),
     }),
     deps,
   );
   // O payload precisa carregar o sentinel — é ele que efetiva a revogação.
   const writtenHealth = (lastWrite(db).data.permissions as JsonMap).health as JsonMap;
   assert.ok(
-    isDeleteSentinel(writtenHealth.read),
+    isDeleteSentinel(writtenHealth.create),
     "false em EDIT/merge deve virar FieldValue.delete()",
   );
   const health = permissionsOf(db).health as JsonMap;
-  assert.ok(!("read" in health), "a capability revogada deve desaparecer do documento");
+  assert.ok(!("create" in health), "a capability revogada deve desaparecer do documento");
   assert.strictEqual(health.view, true, "capability vizinha não pode ser afetada");
   assert.strictEqual(
     (permissionsOf(db).k9 as JsonMap).view,
@@ -483,7 +483,7 @@ async function testTriStateFalseOmittedInCreate(): Promise<void> {
   const deps = createDeps(db);
   await runAdminSaveAccessProfile(
     makeRequest({
-      profile: sourceProfile({permissions: {health: {view: true, read: false}}}),
+      profile: sourceProfile({permissions: {health: {view: true, archive: false}}}),
     }),
     deps,
   );
@@ -581,7 +581,6 @@ async function testTriStateMalformedPermissionMaps(): Promise<void> {
 
 const ACCEPTED_PAIRS: Array<[string, string]> = [
   ["health", "view"],
-  ["health", "read"],
   ["health", "manage_nutrition_plan"],
   ["health", "record_routine"],
   ["health", "issue_restriction"],
@@ -598,6 +597,9 @@ const ACCEPTED_PAIRS: Array<[string, string]> = [
 ];
 
 const REJECTED_PAIRS: Array<[string, string]> = [
+  // CT3.AUTH-HEALTH-01 / CT3.F10.HEALTH-READ-ACTION-SCHEMA-CLOSURE-R2:
+  // health.read é explicitamente rejeitado pelo writer canônico
+  ["health", "read"],
   // módulo inexistente
   ["foo", "read"],
   // typo de módulo
@@ -671,7 +673,7 @@ async function testKnownModuleAndActionIsNotEnough(): Promise<void> {
     ["vehicles", "record_routine"],
     ["inventory", "issue_restriction"],
     ["me", "archive"],
-    ["k9", "read"],
+    ["k9", "manage_nutrition_plan"],
   ];
   for (const [moduleId, action] of crossed) {
     const moduleExists = isCanonicalCapability(moduleId, "view");
@@ -727,7 +729,6 @@ const SEED_V6_BASE_ACTIONS = [
 ];
 const SEED_V6_HEALTH_ACTIONS = [
   "view",
-  "read",
   "create",
   "edit",
   "archive",
@@ -746,7 +747,7 @@ async function testSeedMatrixCompatibility(): Promise<void> {
   for (const action of SEED_V6_HEALTH_ACTIONS) pairs.push(["health", action]);
   for (const action of SEED_V6_ME_ACTIONS) pairs.push(["me", action]);
 
-  assert.strictEqual(pairs.length, 109, "o seed v6 canônico tem 109 pares distintos");
+  assert.strictEqual(pairs.length, 108, "o seed canônico pós CT3.AUTH-HEALTH-01 tem 108 pares distintos (sem health.read)");
   const unrecognized = pairs.filter(([m, a]) => !isCanonicalCapability(m, a));
   assert.deepStrictEqual(
     unrecognized,
@@ -754,9 +755,9 @@ async function testSeedMatrixCompatibility(): Promise<void> {
     "todo par do seed canônico deve ser reconhecido pelo writer",
   );
 
-  // `health.read` é capability VÁLIDA. A política de quem a recebe
-  // (instrutor_k9, administrador) é deliberadamente 4B e fica fora do I2.
-  assert.strictEqual(isCanonicalCapability("health", "read"), true);
+  // CT3.AUTH-HEALTH-01 / CT3.F10.HEALTH-READ-ACTION-SCHEMA-CLOSURE-R2:
+  // health.read NÃO é capability de escrita e falha fechado.
+  assert.strictEqual(isCanonicalCapability("health", "read"), false);
 
   // Capabilities operacionais emitidas pelo backend, ausentes do seed mas
   // legítimas: se caíssem da matriz, o próprio backend seria rejeitado.
@@ -832,9 +833,9 @@ async function testClinicalCapabilitiesDefinedButNotGranted(): Promise<void> {
     );
   }
 
-  // (d) INVARIANTE health.read: o W2 não altera a política de leitura.
-  assert.strictEqual(isCanonicalCapability("health", "read"), true);
-  assert.strictEqual(health.read, true, "health.read preservado do stored");
+  // (d) INVARIANTE CT3.AUTH-HEALTH-01: health.read não é canônico; create preservado do stored.
+  assert.strictEqual(isCanonicalCapability("health", "read"), false);
+  assert.strictEqual(health.create, true, "health.create preservado do stored");
 
   // (e) MUNDO FECHADO PRESERVADO: nome clínico inventado continua inválido.
   for (const action of [
@@ -944,7 +945,7 @@ async function testCreateSucceedsWithoutExpectedUpdatedAt(): Promise<void> {
   const result = await runAdminSaveAccessProfile(
     makeRequest({
       profile: sourceProfile({
-        permissions: {health: {view: true, read: true, archive: false}},
+        permissions: {health: {view: true, create: true, archive: false}},
         seed_version: 99,
       }),
     }),
@@ -973,7 +974,7 @@ async function testCreateSucceedsWithoutExpectedUpdatedAt(): Promise<void> {
   assert.strictEqual(trail[0].action, "created", "trilha de CREATE registra `created`");
   const health = permissionsOf(db).health as JsonMap;
   assert.strictEqual(health.view, true);
-  assert.strictEqual(health.read, true);
+  assert.strictEqual(health.create, true);
   assert.ok(!("archive" in health), "false em CREATE apenas omite");
 }
 
@@ -1250,11 +1251,11 @@ async function testStaleConcurrencyNoLastWriteWins(): Promise<void> {
   const depsB = createDeps(db);
 
   // Editor A e Editor B leem a MESMA before-image T1.
-  // A revoga health.read e commita, produzindo T2.
+  // A revoga health.create e commita, produzindo T2.
   await runAdminSaveAccessProfile(
     makeRequest({
       expectedUpdatedAt: STORED_T1,
-      profile: sourceProfile({permissions: {health: {read: false}}}),
+      profile: sourceProfile({permissions: {health: {create: false}}}),
     }),
     depsA,
   );
@@ -1262,19 +1263,19 @@ async function testStaleConcurrencyNoLastWriteWins(): Promise<void> {
   const t2 = (afterA.updated_at as admin.firestore.Timestamp).toMillis();
   assert.notStrictEqual(t2, STORED_T1, "A deve avançar updated_at para T2");
   assert.ok(
-    !("read" in (permissionsOf(db).health as JsonMap)),
-    "A revogou health.read",
+    !("create" in (permissionsOf(db).health as JsonMap)),
+    "A revogou health.create",
   );
   const writesAfterA = db._writes().length;
 
-  // B ainda segura T1 e tentaria restaurar health.read — exatamente o stale
+  // B ainda segura T1 e tentaria restaurar health.create — exatamente o stale
   // write que reintroduziria silenciosamente uma capability revogada.
   await expectHttpsError(
     () =>
       runAdminSaveAccessProfile(
         makeRequest({
           expectedUpdatedAt: STORED_T1,
-          profile: sourceProfile({permissions: {health: {read: true}}}),
+          profile: sourceProfile({permissions: {health: {create: true}}}),
         }),
         depsB,
       ),
@@ -1283,7 +1284,7 @@ async function testStaleConcurrencyNoLastWriteWins(): Promise<void> {
   );
   assertZeroWrites(db, "editor B stale", writesAfterA);
   assert.ok(
-    !("read" in (permissionsOf(db).health as JsonMap)),
+    !("create" in (permissionsOf(db).health as JsonMap)),
     "a revogação de A deve sobreviver: nada de last-write-wins",
   );
 
@@ -1291,11 +1292,11 @@ async function testStaleConcurrencyNoLastWriteWins(): Promise<void> {
   await runAdminSaveAccessProfile(
     makeRequest({
       expectedUpdatedAt: t2,
-      profile: sourceProfile({permissions: {health: {read: true}}}),
+      profile: sourceProfile({permissions: {health: {create: true}}}),
     }),
     depsB,
   );
-  assert.strictEqual((permissionsOf(db).health as JsonMap).read, true);
+  assert.strictEqual((permissionsOf(db).health as JsonMap).create, true);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1330,7 +1331,7 @@ async function testZeroWriteFailurePaths(): Promise<void> {
       stored: storedProfile(),
       data: {
         expectedUpdatedAt: STORED_T1,
-        profile: sourceProfile({permissions: {health: {read: null}}}),
+        profile: sourceProfile({permissions: {health: {create: null}}}),
       },
       code: "invalid-argument",
     },
@@ -1339,7 +1340,7 @@ async function testZeroWriteFailurePaths(): Promise<void> {
       stored: storedProfile(),
       data: {
         expectedUpdatedAt: STORED_T1,
-        profile: sourceProfile({permissions: {health: {read: "true"}}}),
+        profile: sourceProfile({permissions: {health: {create: "true"}}}),
       },
       code: "invalid-argument",
     },
@@ -1544,7 +1545,7 @@ async function testDuplicateSafety(): Promise<void> {
       id: "perfil_copia",
       profile: sourceProfile({
         name: "Perfil Origem",
-        permissions: {health: {view: true, read: true, archive: false}},
+        permissions: {health: {view: true, create: true, archive: false}},
       }),
     }),
     deps,
@@ -1567,7 +1568,7 @@ async function testDuplicateSafety(): Promise<void> {
   assert.strictEqual(doc.slug, "perfil_copia");
   const health = (doc.permissions as JsonMap).health as JsonMap;
   assert.strictEqual(health.view, true, "capability true é incluída");
-  assert.strictEqual(health.read, true);
+  assert.strictEqual(health.create, true);
   assert.ok(!("archive" in health), "capability false é omitida, sem sentinel");
 }
 
@@ -1747,7 +1748,7 @@ async function testReadSideRegression(): Promise<void> {
     profileGrantsPermission(
       {status: "active", permissions: {health: {read: true}}},
       "health",
-      "read",
+      "read" as unknown as AccessProfileAction,
     ),
     true,
     "true armazenado concede",
@@ -1756,7 +1757,7 @@ async function testReadSideRegression(): Promise<void> {
     profileGrantsPermission(
       {status: "active", permissions: {health: {read: false}}},
       "health",
-      "read",
+      "read" as unknown as AccessProfileAction,
     ),
     false,
     "false armazenado não concede",
@@ -1766,7 +1767,7 @@ async function testReadSideRegression(): Promise<void> {
       profileGrantsPermission(
         {status: "active", permissions: {health: {read: malformed}}},
         "health",
-        "read",
+        "read" as unknown as AccessProfileAction,
       ),
       false,
       `valor malformado ${JSON.stringify(malformed)} não pode conceder`,
@@ -1783,7 +1784,7 @@ async function testReadSideRegression(): Promise<void> {
       me: {manage_nutrition_plan: true},
     },
   };
-  assert.strictEqual(profileGrantsPermission(legacy, "health", "read"), false);
+  assert.strictEqual(profileGrantsPermission(legacy, "health", "read" as unknown as AccessProfileAction), false);
   assert.strictEqual(profileGrantsPermission(legacy, "health", "view"), true);
 
   // ASSIMETRIA LEITURA/ESCRITA (ver ACHADO 1 no relatório) — caracterizada,
@@ -1797,7 +1798,7 @@ async function testReadSideRegression(): Promise<void> {
       profileGrantsPermission(
         {status: "active", permissions: {health: {[variant]: true}}},
         "health",
-        "read",
+        "read" as unknown as AccessProfileAction,
       ),
       true,
       `LEITURA normaliza ${JSON.stringify(variant)} para read (vigente)`,
@@ -1820,7 +1821,7 @@ async function testReadSideRegression(): Promise<void> {
     profileGrantsPermission(
       {status: "inactive", permissions: {health: {read: true}}},
       "health",
-      "read",
+      "read" as unknown as AccessProfileAction,
     ),
     false,
   );
@@ -1913,7 +1914,7 @@ async function testErrorCodeContract(): Promise<void> {
       "invalid-argument",
       {
         expectedUpdatedAt: STORED_T1,
-        profile: sourceProfile({permissions: {health: {read: 1}}}),
+        profile: sourceProfile({permissions: {health: {view: 1}}}),
       },
       storedProfile(),
     ],
@@ -1965,6 +1966,30 @@ async function testErrorCodeContract(): Promise<void> {
   assert.strictEqual((error.details as JsonMap).code, "profile-operation-changed");
 }
 
+async function testHealthReadExplicitlyRejectedFailsClosed(): Promise<void> {
+  // CT3.AUTH-HEALTH-01 / CT3.F10.HEALTH-READ-ACTION-SCHEMA-CLOSURE-R2:
+  // Salvar payload contendo health.read deve falhar fechado com invalid-argument
+  // e produzir zero escritas no Firestore.
+  assert.strictEqual(isCanonicalCapability("health", "read"), false);
+
+  const db = createFakeDb({[PATH]: storedProfile()});
+  const deps = createDeps(db);
+  const err = await expectHttpsError(
+    () =>
+      runAdminSaveAccessProfile(
+        makeRequest({
+          expectedUpdatedAt: STORED_T1,
+          profile: sourceProfile({permissions: {health: {read: true}}}),
+        }),
+        deps,
+      ),
+    "invalid-argument",
+    "health.read deve ser rejeitado no save de perfil",
+  );
+  assert.ok(err.message.includes("Capability desconhecida para este módulo: health.read"));
+  assertZeroWrites(db, "save com health.read produz zero escritas");
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 const tests: Array<[string, () => Promise<void>]> = [
@@ -2007,6 +2032,7 @@ const tests: Array<[string, () => Promise<void>]> = [
   ["leitura: regressão do sanitizer", testReadSideRegression],
   ["escopo: nunca vira global", testScopeNeverBecomesGlobal],
   ["contrato de códigos de erro", testErrorCodeContract],
+  ["CT3.AUTH-HEALTH-01: health.read rejeitado no save", testHealthReadExplicitlyRejectedFailsClosed],
 ];
 
 (async () => {

@@ -66,6 +66,12 @@ export const CLINICAL_DOMAIN_ERROR_CODES = [
   "missing_uid",
   "missing_name",
   "missing_internal_role",
+  // Case closure at-rest validity (CLIN-WRITER-1.W6.I1)
+  "missing_closure_reason",
+  "incomplete_closure_metadata",
+  "inconsistent_closure_metadata",
+  "unexpected_closure_metadata",
+  "unknown_closure_type",
 ] as const;
 
 export type ClinicalDomainErrorCode = typeof CLINICAL_DOMAIN_ERROR_CODES[number];
@@ -456,6 +462,181 @@ export function assertCaseReopenConsistency(
     reopenReason: normalizedReason as string,
     reopenedCount: count,
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ClinicalCase closure at-rest consistency (CLIN-WRITER-1.W6.I1)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const CLINICAL_CASE_CLOSURE_TYPES = [
+  "discharge",
+  "cancelled",
+] as const;
+
+export type ClinicalCaseClosureType =
+  typeof CLINICAL_CASE_CLOSURE_TYPES[number];
+
+export function isClinicalCaseClosureType(
+  value: unknown,
+): value is ClinicalCaseClosureType {
+  return (
+    typeof value === "string" &&
+    (CLINICAL_CASE_CLOSURE_TYPES as readonly string[]).includes(value)
+  );
+}
+
+export function assertClinicalCaseClosureType(
+  value: unknown,
+): ClinicalCaseClosureType {
+  if (!isClinicalCaseClosureType(value)) {
+    throw invalidValue(
+      "unknown_closure_type",
+      `closure_type inválido: ${JSON.stringify(value)}. Valores aceitos: ${CLINICAL_CASE_CLOSURE_TYPES.join(", ")}`,
+    );
+  }
+  return value;
+}
+
+export interface ClinicalCaseClosureInput {
+  readonly closedAt?: Date | null;
+  readonly closedBy?: ClinicalActor | null;
+  readonly closureType?: ClinicalCaseClosureType | string | null;
+  readonly closureReason?: string | null;
+}
+
+export interface ClinicalCaseClosure {
+  readonly closedAt: Date;
+  readonly closedBy: ClinicalActor;
+  readonly closureType: ClinicalCaseClosureType;
+  readonly closureReason?: string;
+}
+
+/**
+ * Enforces ClinicalCase closure at-rest invariants across all case statuses.
+ *
+ * Rules:
+ * - ACTIVE cases (open, under_investigation, under_treatment, monitoring):
+ *   all closure fields must be absent. Any present field throws `unexpected_closure_metadata`.
+ * - DISCHARGED cases:
+ *   `closed_at`, `closed_by` (valid ClinicalActor), and `closure_type == "discharge"` are required.
+ *   `closure_reason` is optional; if present, it must be a non-empty trimmed string.
+ * - CANCELLED cases:
+ *   `closed_at`, `closed_by` (valid ClinicalActor), `closure_type == "cancelled"`, and `closure_reason`
+ *   (mandatory non-empty trimmed string) are required.
+ * - Partial or inconsistent closure tuples fail closed (`incomplete_closure_metadata` / `inconsistent_closure_metadata`).
+ */
+export function assertCaseClosureConsistency(
+  status: ClinicalCaseStatus,
+  closure: ClinicalCaseClosureInput = {},
+): ClinicalCaseClosure | null {
+  parseClinicalCaseStatus(status);
+
+  const {closedAt, closedBy, closureType, closureReason} = closure;
+  const isPresent = (v: unknown) => v !== undefined && v !== null;
+
+  const hasAny =
+    isPresent(closedAt) ||
+    isPresent(closedBy) ||
+    isPresent(closureType) ||
+    isPresent(closureReason);
+
+  if (!isTerminalCaseStatus(status)) {
+    if (hasAny) {
+      throw invalidValue(
+        "unexpected_closure_metadata",
+        `Caso em status ativo (${status}) não pode conter metadados de fechamento`,
+      );
+    }
+    return null;
+  }
+
+  if (status === "discharged") {
+    if (!isPresent(closedAt) || !isPresent(closedBy) || !isPresent(closureType)) {
+      throw invalidValue(
+        "incomplete_closure_metadata",
+        "Caso discharged exige closed_at, closed_by e closure_type",
+      );
+    }
+    if (!(closedAt instanceof Date) || isNaN(closedAt.getTime())) {
+      throw invalidValue(
+        "incomplete_closure_metadata",
+        "closed_at deve ser uma data válida",
+      );
+    }
+    if (closureType !== "discharge") {
+      throw invalidValue(
+        "inconsistent_closure_metadata",
+        `Caso discharged exige closure_type "discharge", encontrado: ${JSON.stringify(closureType)}`,
+      );
+    }
+    const validatedActor = assertClinicalActor(closedBy);
+    let normalizedReason: string | undefined;
+    if (isPresent(closureReason)) {
+      if (typeof closureReason !== "string") {
+        throw invalidValue(
+          "invalid_case_transition",
+          "closure_reason deve ser uma string",
+        );
+      }
+      const trimmed = closureReason.trim();
+      if (trimmed.length === 0) {
+        throw invalidValue(
+          "missing_closure_reason",
+          "closure_reason não pode ser apenas espaços em branco quando fornecido",
+        );
+      }
+      normalizedReason = trimmed;
+    }
+    return {
+      closedAt,
+      closedBy: validatedActor,
+      closureType: "discharge",
+      ...(normalizedReason !== undefined ? {closureReason: normalizedReason} : {}),
+    };
+  }
+
+  if (status === "cancelled") {
+    if (!isPresent(closedAt) || !isPresent(closedBy) || !isPresent(closureType)) {
+      throw invalidValue(
+        "incomplete_closure_metadata",
+        "Caso cancelled exige closed_at, closed_by e closure_type",
+      );
+    }
+    if (!(closedAt instanceof Date) || isNaN(closedAt.getTime())) {
+      throw invalidValue(
+        "incomplete_closure_metadata",
+        "closed_at deve ser uma data válida",
+      );
+    }
+    if (closureType !== "cancelled") {
+      throw invalidValue(
+        "inconsistent_closure_metadata",
+        `Caso cancelled exige closure_type "cancelled", encontrado: ${JSON.stringify(closureType)}`,
+      );
+    }
+    const validatedActor = assertClinicalActor(closedBy);
+    if (!isPresent(closureReason) || typeof closureReason !== "string") {
+      throw invalidValue(
+        "missing_closure_reason",
+        "Caso cancelled exige closure_reason",
+      );
+    }
+    const trimmed = closureReason.trim();
+    if (trimmed.length === 0) {
+      throw invalidValue(
+        "missing_closure_reason",
+        "closure_reason é obrigatório para caso cancelado",
+      );
+    }
+    return {
+      closedAt,
+      closedBy: validatedActor,
+      closureType: "cancelled",
+      closureReason: trimmed,
+    };
+  }
+
+  return null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

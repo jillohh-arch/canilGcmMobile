@@ -25,6 +25,7 @@
 import * as assert from "assert";
 import {
   checkRelevant,
+  checkRelevantClinicalEvent,
   isRelevantHealthEventType,
   normalizeEventType,
 } from "./health_readiness_trigger_filter";
@@ -240,6 +241,78 @@ async function main() {
     assert.strictEqual(checkRelevant(null, "treatment"), false);
     assert.strictEqual(checkRelevant(null, "other"), false);
   });
+
+  // ── T-28..T-38 Canonical Clinical Event Trigger Filter Tests ─────────────
+  const baseConsultation = {
+    event_type: "consultation",
+    payload_type: "consultation_v1",
+    occurred_at: "2026-08-01T10:00:00.000Z",
+  };
+
+  await test("T-28 non-consultation event (incident, exam) is ignored", async () => {
+    const incidentDoc = {event_type: "incident", payload_type: "incident_v1", status: "final"};
+    assert.strictEqual(checkRelevantClinicalEvent(null, incidentDoc), false);
+    assert.strictEqual(checkRelevantClinicalEvent(incidentDoc, null), false);
+    assert.strictEqual(checkRelevantClinicalEvent(incidentDoc, incidentDoc), false);
+  });
+
+  await test("T-29 CREATE draft consultation → ignore", async () => {
+    const draftDoc = {...baseConsultation, status: "draft"};
+    assert.strictEqual(checkRelevantClinicalEvent(null, draftDoc), false);
+  });
+
+  await test("T-30 UPDATE draft → draft consultation → ignore", async () => {
+    const draft1 = {...baseConsultation, status: "draft", revision: 1};
+    const draft2 = {...baseConsultation, status: "draft", revision: 2};
+    assert.strictEqual(checkRelevantClinicalEvent(draft1, draft2), false);
+  });
+
+  await test("T-31 UPDATE draft → cancelled consultation → ignore", async () => {
+    const draft = {...baseConsultation, status: "draft"};
+    const cancelled = {...baseConsultation, status: "cancelled"};
+    assert.strictEqual(checkRelevantClinicalEvent(draft, cancelled), false);
+  });
+
+  await test("T-32 UPDATE draft → final consultation → refresh", async () => {
+    const draft = {...baseConsultation, status: "draft"};
+    const finalDoc = {...baseConsultation, status: "final"};
+    assert.strictEqual(checkRelevantClinicalEvent(draft, finalDoc), true);
+  });
+
+  await test("T-33 CREATE final consultation → refresh", async () => {
+    const finalDoc = {...baseConsultation, status: "final"};
+    assert.strictEqual(checkRelevantClinicalEvent(null, finalDoc), true);
+  });
+
+  await test("T-34 UPDATE final → cancelled consultation → refresh", async () => {
+    const finalDoc = {...baseConsultation, status: "final"};
+    const cancelled = {...baseConsultation, status: "cancelled"};
+    assert.strictEqual(checkRelevantClinicalEvent(finalDoc, cancelled), true);
+  });
+
+  await test("T-35 DELETE final consultation → refresh", async () => {
+    const finalDoc = {...baseConsultation, status: "final"};
+    assert.strictEqual(checkRelevantClinicalEvent(finalDoc, null), true);
+  });
+
+  await test("T-36 SOFT-DELETE final consultation → refresh", async () => {
+    const finalDoc = {...baseConsultation, status: "final"};
+    const softDeleted = {...baseConsultation, status: "final", deleted_at: "2026-08-02T10:00:00.000Z"};
+    assert.strictEqual(checkRelevantClinicalEvent(finalDoc, softDeleted), true);
+  });
+
+  await test("T-37 UPDATE final → final with occurred_at changed → refresh", async () => {
+    const final1 = {...baseConsultation, status: "final", occurred_at: "2026-08-01T10:00:00.000Z"};
+    const final2 = {...baseConsultation, status: "final", occurred_at: "2026-08-02T10:00:00.000Z"};
+    assert.strictEqual(checkRelevantClinicalEvent(final1, final2), true);
+  });
+
+  await test("T-38 UPDATE final → final with identical occurred_at → ignore", async () => {
+    const final1 = {...baseConsultation, status: "final", occurred_at: "2026-08-01T10:00:00.000Z", revision: 1};
+    const final2 = {...baseConsultation, status: "final", occurred_at: "2026-08-01T10:00:00.000Z", revision: 2, content: {notes: "updated"}};
+    assert.strictEqual(checkRelevantClinicalEvent(final1, final2), false);
+  });
+
 
   console.log(
     `\nhealth_readiness_trigger_test: ${failed === 0 ? "all passed" : `${failed} failed`}`,

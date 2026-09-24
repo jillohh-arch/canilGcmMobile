@@ -607,23 +607,133 @@ function latestRecognizedEvent(
   return {latest, malformed};
 }
 
+/** Classification of a canonical clinical event consultation. */
+export type CanonicalConsultationClassification =
+  | {readonly kind: "match"; readonly at: Date}
+  | {readonly kind: "ignored"}
+  | {readonly kind: "malformed"};
+
+/**
+ * Classifies a canonical `clinical_events` document for consultation evidence.
+ *
+ * Qualifying condition:
+ * - `event_type == "consultation"`
+ * - `payload_type == "consultation_v1"`
+ * - `status == "final"`
+ * - not soft-deleted
+ *
+ * Factual instant is strictly `occurred_at` (client clinical event time).
+ * `finalized_at` and `created_at` are NEVER used as the factual consultation date.
+ * If a document meets the qualifying criteria but `occurred_at` is absent or unparseable,
+ * it is classified as `malformed`.
+ * Non-qualifying events (e.g. incident, exam, draft, cancelled) are `ignored`.
+ */
+export function classifyCanonicalClinicalEvent(
+  doc: RawDoc,
+): CanonicalConsultationClassification {
+  const data = doc.data;
+
+  if (isSoftDeleted(data)) return {kind: "ignored"};
+
+  const eventType = normalizeEventType(data["event_type"] ?? data["eventType"]);
+  if (eventType !== CONSULTATION_TYPE) return {kind: "ignored"};
+
+  const payloadType = normalizeEventType(data["payload_type"] ?? data["payloadType"]);
+  if (payloadType !== "consultation_v1") return {kind: "ignored"};
+
+  const status = normalizeEventType(data["status"]);
+  if (status !== "final") return {kind: "ignored"};
+
+  // Factual instant of clinical consultation: occurred_at only.
+  const at = readInstant(data["occurred_at"] ?? data["occurredAt"]);
+  if (at === null) return {kind: "malformed"};
+
+  return {kind: "match", at};
+}
+
+/**
+ * Deterministically selects the latest canonical clinical consultation.
+ * Ties on the factual date are broken by document id DESC.
+ */
+export function latestRecognizedCanonicalConsultation(
+  docs: readonly RawDoc[],
+): {latest: {at: Date; id: string} | null; malformed: boolean} {
+  let latest: {at: Date; id: string} | null = null;
+  let malformed = false;
+
+  for (const doc of docs) {
+    const classified = classifyCanonicalClinicalEvent(doc);
+    if (classified.kind === "malformed") {
+      malformed = true;
+      continue;
+    }
+    if (classified.kind === "ignored") continue;
+
+    const candidate = {at: classified.at, id: doc.id};
+    if (latest === null) {
+      latest = candidate;
+      continue;
+    }
+    const diff = candidate.at.getTime() - latest.at.getTime();
+    if (diff > 0 || (diff === 0 && candidate.id > latest.id)) {
+      latest = candidate;
+    }
+  }
+
+  return {latest, malformed};
+}
+
 /**
  * Consultation evidence.
  *
- * TARGET AUTHORITY: `clinical_cases/{caseId}/events/{eventId}`.
- * RUNTIME SOURCE (coexistence): `dogs/{dogId}/health_events` with
- * `type == "consultation"`.
+ * TARGET AUTHORITY: `dogs/{dogId}/clinical_cases/{caseId}/clinical_events/{eventId}` (canonical).
+ * RUNTIME SOURCE (coexistence): `dogs/{dogId}/health_events` with `type == "consultation"`.
  *
  * An exam is a different event type and can never be read as a consultation.
+ * Canonical consultation requires `event_type == "consultation"`,
+ * `payload_type == "consultation_v1"`, and `status == "final"`.
+ * Factual date is strictly `occurred_at` (never `finalized_at`).
+ *
+ * When both canonical and coexistence queries are available, selects
+ * `max(canonicalLatest.at, legacyLatest.at)` to respect legacy historical coexistence.
  */
-export function resolveConsultationEvidence(query: RawQuery): EvidenceState<Date> {
-  if (query.kind === "failed") {
-    return {kind: "unreliable", reasonCode: query.reasonCode};
+export function resolveConsultationEvidence(
+  canonicalOrLegacy: RawQuery,
+  legacy?: RawQuery,
+): EvidenceState<Date> {
+  if (canonicalOrLegacy.kind === "failed") {
+    return {kind: "unreliable", reasonCode: canonicalOrLegacy.reasonCode};
   }
-  const {latest, malformed} = latestRecognizedEvent(query.docs, CONSULTATION_TYPE);
-  if (latest !== null) return {kind: "present", value: latest.at};
-  // A malformed consultation-like document must not read as "none recorded".
-  if (malformed) return {kind: "unreliable", reasonCode: "malformed"};
+  if (legacy !== undefined && legacy.kind === "failed") {
+    return {kind: "unreliable", reasonCode: legacy.reasonCode};
+  }
+
+  const canonicalResult = latestRecognizedCanonicalConsultation(canonicalOrLegacy.docs);
+  const legacyResult = legacy !== undefined
+    ? latestRecognizedEvent(legacy.docs, CONSULTATION_TYPE)
+    : latestRecognizedEvent(canonicalOrLegacy.docs, CONSULTATION_TYPE);
+
+  // A malformed consultation document in either source blocks proving the state.
+  if (canonicalResult.malformed || legacyResult.malformed) {
+    return {kind: "unreliable", reasonCode: "malformed"};
+  }
+
+  const cLatest = canonicalResult.latest;
+  const lLatest = legacyResult.latest;
+
+  if (cLatest !== null && lLatest !== null) {
+    return {
+      kind: "present",
+      value: cLatest.at.getTime() >= lLatest.at.getTime() ? cLatest.at : lLatest.at,
+    };
+  }
+  if (cLatest !== null) {
+    return {kind: "present", value: cLatest.at};
+  }
+  if (lLatest !== null) {
+    return {kind: "present", value: lLatest.at};
+  }
+
   return {kind: "absent"};
 }
 

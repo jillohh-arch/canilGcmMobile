@@ -10,6 +10,45 @@ import {
   onRequest,
 } from "firebase-functions/v2/https";
 import {
+  K9IdentityTransaction,
+  patchK9Identity,
+} from "./admin_patch_k9_identity";
+import {
+  createHuman,
+  DocumentAlreadyExistsError,
+} from "./admin_create_human";
+import {
+  HumanPersonnelTransaction,
+  patchHumanPersonnel,
+} from "./admin_patch_human_personnel";
+import {
+  HumanPhotoTransaction,
+  patchHumanPhoto,
+} from "./admin_patch_human_photo";
+import {
+  deactivateHuman,
+  HumanLifecycleTransaction,
+  isCurrentlyActive,
+  reactivateHuman,
+} from "./admin_human_lifecycle";
+import {
+  defaultGenerateTemporaryPassword,
+  resetHumanPasswordLogic,
+  ResetPasswordDeps,
+} from "./admin_reset_human_password";
+import {
+  defaultGenerateInitialPassword,
+  provisionHumanAuthLogic,
+  ProvisionHumanAuthDeps,
+} from "./admin_provision_human_auth";
+import {
+  buildAdminGetAccessHomologationSnapshotHandler,
+  createAdminAccessHomologationSnapshotDeps,
+} from "./admin_access_homologation_snapshot";
+import {isAuthUserNotFound} from "./auth_error_classification";
+import {unassignAccessProfileLogic} from "./admin_access_unassignment";
+import {composeEffectiveAccessClaims} from "./access_claims_composition";
+import {
   AccessScope,
   AccessScopeResolution,
   decideAccessScope,
@@ -46,7 +85,11 @@ import type {NutritionActor} from "./health_nutrition_engine";
 import {
   buildHealthWeightCreateRecordHandler,
   createAdminWeightEngineDeps,
+  type HealthWeightCallableDeps,
 } from "./health_weight_callables";
+import {
+  isWeightActiveDog,
+} from "./health_weight_logic";
 import {
   DocumentCaller,
   runHealthDocumentFinalizeUpload,
@@ -60,11 +103,36 @@ import {
   ClinicalCaller,
   runHealthAmendClinicalEvent,
   runHealthAppendClinicalEvent,
+  runHealthCancelClinicalCase,
   runHealthCancelClinicalEvent,
+  runHealthDischargeClinicalCase,
   runHealthFinalizeClinicalEvent,
   runHealthOpenClinicalCase,
+  runHealthReopenClinicalCase,
+  runHealthTransitionClinicalCase,
   type ClinicalCaseCallableDeps,
 } from "./clinical_case_callables";
+import {
+  type ExamCaller,
+  type ExamProcessCallableDeps,
+  runHealthRequestExam,
+  runHealthRecordExamCollection,
+  runHealthRecordExamResult,
+  runHealthRecordExamInterpretation,
+  runHealthAssessExamImpact,
+  runHealthCancelExam,
+} from "./exam_process_callables";
+import {
+  type TreatmentCaller,
+  type TreatmentProtocolCallableDeps,
+  runHealthCreateTreatmentProtocol,
+  runHealthPauseTreatmentProtocol,
+  runHealthResumeTreatmentProtocol,
+  runHealthCompleteTreatmentProtocol,
+  runHealthCancelTreatmentProtocol,
+  runHealthAdministerTreatmentDose,
+  runHealthSkipTreatmentDose,
+} from "./treatment_protocol_callables";
 import {
   RestrictionCaller,
   runHealthRestrictionCancel,
@@ -95,6 +163,7 @@ import {
   healthReadinessProjectHealthEvent,
   healthReadinessProjectNutritionPlan,
   healthReadinessProjectRestriction,
+  healthReadinessProjectClinicalEvent,
 } from "./health_readiness_triggers";
 import {runSystemAuthoritativeTimeNow} from "./system_authoritative_time_callable";
 import {
@@ -180,6 +249,44 @@ function emailForRa(ra: string): string {
   return `${ra.trim().toLowerCase()}@gcm.com.br`;
 }
 
+/**
+ * FRONT10.ACCESS-CREDENTIALS.A (AUTH-WIRING-01) — busca de identidade Auth que
+ * FALHA FECHADO.
+ *
+ * O anti-padrao que estes dois helpers substituem era `catch { user = null; }`.
+ * Ele tratava QUALQUER falha do Auth — uid invalido, erro interno, timeout de
+ * rede, quota, credencial sem permissao — como "a identidade nao existe". O
+ * chamador recebia sucesso e as claims simplesmente nao eram escritas, ou (pior,
+ * no `adminUpsertHuman`) a ausencia aparente virava caminho de CRIACAO de conta.
+ *
+ * `auth/user-not-found` e a UNICA condicao que significa ausencia. Todo o resto
+ * propaga. `isAuthUserNotFound` e a autoridade compartilhada, ja usada pelo
+ * Lifecycle — nao duplicamos a classificacao aqui e nao a alargamos para
+ * "engolir erro do Auth".
+ */
+async function lookupAuthUserByUid(
+  uid: string,
+): Promise<admin.auth.UserRecord | null> {
+  try {
+    return await admin.auth().getUser(uid);
+  } catch (error) {
+    if (isAuthUserNotFound(error)) return null;
+    throw error;
+  }
+}
+
+/** Par de `lookupAuthUserByUid` para busca por e-mail. Mesma regra fail-closed. */
+async function lookupAuthUserByEmail(
+  email: string,
+): Promise<admin.auth.UserRecord | null> {
+  try {
+    return await admin.auth().getUserByEmail(email);
+  } catch (error) {
+    if (isAuthUserNotFound(error)) return null;
+    throw error;
+  }
+}
+
 function stringValue(value: unknown): string | undefined {
   if (value === null || value === undefined) return undefined;
   const text = String(value).trim();
@@ -256,26 +363,6 @@ export function isAdminUserRecord(user: JsonMap): boolean {
   return isAdminAccessLevel(accessLevel) || user.admin === true;
 }
 
-const MANAGED_ACCESS_ROLES = new Set([
-  "admin",
-  "administrador",
-  "admin_master",
-  "almoxarifado",
-  "condutor",
-  "estoque",
-  "gestor",
-  "handler",
-  "inspetor",
-  "instrutor",
-  "instrutor_k9",
-  "inventory_manager",
-  "mobile_user",
-  "subinspetor",
-  "subinspetor_inspetor",
-  "supervisor",
-  "supervisor_operacional",
-]);
-
 function normalizedRoleKeys(...sources: unknown[]): string[] {
   return Array.from(
     new Set(
@@ -293,90 +380,14 @@ function accessClaimsForProfile(
   profileId: string | null,
   roleKeys: string[],
   accessScope: "global" | "own_records" = "global",
+  isInstructor: boolean = false,
 ): JsonMap {
-  const profileKey = normalizedKey(profileId);
-  const profileRoles = new Set([
-    ...roleKeys.map((role) => normalizedKey(role)).filter((role) => role.length > 0),
-    ...(profileKey ? [profileKey] : []),
-  ]);
-  const isAdminProfile = profileRoles.has("admin") ||
-    profileRoles.has("administrador") ||
-    profileRoles.has("admin_master");
-  const isInstructorProfile = profileRoles.has("instrutor_k9") ||
-    profileRoles.has("instrutor") ||
-    profileRoles.has("adestrador");
-  const isInventoryProfile = profileRoles.has("inventory_manager") ||
-    profileRoles.has("almoxarifado") ||
-    profileRoles.has("estoque");
-  const isManagerProfile = profileRoles.has("gestor") ||
-    profileRoles.has("subinspetor") ||
-    profileRoles.has("inspetor") ||
-    profileRoles.has("subinspetor_inspetor");
-  const isHandlerProfile = profileRoles.has("condutor") ||
-    profileRoles.has("handler") ||
-    profileRoles.has("mobile_user") ||
-    profileRoles.has("operacional") ||
-    profileRoles.has("operador") ||
-    profileRoles.has("operador_k9") ||
-    profileRoles.has("guarda_k9");
-  const mobileAccess = isAdminProfile || isInstructorProfile || isHandlerProfile;
-  const webAccess = true;
-  const preservedRoles = Array.isArray(existingClaims.roles) ?
-    existingClaims.roles
-      .map((role) => normalizedKey(role))
-      .filter((role) => role.length > 0 && !MANAGED_ACCESS_ROLES.has(role)) :
-    [];
-  const roles = new Set([...preservedRoles, ...profileRoles]);
-
-  if (isAdminProfile) roles.add("admin");
-  if (isInstructorProfile) {
-    roles.add("instrutor_k9");
-    roles.add("condutor");
-  }
-  if (isInventoryProfile) roles.add("inventory_manager");
-  if (isManagerProfile) roles.add("gestor");
-  if (isHandlerProfile) roles.add("condutor");
-
-  const primaryRole = isAdminProfile
-    ? "admin"
-    : isInstructorProfile
-      ? "instrutor_k9"
-      : isInventoryProfile
-        ? "inventory_manager"
-        : isManagerProfile
-          ? "gestor"
-          : "condutor";
-  const appAccess = mobileAccess ? ["web", "mobile"] : ["web"];
-  const claims: JsonMap = {
-    ...existingClaims,
+  return composeEffectiveAccessClaims(
+    existingClaims,
     ra,
-    access_profile_id: profileKey || null,
-    access_scope: accessScope,
-    admin: isAdminProfile,
-    app_access: appAccess,
-    mobile_access: mobileAccess,
-    role: primaryRole,
-    roles: Array.from(roles).sort(),
-    web_access: webAccess,
-  };
-
-  if (isInstructorProfile) {
-    claims.instrutor_k9 = true;
-    claims.training_role = "instrutor_k9";
-    claims.training_instructor = true;
-  } else {
-    delete claims.instrutor_k9;
-    delete claims.training_role;
-    delete claims.training_instructor;
-  }
-
-  if (isInventoryProfile) {
-    claims.inventory_manager = true;
-  } else {
-    delete claims.inventory_manager;
-  }
-
-  return claims;
+    { profileId, roleKeys, accessScope },
+    isInstructor,
+  );
 }
 
 function humanClaims(
@@ -387,16 +398,12 @@ function humanClaims(
   isK9Instructor: boolean,
   accessScope: "global" | "own_records" = "global",
 ): JsonMap {
-  const roleKeys = normalizedRoleKeys(
-    [accessLevel, accessProfileId],
-    isK9Instructor ? ["instrutor_k9"] : [],
-  );
-  return accessClaimsForProfile(
+  const roleKeys = normalizedRoleKeys([accessLevel, accessProfileId]);
+  return composeEffectiveAccessClaims(
     existingClaims,
     ra,
-    accessProfileId,
-    roleKeys,
-    accessScope,
+    { profileId: accessProfileId, roleKeys, accessScope },
+    isK9Instructor,
   );
 }
 
@@ -1841,6 +1848,61 @@ export const adminSetAccessProfileStatus = onCall({region}, async (request) => {
   return {id: profileId, status};
 });
 
+/**
+ * FRONT10.ACCESS-CREDENTIALS.A (F-03) — escrita canonica da atribuicao COM
+ * compensacao de claims.
+ *
+ * Auth e Firestore nao compartilham transacao. As claims sao mutadas primeiro
+ * (o token precisa refletir o novo perfil), entao uma falha na escrita
+ * subsequente deixaria claims novas com espelho antigo — divergencia silenciosa
+ * de autorizacao. Aqui restauramos as claims anteriores e propagamos o erro
+ * original: nunca reportamos sucesso.
+ *
+ * Se a propria compensacao falhar, o resultado NAO e o erro original: e um
+ * estado possivelmente divergente, e o chamador precisa saber a diferenca. Por
+ * isso `COMPENSATION_FAILED` tem caminho proprio. O log carrega apenas `ra` e
+ * `uid` — jamais o conteudo das claims.
+ */
+async function commitAccessProfileAssignment(input: {
+  authUser: admin.auth.UserRecord | null;
+  claimsMutated: boolean;
+  payload: JsonMap;
+  previousClaims: JsonMap | null;
+  ra: string;
+  userRef: admin.firestore.DocumentReference;
+}): Promise<void> {
+  try {
+    await input.userRef.set(input.payload, {merge: true});
+  } catch (error) {
+    if (!input.claimsMutated || input.authUser === null) throw error;
+    try {
+      await admin.auth().setCustomUserClaims(
+        input.authUser.uid,
+        input.previousClaims ?? {},
+      );
+    } catch (compensationError) {
+      logger.error("admin_assign_access_profile_compensation_failed", {
+        error: String(compensationError),
+        ra: input.ra,
+        uid: input.authUser.uid,
+      });
+      throw new HttpsError(
+        "internal",
+        "As claims de acesso foram alteradas, a gravacao do cadastro falhou e a " +
+          "reversao nao foi garantida. Confira o acesso deste integrante antes " +
+          "de nova tentativa.",
+        {
+          reason: "COMPENSATION_FAILED",
+          operation: "adminAssignAccessProfile",
+          stage: "revert_custom_claims",
+          target_ra: input.ra,
+        },
+      );
+    }
+    throw error;
+  }
+}
+
 export const adminAssignAccessProfile = onCall({region}, async (request) => {
   const caller = await requireAccessPermission(request.auth, "access", "edit");
   const data = request.data as JsonMap;
@@ -1848,6 +1910,20 @@ export const adminAssignAccessProfile = onCall({region}, async (request) => {
   const profileId = requiredString(data, "profileId");
   assertHumanRa(ra);
   assertDocumentId(profileId, "Identificador do perfil");
+
+  // F10.ACCESS-CREDENTIALS.H1.C1 / I2.R2: O perfil legado 'instrutor_k9' foi descontinuado como
+  // perfil de acesso base. Novas atribuicoes sao recusadas fail-closed antes de qualquer
+  // busca no catalogo de perfis, busca no Auth, mutacao de claims ou escrita no Firestore.
+  // A rejeicao ocorre independentemente de o documento 'access_profiles/instrutor_k9' existir no Firestore.
+  const normalizedProfileId = normalizedKey(profileId);
+  if (normalizedProfileId === "instrutor_k9") {
+    throw new HttpsError(
+      "failed-precondition",
+      "O perfil 'instrutor_k9' foi descontinuado como perfil de acesso base e nao " +
+        "pode receber novas atribuicoes. Utilize a qualificacao funcional de Instrutor.",
+      { reason: "ACCESS_PROFILE_DEPRECATED" },
+    );
+  }
 
   const userRef = db.collection("users").doc(ra);
   const profileRef = db.collection("access_profiles").doc(profileId);
@@ -1858,9 +1934,20 @@ export const adminAssignAccessProfile = onCall({region}, async (request) => {
   if (!profileSnap.exists) {
     throw new HttpsError("not-found", "Perfil de acesso nao encontrado.");
   }
+
+  if (profileSnap.data()?.deprecated === true) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Perfil de acesso descontinuado nao pode receber novas atribuicoes.",
+      { reason: "ACCESS_PROFILE_DEPRECATED" },
+    );
+  }
+
   const profile = profileSnap.data() ?? {};
   if (profile.status === "inactive") {
-    throw new HttpsError("failed-precondition", "Perfil inativo nao pode ser atribuido.");
+    throw new HttpsError("failed-precondition", "Perfil inativo nao pode ser atribuido.", {
+      reason: "ACCESS_PROFILE_INACTIVE",
+    });
   }
   const profileName = stringValue(profile.name) ?? profileId;
   const seedVersion = optionalNumberValue(profile.seed_version) ?? null;
@@ -1901,28 +1988,64 @@ export const adminAssignAccessProfile = onCall({region}, async (request) => {
     roleSet.has("operador") ||
     roleSet.has("operador_k9") ||
     roleSet.has("guarda_k9");
-  const appAccess = mobileAccess ? ["web", "mobile"] : ["web"];
   const userData = userSnap.data() ?? {};
+
+  // FRONT10.ACCESS-CREDENTIALS.B — politica congelada: atribuir ou TROCAR o
+  // perfil de um Personnel INATIVO e recusado FAIL-CLOSED.
+  //
+  // Isto NAO funde Lifecycle e Access. Um Personnel inativo CONTINUA com o
+  // perfil que ja possuia: desativar nao remove Access nem limpa claims, e
+  // atribuir Access nunca reativa Personnel. O que se proibe e a MUDANCA de
+  // privilegio enquanto o cadastro esta fora do fluxo administrativo — caso
+  // contrario seria possivel preparar acesso invisivel numa identidade
+  // arquivada. A Web ja sugere isso omitindo inativos da lista; aqui o contrato
+  // passa a ser do servidor.
+  //
+  // `isCurrentlyActive` e a autoridade canonica do Lifecycle (importada, nao
+  // reimplementada): considera `active`, `deleted_at`, `archived_at` e `status`.
+  // Recusa ANTES de qualquer leitura ou mutacao de Auth — nenhuma claim e lida,
+  // escrita ou revertida neste caminho.
+  if (!isCurrentlyActive(userData)) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Cadastro inativo nao pode receber ou trocar perfil de acesso. " +
+        "Reative o integrante antes de alterar o acesso.",
+      {reason: "PERSONNEL_INACTIVE"},
+    );
+  }
+
   const authUid =
     stringValue(userData.auth_uid) ??
     stringValue(userData.authUid) ??
     stringValue(userData.uid);
   const authEmail = stringValue(userData.email) ?? emailForRa(ra);
+  // AUTH-WIRING-01 (A1/A2): buscas classificadas. Ausencia real -> null;
+  // qualquer outra falha do Auth propaga e a atribuicao NAO reporta sucesso.
   let authUser: admin.auth.UserRecord | null = null;
   if (authUid) {
-    try {
-      authUser = await admin.auth().getUser(authUid);
-    } catch {
-      authUser = null;
-    }
+    authUser = await lookupAuthUserByUid(authUid);
   }
   if (!authUser) {
-    try {
-      authUser = await admin.auth().getUserByEmail(authEmail);
-    } catch {
-      authUser = null;
-    }
+    authUser = await lookupAuthUserByEmail(authEmail);
   }
+
+  // Compensacao (F-03): as claims sao mutadas ANTES da escrita canonica no
+  // Firestore, e as duas nao sao uma transacao. Guardamos o valor anterior para
+  // poder restaura-lo se a escrita falhar — o padrao seguro que o
+  // `adminUpsertHuman` ja aplica. Nunca logamos o conteudo das claims.
+  const previousClaims: JsonMap | null = authUser
+    ? ({...(authUser.customClaims ?? {})} as JsonMap)
+    : null;
+  let claimsMutated = false;
+  // FRONT10.ACCESS-CREDENTIALS.D: A atribuicao de perfil de acesso NAO PODE
+  // sobrescrever nem apagar a qualificacao funcional de Instrutor K9 existente.
+  // Lemos o estado direto canonico de instrutor do cadastro e compomos tanto as
+  // claims quanto o payload do Firestore.
+  const isK9Instructor = userData.is_k9_instructor === true;
+  const effectiveRoles = Array.from(
+    new Set([...roleKeys, ...(isK9Instructor ? ["instrutor_k9"] : [])]),
+  ).sort();
+
   if (authUser) {
     await admin.auth().setCustomUserClaims(
       authUser.uid,
@@ -1932,62 +2055,300 @@ export const adminAssignAccessProfile = onCall({region}, async (request) => {
         profileId,
         roleKeys,
         accessScope,
+        isK9Instructor,
       ),
     );
+    claimsMutated = true;
   }
 
-  await userRef.set(
-    {
-      ...(authUser ? {auth_uid: authUser.uid, email: authEmail} : {}),
+  const primaryRole = isAdminProfile
+    ? "admin"
+    : isManagerProfile
+      ? "gestor"
+      : isInventoryProfile
+        ? "inventory_manager"
+        : isInstructorProfile
+          ? "instrutor_k9"
+          : "condutor";
+
+  const assignmentPayload: JsonMap = {
+    ...(authUser ? {auth_uid: authUser.uid, email: authEmail} : {}),
+    access_profile_id: profileId,
+    access_profile: profileName,
+    accessProfile: profileName,
+    accessProfileId: profileId,
+    access_scope: accessScope,
+    accessScope,
+    admin: isAdminProfile,
+    app_access: (mobileAccess || isK9Instructor) ? ["web", "mobile"] : ["web"],
+    claim_role: primaryRole,
+    inventory_manager: isInventoryProfile,
+    is_k9_instructor: isK9Instructor,
+    mobile_access: mobileAccess || isK9Instructor,
+    permissions_version: seedVersion,
+    role: primaryRole,
+    roles: effectiveRoles,
+    training_instructor: isK9Instructor ? true : null,
+    training_role: isK9Instructor ? "instrutor_k9" : null,
+    web_access: true,
+    claim_refresh_required: authUser != null,
+    claim_updated_at: authUser
+      ? admin.firestore.FieldValue.serverTimestamp()
+      : null,
+    updated_at: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updated_by: caller.ra,
+    audit_trail: admin.firestore.FieldValue.arrayUnion({
+      ...auditEntry("assign_access_profile", caller),
       access_profile_id: profileId,
-      access_profile: profileName,
-      accessProfile: profileName,
-      accessProfileId: profileId,
-      access_scope: accessScope,
-      accessScope,
-      admin: isAdminProfile,
-      app_access: appAccess,
-      claim_role: isAdminProfile
-        ? "admin"
-        : isInstructorProfile
-          ? "instrutor_k9"
-          : isInventoryProfile
-            ? "inventory_manager"
-            : isManagerProfile
-              ? "gestor"
-              : "condutor",
-      inventory_manager: isInventoryProfile,
-      is_k9_instructor: isInstructorProfile,
-      mobile_access: mobileAccess,
-      permissions_version: seedVersion,
-      role: isAdminProfile
-        ? "admin"
-        : isInstructorProfile
-          ? "instrutor_k9"
-          : isInventoryProfile
-            ? "inventory_manager"
-            : isManagerProfile
-              ? "gestor"
-              : "condutor",
-      roles: roleKeys,
-      training_instructor: isInstructorProfile,
-      training_role: isInstructorProfile ? "instrutor_k9" : null,
-      web_access: true,
-      claim_refresh_required: authUser != null,
-      claim_updated_at: authUser
-        ? admin.firestore.FieldValue.serverTimestamp()
-        : null,
-      updated_at: admin.firestore.FieldValue.serverTimestamp(),
-      updated_by: caller.ra,
-      audit_trail: admin.firestore.FieldValue.arrayUnion({
-        ...auditEntry("assign_access_profile", caller),
-        access_profile_id: profileId,
-        access_profile_name: profileName,
-      }),
-    },
-    {merge: true},
-  );
+      access_profile_name: profileName,
+    }),
+  };
+
+  await commitAccessProfileAssignment({
+    authUser,
+    claimsMutated,
+    payload: assignmentPayload,
+    previousClaims,
+    ra,
+    userRef,
+  });
   return {ra, profileId, profileName};
+});
+
+export const adminUnassignAccessProfile = onCall({region}, async (request) => {
+  const caller = await requireAccessPermission(request.auth, "access", "edit");
+  return unassignAccessProfileLogic(
+    request.data,
+    {
+      authorize: async () => caller,
+      getUser: async (ra: string) => {
+        const snap = await db.collection("users").doc(ra).get();
+        return { exists: snap.exists, data: snap.data() ?? null };
+      },
+      getProfile: async (profileId: string) => {
+        const snap = await db.collection("access_profiles").doc(profileId).get();
+        return { exists: snap.exists, data: snap.data() ?? null };
+      },
+      lookupAuthUserByUid,
+      lookupAuthUserByEmail,
+      setCustomUserClaims: async (uid: string, claims: JsonMap) => {
+        await admin.auth().setCustomUserClaims(uid, claims);
+      },
+      updateUser: async (ra: string, payload: JsonMap) => {
+        await db.collection("users").doc(ra).set(payload, { merge: true });
+      },
+      serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+      deleteField: () => admin.firestore.FieldValue.delete(),
+      arrayUnion: (value: unknown) => admin.firestore.FieldValue.arrayUnion(value),
+      auditEntry: (action: string, c: CallerIdentity) => auditEntry(action, c),
+      canonicalAuthEmail: (user: JsonMap, ra: string) =>
+        stringValue(user.email) ?? emailForRa(ra),
+    },
+    request.auth,
+  );
+});
+
+/**
+ * FRONT10.ACCESS-CREDENTIALS — RECUPERACAO DE PARIDADE DE SOURCE.
+ *
+ * `adminGetAccessHomologationSnapshot` esta ATIVA em producao (canil-gcm) e nao
+ * existia no trunk: um `firebase deploy --only functions` amplo a DELETARIA. O
+ * modulo foi transplantado byte a byte de `f2948f0`
+ * (`origin/feature/health-auth-readonly-inspection`) — nao houve merge, rebase
+ * nem cherry-pick daquela branch obsoleta — e apenas o wiring foi reconciliado
+ * com o trunk atual.
+ *
+ * A callable e READ-ONLY: nao escreve Firestore, nao muta Auth e nao altera
+ * claims. Existe para inspecao controlada de autoridade em homologacao.
+ *
+ * UNICO desvio deliberado em relacao ao historico: `projectId` era o literal
+ * "canil-gcm". Um snapshot tirado em staging se identificaria como producao —
+ * mentira num artefato de auditoria. Passa a ser resolvido do runtime, o que
+ * mantem o valor observavel IDENTICO em producao e o torna verdadeiro nos outros
+ * ambientes.
+ */
+const runAdminGetAccessHomologationSnapshot =
+  buildAdminGetAccessHomologationSnapshotHandler(
+    createAdminAccessHomologationSnapshotDeps({
+      auth: admin.auth(),
+      authorize: async (auth) => {
+        const typedAuth = auth as
+          | {uid: string; token: admin.auth.DecodedIdToken}
+          | undefined;
+        const caller = requireAuth(typedAuth);
+        if (typedAuth && isAdminToken(typedAuth.token)) {
+          return {uid: caller.uid, ra: caller.ra};
+        }
+        const user = await db.collection("users").doc(caller.ra).get();
+        if (user.exists && isAdminUserRecord(user.data() ?? {})) {
+          return {uid: caller.uid, ra: caller.ra};
+        }
+        throw new HttpsError(
+          "permission-denied",
+          "Autoridade administrativa obrigatoria.",
+        );
+      },
+      db,
+      logInfo: (event) =>
+        logger.info("admin_access_homologation_snapshot_read", event),
+      logWarning: (event) =>
+        logger.warn("admin_access_homologation_snapshot_read_failed", event),
+      projectId:
+        admin.app().options.projectId ??
+        process.env.GCLOUD_PROJECT ??
+        "unknown",
+    }),
+  );
+
+/** Read-only, admin-only authorization snapshot for controlled homologation. */
+export const adminGetAccessHomologationSnapshot = onCall(
+  {region},
+  async (request) => runAdminGetAccessHomologationSnapshot(request),
+);
+
+/**
+ * FRONT10.ACCESS-CREDENTIALS — RECUPERACAO DE PARIDADE DE SOURCE (Phase C / C1-02).
+ *
+ * `adminResetHumanPassword` existe em producao (canil-gcm) e e chamada pelo
+ * Web client (`callAdminResetHumanPassword`).
+ * Reconstruida com contrato estrito:
+ * - autorizacao administrativa (access.edit ou humans.edit);
+ * - busca fail-closed da identidade Auth;
+ * - integrante sem Auth -> NOT_FOUND com AUTH_IDENTITY_NOT_FOUND (NUNCA cria conta);
+ * - gera senha temporaria forte em memoria;
+ * - NUNCA persiste a senha no Firestore, NUNCA coloca em log e NUNCA em auditoria;
+ * - auditoria canonica de sucesso registrada no Firestore (users/{ra});
+ * - sincroniza ambos os espelhos (updated_at e updatedAt);
+ * - identidade Auth disabled permanece disabled.
+ */
+export function buildAdminResetHumanPasswordDeps(): ResetPasswordDeps {
+  return {
+    authorize: async (auth) => {
+      const typedAuth = auth as
+        | {uid: string; token: admin.auth.DecodedIdToken}
+        | undefined;
+      try {
+        return await requireAccessPermission(typedAuth, "access", "edit");
+      } catch {
+        return await requireAccessPermission(typedAuth, "humans", "edit");
+      }
+    },
+    generateTemporaryPassword: defaultGenerateTemporaryPassword,
+    getPersonnel: async (ra) => {
+      const snap = await db.collection("users").doc(ra).get();
+      return {exists: snap.exists, data: (snap.data() ?? {}) as JsonMap};
+    },
+    lookupAuthByUid: async (uid) => {
+      const user = await lookupAuthUserByUid(uid);
+      if (!user) return null;
+      return {disabled: user.disabled, email: user.email, uid: user.uid};
+    },
+    lookupAuthByEmail: async (email) => {
+      const user = await lookupAuthUserByEmail(email);
+      if (!user) return null;
+      return {disabled: user.disabled, email: user.email, uid: user.uid};
+    },
+    serverTimestamp: () => admin.firestore.Timestamp.now(),
+    updatePassword: async (uid, password) => {
+      await admin.auth().updateUser(uid, {password});
+    },
+    updatePersonnelAudit: async (ra, payload) => {
+      await db.collection("users").doc(ra).set({
+        ...payload,
+        audit_trail: admin.firestore.FieldValue.arrayUnion(payload.audit_trail),
+      }, {merge: true});
+    },
+  };
+}
+
+export const adminResetHumanPassword = onCall({region}, async (request) => {
+  return resetHumanPasswordLogic({auth: request.auth, data: request.data}, buildAdminResetHumanPasswordDeps());
+});
+
+/**
+ * F10.AUTH-PROVISIONING-CREDENTIALS-R1 — PROVISIONAMENTO DEDICADO DE AUTENTICACAO.
+ *
+ * Callable administrativo dedicado para provisionar a credencial Auth de integrante (users/{ra}).
+ * - Autoridade administrativa canonica (access.edit com fallback humans.edit);
+ * - Validacao de cadastro existente e ativo;
+ * - Idempotencia segura e sem revelacao retroativa de senha;
+ * - Ciclo de vida seguro: disabled -> persistencia firestore -> enabled;
+ * - Senha inicial forte, unica e jamais registrada em Firestore/logs.
+ */
+export function buildAdminProvisionHumanAuthDeps(): ProvisionHumanAuthDeps {
+  return {
+    authorize: async (auth) => {
+      const typedAuth = auth as
+        | {uid: string; token: admin.auth.DecodedIdToken}
+        | undefined;
+      try {
+        return await requireAccessPermission(typedAuth, "access", "edit");
+      } catch {
+        return await requireAccessPermission(typedAuth, "humans", "edit");
+      }
+    },
+    createAuthUser: async (input) => {
+      const user = await admin.auth().createUser({
+        disabled: input.disabled,
+        displayName: input.displayName,
+        email: input.email,
+        password: input.password,
+      });
+      return {
+        disabled: user.disabled,
+        displayName: user.displayName,
+        email: user.email,
+        uid: user.uid,
+      };
+    },
+    deleteAuthUser: async (uid) => {
+      await admin.auth().deleteUser(uid);
+    },
+    generateInitialPassword: defaultGenerateInitialPassword,
+    getPersonnel: async (ra) => {
+      const snap = await db.collection("users").doc(ra).get();
+      return {exists: snap.exists, data: (snap.data() ?? {}) as JsonMap};
+    },
+    lookupAuthByEmail: async (email) => {
+      const user = await lookupAuthUserByEmail(email);
+      if (!user) return null;
+      return {disabled: user.disabled, displayName: user.displayName, email: user.email, uid: user.uid};
+    },
+    lookupAuthByUid: async (uid) => {
+      const user = await lookupAuthUserByUid(uid);
+      if (!user) return null;
+      return {disabled: user.disabled, displayName: user.displayName, email: user.email, uid: user.uid};
+    },
+    lookupPersonnelByAuthUid: async (uid) => {
+      const snap = await db.collection("users").where("auth_uid", "==", uid).limit(1).get();
+      if (!snap.empty) {
+        return snap.docs[0].id;
+      }
+      const snap2 = await db.collection("users").where("authUid", "==", uid).limit(1).get();
+      if (!snap2.empty) {
+        return snap2.docs[0].id;
+      }
+      return null;
+    },
+    serverTimestamp: () => admin.firestore.Timestamp.now(),
+    updateAuthUser: async (uid, patch) => {
+      await admin.auth().updateUser(uid, patch);
+    },
+    updatePersonnelAudit: async (ra, payload) => {
+      await db.collection("users").doc(ra).set({
+        ...payload,
+        audit_trail: admin.firestore.FieldValue.arrayUnion(payload.audit_trail),
+      }, {merge: true});
+    },
+  };
+}
+
+export const adminProvisionHumanAuth = onCall({region}, async (request) => {
+  return provisionHumanAuthLogic(
+    {auth: request.auth, data: request.data},
+    buildAdminProvisionHumanAuthDeps(),
+  );
 });
 
 export const adminSeedAccessProfiles = onCall({region}, async (request) => {
@@ -2383,6 +2744,58 @@ export const adminUpsertK9 = onCall({region}, async (request) => {
   });
   await batch.commit();
   return {id: dogId};
+});
+
+/**
+ * Patch administrativo seguro da identidade do K9.
+ *
+ * Substitui a edicao legada (adminUpsertK9 mode="edit"), que reescrevia o
+ * documento inteiro. A logica de contrato vive em admin_patch_k9_identity.ts;
+ * aqui apenas injetamos Firestore, autorizacao e convencoes de timestamp.
+ */
+export const adminPatchK9Identity = onCall({region}, async (request) => {
+  return patchK9Identity(
+    {
+      authorize: () => requireAccessPermission(request.auth, "k9", "edit"),
+      runTransaction: (handler) =>
+        db.runTransaction(async (transaction) => {
+          const tx: K9IdentityTransaction = {
+            getDog: async (dogId) =>
+              transaction.get(db.collection("dogs").doc(dogId)),
+            findRegistrationOwners: async (registrationNumber) => {
+              const [legacySnap, currentSnap] = await Promise.all([
+                transaction.get(
+                  db.collection("dogs").where("matricula", "==", registrationNumber),
+                ),
+                transaction.get(
+                  db
+                    .collection("dogs")
+                    .where("registrationNumber", "==", registrationNumber),
+                ),
+              ]);
+              return Array.from(
+                new Set(
+                  [...legacySnap.docs, ...currentSnap.docs].map(
+                    (docSnapshot) => docSnapshot.id,
+                  ),
+                ),
+              );
+            },
+            patchDog: (dogId, patch) => {
+              transaction.set(db.collection("dogs").doc(dogId), patch, {merge: true});
+            },
+            writeAuditLog: (entry) => {
+              transaction.set(db.collection("auditLogs").doc(), entry);
+            },
+          };
+          return handler(tx);
+        }),
+      serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+      auditEntry: (action, caller) => auditEntry(action, caller),
+      arrayUnion: (value) => admin.firestore.FieldValue.arrayUnion(value),
+    },
+    request.data,
+  );
 });
 
 export const adminArchiveK9 = onCall({region}, async (request) => {
@@ -2788,18 +3201,18 @@ export const adminUpsertHuman = onCall({region}, async (request) => {
   let createdNewAuthUser = false;
 
   if (existingUid) {
-    try {
-      authUser = await admin.auth().getUser(existingUid);
-    } catch {
-      authUser = null;
-    }
+    // AUTH-WIRING-01 (A3): correcao NARROW. O `catch { authUser = null; }`
+    // anterior era a mais grave das quatro: `authUser === null` e exatamente a
+    // condicao que, abaixo, autoriza `admin.auth().createUser`. Uma falha
+    // transitoria de leitura sobre uma conta EXISTENTE podia portanto escalar
+    // para criacao de identidade — conta duplicada ou orfa. Somente
+    // `auth/user-not-found` significa ausencia; todo o resto propaga.
+    authUser = await lookupAuthUserByUid(existingUid);
   }
   if (!authUser) {
-    try {
-      authUser = await admin.auth().getUserByEmail(email);
-    } catch {
-      authUser = null;
-    }
+    // AUTH-WIRING-01 (A4): mesma correcao no fallback por e-mail, que e o
+    // caminho comum de quem nao tem espelho `auth_uid`.
+    authUser = await lookupAuthUserByEmail(email);
   }
 
   let temporaryPassword: string | null = null;
@@ -2971,6 +3384,187 @@ export const adminUpsertHuman = onCall({region}, async (request) => {
     temporary_password: temporaryPassword,
     token_refresh_required: true,
   };
+});
+
+export const adminCreateHuman = onCall({region}, async (request) => {
+  return createHuman(
+    {
+      authorize: () => requireAccessPermission(request.auth, "humans", "create"),
+      createUserDoc: async (ra, payload) => {
+        try {
+          // create() e atomico e falha se o documento ja existir: nao ha
+          // janela TOCTOU nem risco de overwrite (nunca usa merge).
+          await db.collection("users").doc(ra).create(payload);
+        } catch (error) {
+          const code = (error as {code?: unknown}).code;
+          // Firestore ALREADY_EXISTS: gRPC code 6 (admin SDK) ou string.
+          if (code === 6 || code === "already-exists") {
+            throw new DocumentAlreadyExistsError();
+          }
+          throw error;
+        }
+      },
+      serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+      auditEntry: (action, caller) => auditEntry(action, caller),
+    },
+    request.data,
+  );
+});
+
+export const adminPatchHumanPersonnel = onCall({region}, async (request) => {
+  return patchHumanPersonnel(
+    {
+      authorize: () => requireAccessPermission(request.auth, "humans", "edit"),
+      runTransaction: (handler) =>
+        db.runTransaction(async (transaction) => {
+          const tx: HumanPersonnelTransaction = {
+            getUser: async (ra) => {
+              const snap = await transaction.get(
+                db.collection("users").doc(ra),
+              );
+              return {exists: snap.exists, data: snap.data() ?? null};
+            },
+            patchUser: (ra, patch) => {
+              // merge:true aplica atualizacoes e FieldValue.delete() sem
+              // reescrever o documento inteiro.
+              transaction.set(db.collection("users").doc(ra), patch, {
+                merge: true,
+              });
+            },
+          };
+          return handler(tx);
+        }),
+      serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+      auditEntry: (action, caller) => auditEntry(action, caller),
+      arrayUnion: (value) => admin.firestore.FieldValue.arrayUnion(value),
+      deleteField: () => admin.firestore.FieldValue.delete(),
+    },
+    request.data,
+  );
+});
+
+export const adminPatchHumanPhoto = onCall({region}, async (request) => {
+  return patchHumanPhoto(
+    {
+      authorize: () => requireAccessPermission(request.auth, "humans", "edit"),
+      runTransaction: (handler) =>
+        db.runTransaction(async (transaction) => {
+          const tx: HumanPhotoTransaction = {
+            getUser: async (ra) => {
+              const snap = await transaction.get(
+                db.collection("users").doc(ra),
+              );
+              return {exists: snap.exists, data: snap.data() ?? null};
+            },
+            patchUser: (ra, patch) => {
+              transaction.set(db.collection("users").doc(ra), patch, {
+                merge: true,
+              });
+            },
+          };
+          return handler(tx);
+        }),
+      serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+      auditEntry: (action, caller) => auditEntry(action, caller),
+      arrayUnion: (value) => admin.firestore.FieldValue.arrayUnion(value),
+    },
+    request.data,
+  );
+});
+
+/**
+ * Wiring compartilhado das duas callables de Human Lifecycle V1.
+ *
+ * As chamadas de Auth ficam FORA do callback de runTransaction: transacoes
+ * podem sofrer retry e repetiriam o efeito colateral externo. A ordem e a
+ * compensacao vivem em admin_human_lifecycle.ts.
+ */
+function humanLifecycleDeps(request: CallableRequest<unknown>) {
+  const userRef = (ra: string) => db.collection("users").doc(ra);
+  const activeShiftRef = (ra: string) =>
+    db.collection("active_shifts").doc(ra);
+  return {
+    authorize: () =>
+      requireAccessPermission(request.auth, "humans", "archive"),
+    runTransaction: <T>(
+      handler: (tx: HumanLifecycleTransaction) => Promise<T>,
+    ) =>
+      db.runTransaction(async (transaction) => {
+        const tx: HumanLifecycleTransaction = {
+          getUser: async (ra) => {
+            const snap = await transaction.get(userRef(ra));
+            return {exists: snap.exists, data: snap.data() ?? null};
+          },
+          // Uma transacao do Firestore le documentos de colecoes diferentes; o
+          // guard de turno precisa ser revalidado no mesmo instante logico.
+          getActiveShift: async (ra) => {
+            const snap = await transaction.get(activeShiftRef(ra));
+            return {exists: snap.exists, data: snap.data() ?? null};
+          },
+          patchUser: (ra, patch) => {
+            transaction.set(userRef(ra), patch, {merge: true});
+          },
+        };
+        return handler(tx);
+      }),
+    getUser: async (ra: string) => {
+      const snap = await userRef(ra).get();
+      return {exists: snap.exists, data: snap.data() ?? null};
+    },
+    getActiveShift: async (ra: string) => {
+      const snap = await activeShiftRef(ra).get();
+      return {exists: snap.exists, data: snap.data() ?? null};
+    },
+    // `null` SOMENTE quando a conta nao existe: o modulo trata como DANGLING (o
+    // doc afirma um uid morto) e falha fechado antes de qualquer mutacao.
+    // Qualquer outro erro propaga: um `catch` nu transformaria falta de
+    // permissao num DANGLING falso (S2.A.D1).
+    getAuthAccount: async (uid: string) => {
+      try {
+        const record = await admin.auth().getUser(uid);
+        return {uid: record.uid, disabled: record.disabled === true};
+      } catch (error) {
+        if (isAuthUserNotFound(error)) return null;
+        throw error;
+      }
+    },
+    // Fallback CANONICO, identico ao de adminAssignAccessProfile/
+    // adminUpsertHuman/setK9InstructorRole. `null` => Personnel sem conta.
+    // Só a inexistencia real vira `null`: engolir um PERMISSION_DENIED aqui
+    // devolveria `not_provisioned` com a conta ainda habilitada (S2.A.D1).
+    findAuthAccountByEmail: async (email: string) => {
+      try {
+        const record = await admin.auth().getUserByEmail(email);
+        return {uid: record.uid, disabled: record.disabled === true};
+      } catch (error) {
+        if (isAuthUserNotFound(error)) return null;
+        throw error;
+      }
+    },
+    // Mesma expressao provada no repo. `institutional_email` NUNCA participa.
+    canonicalAuthEmail: (user: JsonMap, ra: string) =>
+      stringValue(user.email) ?? emailForRa(ra),
+    setAuthDisabled: async (uid: string, disabled: boolean) => {
+      await admin.auth().updateUser(uid, {disabled});
+    },
+    serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+    auditEntry: (
+      action: string,
+      caller: CallerIdentity,
+      reason?: string,
+    ) => auditEntry(action, caller, reason),
+    arrayUnion: (value: unknown) =>
+      admin.firestore.FieldValue.arrayUnion(value),
+    deleteField: () => admin.firestore.FieldValue.delete(),
+  };
+}
+
+export const adminDeactivateHuman = onCall({region}, async (request) => {
+  return deactivateHuman(humanLifecycleDeps(request), request.data);
+});
+
+export const adminReactivateHuman = onCall({region}, async (request) => {
+  return reactivateHuman(humanLifecycleDeps(request), request.data);
 });
 
 export const adminArchiveHuman = onCall({region}, async (request) => {
@@ -4056,51 +4650,129 @@ export const setK9InstructorRole = onCall({region}, async (request) => {
   const userData = userSnap.data() ?? {};
   const uidFromDoc = stringValue(userData.auth_uid) ?? stringValue(userData.authUid) ?? stringValue(userData.uid);
   const email = stringValue(userData.email) ?? emailForRa(ra);
-  let userRecord: admin.auth.UserRecord;
+  let userRecord: admin.auth.UserRecord | null = null;
   if (uidFromDoc) {
-    userRecord = await admin.auth().getUser(uidFromDoc);
-  } else {
-    userRecord = await admin.auth().getUserByEmail(email);
+    userRecord = await lookupAuthUserByUid(uidFromDoc);
+  }
+  if (!userRecord) {
+    userRecord = await lookupAuthUserByEmail(email);
+  }
+  if (!userRecord) {
+    throw new HttpsError(
+      "not-found",
+      "Conta de autenticacao nao encontrada para este integrante.",
+      {reason: "AUTH_IDENTITY_NOT_FOUND"},
+    );
   }
 
-  const existingClaims = userRecord.customClaims ?? {};
-  const roles = new Set<string>(Array.isArray(existingClaims.roles) ? existingClaims.roles.map(String) : []);
-  if (enabled) {
-    roles.add("instrutor_k9");
-  } else {
-    roles.delete("instrutor_k9");
+  // FRONT10.ACCESS-CREDENTIALS.D: A qualificacao funcional de Instrutor K9 e
+  // ortogonal ao Perfil de Acesso base. Preservamos o perfil de acesso e escopo
+  const currentProfileId = stringValue(userData.access_profile_id) ?? stringValue(userData.accessProfileId) ?? null;
+
+  // F10.ACCESS-CREDENTIALS.I2.R2: Se o integrante esta vinculado ao perfil legado 'instrutor_k9',
+  // ele nao pode ser reinterpretado como autorizacao base. A operacao falha closed com
+  // razao tipada antes de qualquer mutacao de claims ou gravacao no Firestore.
+  if (currentProfileId === "instrutor_k9") {
+    throw new HttpsError(
+      "failed-precondition",
+      "O integrante esta vinculado ao perfil legado 'instrutor_k9'. E necessario " +
+        "migrar para um perfil de acesso base valido antes de alterar a qualificacao funcional de instrutor.",
+      { reason: "LEGACY_ACCESS_PROFILE_REQUIRES_MIGRATION" },
+    );
   }
-  const nextClaims: JsonMap = {
-    ...existingClaims,
-    roles: Array.from(roles),
-  };
-  if (enabled) {
-    nextClaims.role = "instrutor_k9";
-    nextClaims.instrutor_k9 = true;
-    nextClaims.training_role = "instrutor_k9";
-    nextClaims.training_instructor = true;
-  } else {
-    delete nextClaims.instrutor_k9;
-    delete nextClaims.training_role;
-    delete nextClaims.training_instructor;
-    if (nextClaims.role === "instrutor_k9") delete nextClaims.role;
+
+  const currentScope = parseAccessScope(userData.access_scope ?? userData.accessScope);
+  let profileRoleKeys: string[] = [];
+  let validProfileId: string | null = null;
+  let validScope: "global" | "own_records" | null = null;
+
+  if (currentProfileId) {
+    const profileSnap = await db.collection("access_profiles").doc(currentProfileId).get();
+    if (profileSnap.exists) {
+      const pData = profileSnap.data() ?? {};
+      const status = stringValue(pData.status) ?? "active";
+      const parsedScope = parseAccessScope(pData.scope) ?? currentScope;
+      if (status === "active" && parsedScope !== null) {
+        validProfileId = currentProfileId;
+        validScope = parsedScope;
+        profileRoleKeys = normalizedRoleKeys(pData.role_keys, [currentProfileId]);
+      }
+    }
   }
+
+  const previousClaims: JsonMap = { ...(userRecord.customClaims ?? {}) };
+  const nextClaims = composeEffectiveAccessClaims(
+    previousClaims,
+    ra,
+    {
+      profileId: validProfileId,
+      roleKeys: profileRoleKeys,
+      accessScope: validScope,
+    },
+    enabled,
+  );
 
   await admin.auth().setCustomUserClaims(userRecord.uid, nextClaims);
-  await userRef.set({
+
+  const effectiveRoles = Array.from(new Set([
+    ...profileRoleKeys,
+    ...(enabled ? ["instrutor_k9"] : []),
+  ])).sort();
+
+  // Preserva a role singular base do perfil existente somente se houver perfil valido.
+  // Sem perfil valido, nenhuma role singular base (operador/gestor/admin) e fabricada.
+  const baseClaimRole = stringValue(userData.claim_role) ?? stringValue(userData.role);
+  const effectiveClaimRole = validProfileId
+    ? ((baseClaimRole && baseClaimRole !== "instrutor_k9")
+        ? baseClaimRole
+        : (nextClaims.role as string | null))
+    : null;
+
+  const instructorFirestorePayload: JsonMap = {
     auth_uid: userRecord.uid,
     email,
     is_k9_instructor: enabled,
     training_role: enabled ? "instrutor_k9" : null,
-    claim_role: enabled ? "instrutor_k9" : null,
+    training_instructor: enabled ? true : null,
+    claim_role: effectiveClaimRole,
+    role: effectiveClaimRole,
+    roles: effectiveRoles,
     claim_refresh_required: true,
     claim_updated_at: admin.firestore.FieldValue.serverTimestamp(),
     updated_at: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     audit_trail: admin.firestore.FieldValue.arrayUnion(auditEntry(
       enabled ? "k9_instructor_role_granted" : "k9_instructor_role_revoked",
       caller,
     )),
-  }, {merge: true});
+  };
+
+  try {
+    await userRef.set(instructorFirestorePayload, {merge: true});
+  } catch (firestoreError) {
+    try {
+      await admin.auth().setCustomUserClaims(userRecord.uid, previousClaims);
+    } catch (compensationError) {
+      logger.error("set_k9_instructor_role_compensation_failed", {
+        error: String(compensationError),
+        ra,
+        uid: userRecord.uid,
+      });
+      throw new HttpsError(
+        "internal",
+        "As claims do instrutor foram alteradas, a gravacao do cadastro falhou e a " +
+          "reversao nao foi garantida. Confira o acesso deste integrante antes " +
+          "de nova tentativa.",
+        {
+          reason: "COMPENSATION_FAILED",
+          operation: "setK9InstructorRole",
+          stage: "revert_custom_claims",
+          target_ra: ra,
+        },
+      );
+    }
+    throw firestoreError;
+  }
 
   return {
     ra,
@@ -8387,6 +9059,16 @@ const clinicalCaseDeps: ClinicalCaseCallableDeps = {
   ) => toClinicalCaller(
     await requireClinicalCapability(auth, "amend_clinical"),
   ),
+  requireManageClinicalCase: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toClinicalCaller(
+    await requireClinicalCapability(auth, "manage_clinical_case"),
+  ),
+  requireReopenClinicalCase: async (
+    auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  ) => toClinicalCaller(
+    await requireClinicalCapability(auth, "reopen_clinical_case"),
+  ),
   requireDogAccess: async (
     auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
     caller: ClinicalCaller,
@@ -8450,6 +9132,228 @@ export const healthCancelClinicalEvent = onCall({region}, async (request) => {
  */
 export const healthAmendClinicalEvent = onCall({region}, async (request) => {
   return runHealthAmendClinicalEvent(request, clinicalCaseDeps);
+});
+
+/**
+ * Transiciona o status de um ClinicalCase ativo (health.manage_clinical_case + dog access).
+ */
+export const healthTransitionClinicalCase = onCall({region}, async (request) => {
+  return runHealthTransitionClinicalCase(request, clinicalCaseDeps);
+});
+
+/**
+ * Concede alta a um ClinicalCase ativo (health.manage_clinical_case + dog access).
+ */
+export const healthDischargeClinicalCase = onCall({region}, async (request) => {
+  return runHealthDischargeClinicalCase(request, clinicalCaseDeps);
+});
+
+/**
+ * Cancela um ClinicalCase ativo (health.manage_clinical_case + dog access).
+ */
+export const healthCancelClinicalCase = onCall({region}, async (request) => {
+  return runHealthCancelClinicalCase(request, clinicalCaseDeps);
+});
+
+/**
+ * Reabre um ClinicalCase encerrado (health.reopen_clinical_case + dog access).
+ */
+export const healthReopenClinicalCase = onCall({region}, async (request) => {
+  return runHealthReopenClinicalCase(request, clinicalCaseDeps);
+});
+
+function toExamCaller(caller: CallerIdentity): ExamCaller {
+  return {
+    uid: caller.uid,
+    email: caller.email,
+    ra: caller.ra,
+    name: caller.name,
+  };
+}
+
+const examProcessDeps: ExamProcessCallableDeps = {
+  db,
+  requireRequestExam: async (auth) => {
+    return toExamCaller(await requireClinicalCapability(auth, "record_clinical"));
+  },
+  requireRecordClinical: async (auth) => {
+    return toExamCaller(await requireClinicalCapability(auth, "record_clinical"));
+  },
+  requireInterpretExam: async (auth) => {
+    return toExamCaller(await requireClinicalCapability(auth, "finalize_clinical"));
+  },
+  requireManageClinicalCase: async (auth) => {
+    return toExamCaller(await requireClinicalCapability(auth, "manage_clinical_case"));
+  },
+  requireDogAccess: async (auth, caller, dogId, dog) => {
+    await requireDogRecordAccess(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+      dogId,
+      dog,
+    );
+  },
+  isAdministrativeAuthority: async (auth, caller) => {
+    return isAdministrativeHealthAuthority(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+    );
+  },
+};
+
+/**
+ * F20.EXAM-V1: Solicita um exame clínico para um caso existente.
+ */
+export const healthRequestExam = onCall({region}, async (request) => {
+  return runHealthRequestExam(request, examProcessDeps);
+});
+
+/**
+ * F20.EXAM-V1: Registra coleta física de material do exame.
+ */
+export const healthRecordExamCollection = onCall({region}, async (request) => {
+  return runHealthRecordExamCollection(request, examProcessDeps);
+});
+
+/**
+ * F20.EXAM-V1: Registra laudo / resultado técnico recebido do laboratório.
+ */
+export const healthRecordExamResult = onCall({region}, async (request) => {
+  return runHealthRecordExamResult(request, examProcessDeps);
+});
+
+/**
+ * F20.EXAM-V1: Registra interpretação clínica emitida por veterinário responsável.
+ */
+export const healthRecordExamInterpretation = onCall({region}, async (request) => {
+  return runHealthRecordExamInterpretation(request, examProcessDeps);
+});
+
+/**
+ * F20.EXAM-V1: Registra avaliação de impacto operacional do exame.
+ */
+export const healthAssessExamImpact = onCall({region}, async (request) => {
+  return runHealthAssessExamImpact(request, examProcessDeps);
+});
+
+/**
+ * F20.EXAM-V1: Cancela exame com justificativa obrigatória.
+ */
+export const healthCancelExam = onCall({region}, async (request) => {
+  return runHealthCancelExam(request, examProcessDeps);
+});
+
+function toTreatmentCaller(caller: CallerIdentity): TreatmentCaller {
+  return {
+    uid: caller.uid,
+    email: caller.email,
+    ra: caller.ra,
+    name: caller.name,
+  };
+}
+
+const treatmentProtocolDeps: TreatmentProtocolCallableDeps = {
+  db,
+  requireRecordClinical: async (auth) => {
+    return toTreatmentCaller(await requireClinicalCapability(auth, "record_clinical"));
+  },
+  requireFinalizeClinical: async (auth) => {
+    return toTreatmentCaller(await requireClinicalCapability(auth, "finalize_clinical"));
+  },
+  requireAmendClinical: async (auth) => {
+    return toTreatmentCaller(await requireClinicalCapability(auth, "amend_clinical"));
+  },
+  requireRecordRoutine: async (auth) => {
+    try {
+      const caller = await requireAccessPermission(auth, "health", "record_routine");
+      return toTreatmentCaller(caller);
+    } catch {
+      return toTreatmentCaller(await requireClinicalCapability(auth, "record_clinical"));
+    }
+  },
+  requireDogAccess: async (auth, caller, dogId, dog) => {
+    await requireDogRecordAccess(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+      dogId,
+      dog,
+    );
+  },
+  isAdministrativeAuthority: async (auth, caller) => {
+    return isAdministrativeHealthAuthority(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+    );
+  },
+  hasOtherOpenCaseSchedule: async (dogId, caseId, excludeProtocolId) => {
+    const snap = await db
+      .collection("dogs")
+      .doc(dogId)
+      .collection("health_schedule")
+      .where("case_id", "==", caseId)
+      .where("lifecycle_status", "==", "open")
+      .limit(20)
+      .get();
+    if (snap.empty) {
+      return false;
+    }
+    for (const doc of snap.docs) {
+      const data = doc.data();
+      if (!excludeProtocolId || data.source_id !== excludeProtocolId) {
+        return true;
+      }
+    }
+    return false;
+  },
+};
+
+/**
+ * F20.TREATMENT-V1: Cria e ativa um protocolo de tratamento (prescrição externa).
+ */
+export const healthCreateTreatmentProtocol = onCall({region}, async (request) => {
+  return runHealthCreateTreatmentProtocol(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Pausa protocolo de tratamento com motivo obrigatório.
+ */
+export const healthPauseTreatmentProtocol = onCall({region}, async (request) => {
+  return runHealthPauseTreatmentProtocol(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Retoma protocolo de tratamento previamente pausado.
+ */
+export const healthResumeTreatmentProtocol = onCall({region}, async (request) => {
+  return runHealthResumeTreatmentProtocol(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Conclui protocolo de tratamento e atualiza ClinicalCase para monitoring.
+ */
+export const healthCompleteTreatmentProtocol = onCall({region}, async (request) => {
+  return runHealthCompleteTreatmentProtocol(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Cancela protocolo de tratamento com justificativa obrigatória.
+ */
+export const healthCancelTreatmentProtocol = onCall({region}, async (request) => {
+  return runHealthCancelTreatmentProtocol(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Registra administração de dose com doseId determinístico e idempotência.
+ */
+export const healthAdministerTreatmentDose = onCall({region}, async (request) => {
+  return runHealthAdministerTreatmentDose(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Registra dose pulada com justificativa obrigatória.
+ */
+export const healthSkipTreatmentDose = onCall({region}, async (request) => {
+  return runHealthSkipTreatmentDose(request, treatmentProtocolDeps);
 });
 
 function toRestrictionCaller(caller: CallerIdentity): RestrictionCaller {
@@ -8657,36 +9561,95 @@ export const healthNutritionCancelPlan = onCall({region}, async (request) => {
   return runHealthNutritionCancelPlan(request, healthNutritionDeps);
 });
 
-const runHealthWeightCreateRecord = buildHealthWeightCreateRecordHandler({
-  db,
-  requireHealthRecordRoutine: async (auth) => {
-    const caller = await requireAccessPermission(
-      auth,
-      "health",
-      "record_routine",
+/**
+ * PESAGEM-01 / HEALTH_WEIGHT_CANONICAL_SPEC §6.2:
+ * Acesso a K9 para registro de pesagem de rotina (health.record_routine).
+ *
+ * Um Operador K9 autorizado PODE executar a operação para qualquer K9 existente
+ * e ativo ao qual tem acesso. O operador NÃO precisa ser o condutor vinculado
+ * (dogHandlerRa) nem ter o K9 em turno ativo (callerHasActiveDog).
+ *
+ * Falha fechado se:
+ * - caller sem health.record_routine;
+ * - autorização/escopo inválido ou negado (missing user mirror, deleted, inactive profile, etc.);
+ * - K9 inexistente, inativo (status !== 'active' ou active === false) ou arquivado/excluído.
+ */
+export async function requireWeightDogAccess(
+  auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  caller: CallerIdentity,
+  dogId: string,
+  dog: JsonMap,
+) {
+  const accessCaller = requireAuth(auth);
+  if (accessCaller.uid !== caller.uid || accessCaller.ra !== caller.ra) {
+    throw new HttpsError("permission-denied", "Identidade do autor inconsistente.");
+  }
+
+  // 1. Validar capability health.record_routine (falha fechada se ausente)
+  await requireAccessPermission(auth, "health", "record_routine");
+
+  // 2. Resolução de escopo e integridade de autorização (falha fechada)
+  const scope = await resolveAccessScope(auth, accessCaller);
+  if (scope.kind === "denied") {
+    throw new HttpsError(
+      "permission-denied",
+      "Nao foi possivel estabelecer autorizacao valida para este acesso.",
+      {code: "authorization-state-invalid", reason: scope.reason},
     );
-    const isAdmin = await isAdministrativeHealthAuthority(auth, caller);
-    return {
-      uid: caller.uid,
-      name: caller.name,
-      ra: caller.ra,
-      internalRole: isAdmin ? "admin" : "condutor",
-    };
-  },
-  requireDogAccess: async (auth, caller, dogId, dog) => {
-    const accessCaller = requireAuth(auth);
-    if (accessCaller.uid !== caller.uid || accessCaller.ra !== caller.ra) {
-      throw new HttpsError("permission-denied", "Identidade do autor inconsistente.");
-    }
-    await requireDogRecordAccess(
-      auth,
-      accessCaller,
-      dogId,
-      dog,
+  }
+
+  // 3. Validação do K9: existente e ativo (HEALTH_WEIGHT_CANONICAL_SPEC §6.2)
+  if (!isWeightActiveDog(dog)) {
+    throw new HttpsError(
+      "permission-denied",
+      "K9 inexistente ou inativo para registro de pesagem.",
+      {code: "dog-inactive"},
     );
-  },
-  createEngineDeps: () => createAdminWeightEngineDeps(db),
-});
+  }
+
+  // 4. Operador autorizado com escopo válido (global ou own_records) possui
+  // acesso ao K9 ativo sem exigir vínculo de condutor ou turno ativo (§6.2).
+}
+
+export function buildHealthWeightCreateRecordDeps(
+  firestoreDb: admin.firestore.Firestore = db,
+): HealthWeightCallableDeps {
+  return {
+    db: firestoreDb,
+    requireHealthRecordRoutine: async (auth) => {
+      const caller = await requireAccessPermission(
+        auth,
+        "health",
+        "record_routine",
+      );
+      const isAdmin = await isAdministrativeHealthAuthority(auth, caller);
+      return {
+        uid: caller.uid,
+        name: caller.name,
+        ra: caller.ra,
+        internalRole: isAdmin ? "admin" : "condutor",
+      };
+    },
+    requireDogAccess: async (auth, caller, dogId, dog) => {
+      await requireWeightDogAccess(
+        auth,
+        {
+          uid: caller.uid,
+          email: (auth?.token?.email as string | undefined) ?? "",
+          ra: caller.ra,
+          name: caller.name,
+        },
+        dogId,
+        dog,
+      );
+    },
+    createEngineDeps: () => createAdminWeightEngineDeps(firestoreDb),
+  };
+}
+
+const runHealthWeightCreateRecord = buildHealthWeightCreateRecordHandler(
+  buildHealthWeightCreateRecordDeps(),
+);
 
 /** Create a canonical WeightRecord with durable receipt idempotency (health.record_routine). */
 export const healthWeightCreateRecord = onCall({region}, async (request) =>
@@ -8768,6 +9731,10 @@ export {healthReadinessProjectNutritionPlan};
 
 /** Readiness trigger — fires on any operational_restrictions write. */
 export {healthReadinessProjectRestriction};
+
+/** Readiness trigger — fires on any clinical_events write (canonical consultation). */
+export {healthReadinessProjectClinicalEvent};
+
 
 
 // =============================================================================

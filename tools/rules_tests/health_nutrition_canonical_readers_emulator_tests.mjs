@@ -181,6 +181,17 @@ async function seedFixtures() {
   log('Seeding canonical reader fixtures (Admin SDK)…');
 
   await ensureUser(OP);
+  await adminDb.collection('access_profiles').doc('nutrition_reader_global').set({
+    status: 'active',
+    scope: 'global',
+    permissions: {health: {view: true}},
+  });
+  await adminDb.collection('users').doc(OP.ra).set({
+    ra: OP.ra,
+    email: OP.email,
+    access_profile_id: 'nutrition_reader_global',
+    access_scope: 'global',
+  });
 
   // --- valid visibility ---
   await seedDog(DOG_VALID, 'Reader Valid');

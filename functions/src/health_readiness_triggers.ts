@@ -21,12 +21,17 @@
 import {Change, DocumentSnapshot, onDocumentWritten} from "firebase-functions/v2/firestore";
 import type {FirestoreEvent} from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
-import {checkRelevant, normalizeEventType} from "./health_readiness_trigger_filter";
+import {
+  checkRelevant,
+  checkRelevantClinicalEvent,
+  normalizeEventType,
+} from "./health_readiness_trigger_filter";
 import {
   handleWeightRecordTrigger,
   handleHealthEventTrigger,
   handleNutritionPlanTrigger,
   handleRestrictionTrigger,
+  handleClinicalEventTrigger,
   ReadinessTriggerParams,
 } from "./health_readiness_trigger_handlers";
 
@@ -55,6 +60,22 @@ export function isRelevantHealthEvent(event: FirestoreEvent<Change<DocumentSnaps
   const beforeType = extractEventType(event.data?.before);
   const afterType = extractEventType(event.data?.after);
   return checkRelevant(beforeType, afterType);
+}
+
+/**
+ * Returns true iff the given onDocumentWritten event for a ClinicalEvent
+ * should trigger a readiness recalculation.
+ */
+export function isRelevantClinicalEvent(
+  event: FirestoreEvent<Change<DocumentSnapshot> | undefined>,
+): boolean {
+  const beforeData = event.data?.before?.exists
+    ? (event.data.before.data() as Record<string, unknown>)
+    : null;
+  const afterData = event.data?.after?.exists
+    ? (event.data.after.data() as Record<string, unknown>)
+    : null;
+  return checkRelevantClinicalEvent(beforeData, afterData);
 }
 
 // ── Generic wrapper (weight, nutrition, restrictions — always relevant) ──────
@@ -145,4 +166,31 @@ export const healthReadinessProjectRestriction = onDocumentWritten(
     retry: true,
   },
   makeGenericWrapper(getDb, handleRestrictionTrigger),
+);
+
+// ── Clinical-events wrapper (consultation-filtered) ─────────────────────────
+
+function makeClinicalEventWrapper(getDb: () => FirebaseFirestore.Firestore) {
+  return async (
+    event: FirestoreEvent<
+      Change<DocumentSnapshot> | undefined,
+      {dogId: string; caseId: string; eventId: string}
+    >,
+  ) => {
+    if (!isRelevantClinicalEvent(event)) return;
+    const dogId = event.params.dogId;
+    const sourcePath = `dogs/${dogId}/clinical_cases/${event.params.caseId}/clinical_events/${event.params.eventId}`;
+    const snapshot = event.data?.after;
+    await handleClinicalEventTrigger(event.params, snapshot, sourcePath, getDb());
+  };
+}
+
+/** Readiness recalculation trigger — clinical_events (canonical consultation). */
+export const healthReadinessProjectClinicalEvent = onDocumentWritten(
+  {
+    document: "dogs/{dogId}/clinical_cases/{caseId}/clinical_events/{eventId}",
+    region,
+    retry: true,
+  },
+  makeClinicalEventWrapper(getDb),
 );
