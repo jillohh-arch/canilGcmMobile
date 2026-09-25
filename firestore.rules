@@ -273,38 +273,28 @@ service cloud.firestore {
         );
     }
 
-    // CLIN-AUTH-BE-3B.A — Autoridade de LEITURA clínica (Clinical v1).
+    // CLIN-AUTH-BE-3B.A / CT3.AUTH-HEALTH-01 — Autoridade de LEITURA clínica (Clinical v1).
     //
-    // Prontuário clínico (clinical_cases/clinical_events/clinical_amendments)
-    // exige capability
-    // EXPLÍCITA `health.read`. Este é o primeiro caminho Health a gatear em
-    // capability granular; os demais (Agenda, Nutrição, Readiness, Documentos)
-    // usam apenas `canAccessDogRecord`, decisão de compatibilidade adiada.
+    // Prontuário clínico (clinical_cases/clinical_events/clinical_amendments),
+    // exames e protocolos de tratamento exigem capability canônica `health.view`
+    // (ratificada em CT3.AUTH-HEALTH-01 e gate CT3.F20.CLINICAL-READ-AUTHORITY-RULES-REPAIR-R1).
+    // F10 removeu health.read da taxonomia canônica AccessAction, default profiles,
+    // normalização e writers; health.view é a autoridade canônica de leitura.
     //
     // POR QUE `activeProfileGrants` DIRETO E NÃO `hasAccessPermission`:
     //   hasAccessPermission() abre com `isAdmin() ||`, então QUALQUER admin
-    //   passa em QUALQUER capability sem grant explícito. A Permission Matrix
-    //   Health v1 define admin como gestor administrativo SEM qualificação
-    //   clínica, e a decisão humana GATE-C.B (functions/src/index.ts) já
-    //   construiu um caminho de autorização dedicado, sem bypass admin, pelo
-    //   mesmo motivo: administração técnica NÃO é autoridade clínica.
+    //   passaria sem perfil ativo ou grant explícito. A autoridade de leitura
+    //   clínica exige perfil ativo concedendo `health.view`, sem bypass
+    //   arbitrário. Administração técnica que possua perfil ativo com
+    //   `health.view=true` acessa legitimamente pelo perfil; sem health.view,
+    //   falha fechado.
     //   activeProfileGrants() não tem bypass admin e ainda exige perfil
     //   existente + status 'active'.
     //
-    // POR QUE `health.view` NÃO É ACEITO (adapter legado = AUTHORITY CONFLICT):
-    //   `view` é a ação genérica de leitura de módulo. O perfil
-    //   `administrador` carrega health.view=true nas fixtures reais, e
-    //   `health.view` não tem NENHUMA proveniência documental como alias de
-    //   `health.read`. Um OR `read || view` vazaria leitura clínica para
-    //   admin técnico e outros perfis não-clínicos — exatamente o que este
-    //   gate precisa impedir. Compatibilidade de migração é decisão de gate
-    //   posterior, não desta fundação.
-    //
     // Capability é resolvida via mapa dinâmico (activeProfileGrants faz
-    // `permissions.get('health',{}).get('read',false)`): nenhum enum novo é
-    // exigido e a capability FALHA FECHADA para todo perfil ainda não migrado.
-    // Perfis migrados (SEED-4/5) já concedem health.read em produção; qualquer
-    // perfil não migrado continua negado.
+    // `permissions.get('health',{}).get('view',false) == true`):
+    // falha fechada se o perfil estiver inativo, ausente, sem a claim RA ou
+    // sem health.view=true.
     //
     // NÃO adiciona acessos a documento novos além dos que canAccessDogRecord()
     // já faz: users/{ra} e access_profiles/{id} são os mesmos documentos que
@@ -312,7 +302,7 @@ service cloud.firestore {
     function hasClinicalReadAuthority() {
       return signedIn()
         && hasRaClaim()
-        && activeProfileGrants(currentAccessProfileId(), 'health', 'read');
+        && activeProfileGrants(currentAccessProfileId(), 'health', 'view');
     }
 
     function canAccessDogData(data) {
@@ -2261,9 +2251,8 @@ service cloud.firestore {
       // o wildcard terminal `/{document=**}` negava tudo.
       //
       // Duas pernas, ambas obrigatórias:
-      //   1. hasClinicalReadAuthority() — capability EXPLÍCITA health.read,
-      //      sem bypass admin (ver helper). Autoridade clínica não se herda de
-      //      administração técnica.
+      //   1. hasClinicalReadAuthority() — capability canônica health.view
+      //      (CT3.AUTH-HEALTH-01), exigindo perfil ativo com health.view=true.
       //   2. canAccessDogRecord(dogId) — o MESMO helper fail-closed do
       //      SEC-02A.2, com o dogId ESTRUTURAL do path.
       //
@@ -2298,7 +2287,7 @@ service cloud.firestore {
       // Sem writer canônico e ZERO documentos clínicos em produção, não há
       // migração de dados neste gate. NENHUM alias antigo é retido: os paths
       // /events e /amendments sob clinical_cases deixam de existir. Autoridade
-      // de leitura INALTERADA (health.read + canAccessDogRecord, sem bypass).
+      // de leitura canônica (health.view + canAccessDogRecord).
       match /clinical_cases/{caseId}/clinical_events/{eventId} {
         allow read: if hasClinicalReadAuthority()
           && canAccessDogRecord(dogId);
