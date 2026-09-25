@@ -52,6 +52,33 @@ android {
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
+    val keystorePropertiesFile = rootProject.file("key.properties")
+    val keystoreProperties = Properties()
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.withReader("UTF-8") { reader ->
+            keystoreProperties.load(reader)
+        }
+    }
+
+    signingConfigs {
+        create("release") {
+            val keyFilePath = keystoreProperties.getProperty("storeFile")
+            val keyFile = if (keyFilePath != null) {
+                val candidate = File(keyFilePath)
+                if (candidate.isAbsolute) candidate else rootProject.file(keyFilePath)
+            } else null
+
+            if (keyFile != null && keyFile.exists()) {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = keyFile
+                storePassword = keystoreProperties.getProperty("storePassword")
+            } else {
+                initWith(getByName("debug"))
+            }
+        }
+    }
+
     // Alvos Firebase explícitos por flavor.
     //
     // `production` mantém o applicationId histórico e resolve
@@ -67,11 +94,13 @@ android {
         create("production") {
             dimension = "environment"
             // Herda defaultConfig.applicationId = "com.ragonha.k9ops"
+            signingConfig = signingConfigs.getByName("release")
         }
         create("staging") {
             dimension = "environment"
             applicationId = "com.example.canil_gcm.staging"
             versionNameSuffix = "-stg"
+            signingConfig = signingConfigs.getByName("debug")
             // O rótulo visível vem do source-set `src/staging/res`, que
             // sobrepõe `src/main/res` — não de `resValue`, para não duplicar
             // recurso com o `strings.xml` de main.
@@ -80,9 +109,6 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
             // Minificação ativada com regras ProGuard explícitas para proteger Firebase/Storage
             isMinifyEnabled = true
             isShrinkResources = true
