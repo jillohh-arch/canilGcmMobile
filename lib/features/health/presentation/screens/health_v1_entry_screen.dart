@@ -23,6 +23,9 @@ import 'package:canil_gcm/features/health/data/coexistence/summary/health_readin
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_dog_context_mapper.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/readiness_callable.dart';
 import 'package:canil_gcm/features/health/data/coexistence/timeline/coexistence_health_timeline_source.dart';
+import 'package:canil_gcm/features/health/data/canonical/restriction/firestore_health_restriction_history_reader.dart';
+import 'package:canil_gcm/features/health/domain/health_restriction_history_reader.dart';
+import 'package:canil_gcm/features/health/presentation/timeline/health_history_presentation_timeline_source.dart';
 import 'package:canil_gcm/features/health/data/config/health_timeline_flag_provider.dart';
 import 'package:canil_gcm/features/health/data/config/health_timeline_mode.dart';
 import 'package:canil_gcm/features/health/data/config/local_health_timeline_flag_provider.dart';
@@ -170,6 +173,10 @@ class HealthV1EntryScreen extends StatefulWidget {
   /// Remote Config: injeção explícita — não via default nesta Etapa 3B.
   final HealthTimelineFlagProvider timelineFlagProvider;
 
+  /// Leitor do histórico de restrições operacionais para composição de apresentação.
+  /// Produção: [FirestoreHealthRestrictionHistoryReader].
+  final HealthRestrictionHistoryReader? restrictionHistoryReader;
+
   const HealthV1EntryScreen({
     super.key,
     required this.dogId,
@@ -189,6 +196,7 @@ class HealthV1EntryScreen extends StatefulWidget {
     this.dogContextOverride,
     this.onTimelineNavigate,
     this.timelineFlagProvider = const LocalHealthTimelineFlagProvider(),
+    this.restrictionHistoryReader,
   });
 
   @override
@@ -239,6 +247,10 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
 
   @visibleForTesting
   HealthTimelineSource? get timelineSourceForTest => _timelineSource;
+
+  @visibleForTesting
+  HealthRestrictionHistoryReader? get restrictionHistoryReaderForTest =>
+      widget.restrictionHistoryReader;
 
   @visibleForTesting
   HealthTimelineController? get timelineControllerForTest =>
@@ -357,7 +369,15 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
   }) {
     if (_timelineController != null) return;
     _timelineSource = source;
-    _timelineController = HealthTimelineController(source: source);
+    final presentationSource =
+        source is HealthHistoryPresentationTimelineSource
+            ? source
+            : HealthHistoryPresentationTimelineSource(
+                primarySource: source,
+                restrictionReader: widget.restrictionHistoryReader ??
+                    FirestoreHealthRestrictionHistoryReader(),
+              );
+    _timelineController = HealthTimelineController(source: presentationSource);
     _filterSession = HealthTimelineFilterSession(
       controller: _timelineController!,
       dogId: widget.dogId,
@@ -822,6 +842,15 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
       );
       final dog = resolved.dog;
 
+      if (target is RestrictionDetailTarget) {
+        await _openRestrictionDetail(
+          dogId: target.dogId,
+          restrictionId: target.sourceId,
+          dogName: dog.name,
+        );
+        return;
+      }
+
       // Mesmo padrão do prontuário legado / ocorrências: root navigator
       // garante push acima do shell (IndexedStack + bottom nav + PopScope).
       final navigator = Navigator.of(context, rootNavigator: true);
@@ -854,6 +883,7 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
                 );
               },
             ),
+            RestrictionDetailTarget() => const SizedBox.shrink(),
           },
         ),
       );

@@ -79,6 +79,21 @@ final class VaccinationHistoryTarget extends HealthTimelineDetailTarget {
   String get navigationActionLabel => 'Abrir histórico de vacinação';
 }
 
+/// Detalhe da restrição operacional do cão ([HealthRestrictionDetailScreen]).
+final class RestrictionDetailTarget extends HealthTimelineDetailTarget {
+  const RestrictionDetailTarget({
+    required super.dogId,
+    required super.sourceId,
+  });
+
+  @override
+  HealthTimelineDestinationKind get kind =>
+      HealthTimelineDestinationKind.relatedHistory;
+
+  @override
+  String get navigationActionLabel => 'Abrir detalhe da restrição';
+}
+
 // Aliases legados da implementação inicial 3D (mesma classe).
 typedef WeightHistoryDetailTarget = WeightHistoryTarget;
 typedef NutritionHistoryDetailTarget = NutritionHistoryTarget;
