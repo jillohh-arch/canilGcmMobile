@@ -11,6 +11,7 @@
  *   npm run test:health-timeline
  */
 import assert from 'node:assert/strict';
+import { pathToFileURL } from 'node:url';
 
 import {
   assertFails,
@@ -150,6 +151,50 @@ async function clearAll() {
 }
 
 /**
+ * SEC-02A.2: o estado declarativo de autorização passou a ser pré-requisito
+ * das Rules — o documento de perfil é a autoridade de escopo, não a claim.
+ * Semeia o estado mínimo derivado das Rules:
+ *   users/{ra}.access_profile_id  -> resolve o perfil
+ *   access_profiles/{id}.status   -> 'active'
+ *   access_profiles/{id}.scope    -> enum válido ('own_records' | 'global')
+ */
+async function seedAuthorizationState(adminDb) {
+  await setDoc(doc(adminDb, 'access_profiles', 'operador_k9'), {
+    status: 'active',
+    scope: 'own_records',
+    permissions: {health: {view: true, create: true, edit: true}},
+  });
+  await setDoc(doc(adminDb, 'access_profiles', 'gestor_global'), {
+    status: 'active',
+    scope: 'global',
+    permissions: {health: {view: true, create: true, edit: true}},
+  });
+  for (const ra of [PRIMARY_RA, MEMBER_RA, OUTSIDER_RA]) {
+    await setDoc(doc(adminDb, 'users', ra), {
+      ra,
+      access_profile_id: 'operador_k9',
+      access_scope: 'own_records',
+    });
+  }
+}
+
+/**
+ * Promove um RA a escopo global VIGENTE (perfil global + espelho sem
+ * restrição). Necessário porque, a partir do SEC-02A.2, uma claim
+ * `access_scope: 'global'` sozinha não concede amplitude: o documento de perfil
+ * é a autoridade de escopo.
+ */
+async function promoteToGlobalScope(ra) {
+  await seedFirestore(async (adminDb) => {
+    await setDoc(doc(adminDb, 'users', ra), {
+      ra,
+      access_profile_id: 'gestor_global',
+      access_scope: 'global',
+    });
+  });
+}
+
+/**
  * Fixtures: dois dogs com dados básicos
  * - DOG_A: atribuído ao PRIMARY_RA (conductor/primary handler)
  * - DOG_B: atribuído ao MEMBER_RA
@@ -157,6 +202,8 @@ async function clearAll() {
  */
 async function seedTimelineFixtures() {
   await seedFirestore(async (adminDb) => {
+    await seedAuthorizationState(adminDb);
+
     // Dog A - atribuído ao PRIMARY_RA
     await setDoc(doc(adminDb, 'dogs', DOG_A), {
       name: 'Rex A',
@@ -248,9 +295,10 @@ test('authenticated authorized dog read → ALLOW', async () => {
 test('authenticated user with global scope can read any dog → ALLOW', async () => {
   await clearAll();
   await seedTimelineFixtures();
-  const db = dbFor(PRIMARY_RA);
+  await promoteToGlobalScope(PRIMARY_RA);
+  const db = dbFor(PRIMARY_RA, {access_scope: 'global'});
 
-  // PRIMARY_RA com access_scope: 'global' (default) pode ler qualquer dog
+  // PRIMARY_RA promovido a escopo global (perfil gestor_global) pode ler qualquer dog
   await assertSucceeds(
     getDoc(doc(db, 'dogs', DOG_B, 'health_timeline', TIMELINE_ID_B))
   );
@@ -342,9 +390,10 @@ test('authorized dog-scoped timeline query → ALLOW', async () => {
 test('dog-scoped timeline query with global scope → ALLOW', async () => {
   await clearAll();
   await seedTimelineFixtures();
-  const db = dbFor(PRIMARY_RA);
+  await promoteToGlobalScope(PRIMARY_RA);
+  const db = dbFor(PRIMARY_RA, {access_scope: 'global'});
 
-  // User com access_scope: 'global' pode consultar qualquer dog
+  // User promovido a escopo global (perfil gestor_global) pode consultar qualquer dog
   const timelineQuery = query(
     collection(db, 'dogs', DOG_B, 'health_timeline'),
     orderBy(documentId(), 'asc'),
@@ -480,7 +529,7 @@ async function run() {
 }
 
 // Execute se chamado diretamente
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   run().catch((error) => {
     console.error('Test runner failed:', error);
     process.exit(1);
