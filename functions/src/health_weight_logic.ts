@@ -185,3 +185,31 @@ export function matchWeightReceipt(
 
   return "idempotency-conflict";
 }
+
+/**
+ * PESAGEM-01 / HEALTH_WEIGHT_CANONICAL_SPEC §6.2:
+ * Validação do K9 para operação de pesagem: existente e ativo.
+ * Falha fechado se:
+ * - K9 nulo, indefinido ou não-objeto;
+ * - status não for canonicamente ativo ("Ativo" ou "active", case-insensitive);
+ * - active === false;
+ * - K9 excluído (deleted_at != null ou deleted === true) ou arquivado (archived_at != null ou archived === true).
+ */
+export function isWeightActiveDog(
+  dog: Record<string, unknown> | null | undefined
+): boolean {
+  if (!dog || typeof dog !== "object") return false;
+
+  const rawStatus = dog.status;
+  if (typeof rawStatus !== "string") return false;
+
+  const status = rawStatus.trim().toLowerCase();
+  if (status !== "ativo" && status !== "active") return false;
+
+  if (dog.active === false) return false;
+  if (dog.deleted_at != null || dog.archived_at != null) return false;
+  if (dog.deleted === true || dog.archived === true) return false;
+
+  return true;
+}
+

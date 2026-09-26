@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
@@ -18,13 +19,17 @@ import 'package:canil_gcm/features/occurrences/presentation/view_models/occurren
 class SignatureConfirmationDialog extends StatefulWidget {
   final Occurrence occurrence;
   final OccurrenceTeamViewModel viewModel;
-  final VoidCallback onSuccess;
+  final FutureOr<void> Function() onSuccess;
+  final LocalAuthentication? localAuth;
+  final String? currentHandlerRa;
 
   const SignatureConfirmationDialog({
     super.key,
     required this.occurrence,
     required this.viewModel,
     required this.onSuccess,
+    this.localAuth,
+    this.currentHandlerRa,
   });
 
   @override
@@ -34,25 +39,34 @@ class SignatureConfirmationDialog extends StatefulWidget {
 
 class _SignatureConfirmationDialogState
     extends State<SignatureConfirmationDialog> {
-  final LocalAuthentication _localAuth = LocalAuthentication();
+  late final LocalAuthentication _localAuth;
   final TextEditingController _passwordController = TextEditingController();
 
   bool _isBiometricAvailable = false;
   bool _isBiometricAuthenticating = false;
   bool _isPasswordAuthenticating = false;
+  bool _isSignatureSuccess = false;
   String? _errorMessage;
   String? _signatureHash;
+  String? _submittedSignatureHash;
 
   @override
   void initState() {
     super.initState();
+    _localAuth = widget.localAuth ?? LocalAuthentication();
+    widget.viewModel.addListener(_onViewModelChanged);
     _checkBiometricAvailability();
   }
 
   @override
   void dispose() {
+    widget.viewModel.removeListener(_onViewModelChanged);
     _passwordController.dispose();
     super.dispose();
+  }
+
+  void _onViewModelChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _checkBiometricAvailability() async {
@@ -182,7 +196,10 @@ class _SignatureConfirmationDialogState
         '$occurrenceHashPreview|$handlerId|${now.toIso8601String()}|${method.toMap()}';
     final hash = sha256.convert(utf8.encode(dataToHash)).toString();
 
-    setState(() => _signatureHash = hash);
+    setState(() {
+      _signatureHash = hash;
+      _submittedSignatureHash = hash;
+    });
 
     final signature = OccurrenceSignature(
       handlerId: handlerId,
@@ -194,8 +211,13 @@ class _SignatureConfirmationDialogState
 
     await widget.viewModel.addSignature(
       signature: signature,
-      onSuccess: (message) {
+      onSuccess: (message) async {
+        await widget.onSuccess();
         if (!mounted) return;
+        setState(() {
+          _isSignatureSuccess = true;
+          _errorMessage = null;
+        });
         _showSuccess(message);
       },
       onError: (error) {
@@ -209,16 +231,15 @@ class _SignatureConfirmationDialogState
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         icon: const Icon(Icons.check_circle, color: AppTheme.success),
         title: const Text('Assinatura realizada'),
         content: Text(message),
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.pop(context);
-              if (mounted) Navigator.of(this.context).pop();
-              widget.onSuccess();
+              Navigator.pop(dialogCtx);
+              if (mounted) Navigator.of(context).pop();
             },
             child: const Text('OK'),
           ),
@@ -228,7 +249,8 @@ class _SignatureConfirmationDialogState
   }
 
   String? _currentHandlerRaOrNull() {
-    return HandlerIdentityService.raFromUser(FirebaseAuth.instance.currentUser);
+    return widget.currentHandlerRa ??
+        HandlerIdentityService.raFromUser(FirebaseAuth.instance.currentUser);
   }
 
   OccurrenceTeamMember? _teamMemberFor(String handlerRa) {
@@ -242,11 +264,13 @@ class _SignatureConfirmationDialogState
     return widget.viewModel.signatures.any(
       (signature) =>
           signature.handlerId == handlerRa &&
-          signature.status == SignatureStatus.signed,
+          signature.status == SignatureStatus.signed &&
+          signature.signatureHash != _submittedSignatureHash,
     );
   }
 
   String? _signatureGuardMessage(String? handlerRa) {
+    if (_isSignatureSuccess) return null;
     if (widget.occurrence.status != OccurrenceStatus.awaitingSignatures) {
       return 'A ocorrência não está aguardando assinaturas';
     }
@@ -323,7 +347,8 @@ class _SignatureConfirmationDialogState
   @override
   Widget build(BuildContext context) {
     final handlerRa = _currentHandlerRaOrNull();
-    final signerError = _signatureGuardMessage(handlerRa);
+    final signerError =
+        _isSignatureSuccess ? null : _signatureGuardMessage(handlerRa);
     final isSubmitting =
         _isBiometricAuthenticating || _isPasswordAuthenticating;
     final media = MediaQuery.of(context);

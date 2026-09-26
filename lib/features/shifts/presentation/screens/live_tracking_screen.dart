@@ -2,12 +2,13 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:latlong2/latlong.dart' as ll2;
 
-import 'package:canil_gcm/core/widgets/app_feedback.dart';
+import 'package:canil_gcm/core/theme/app_map_style.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/live_tracking_viewmodel.dart';
 
 part 'live_tracking_widgets.dart';
@@ -22,9 +23,9 @@ class LiveTrackingScreen extends StatefulWidget {
 }
 
 class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
-  final MapController _mapController = MapController();
+  GoogleMapController? _mapController;
   late final LiveTrackingViewModel _viewModel;
-  LatLng? _lastAnimatedPoint;
+  ll2.LatLng? _lastAnimatedPoint;
 
   @override
   void initState() {
@@ -37,11 +38,11 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
     _viewModel
       ..removeListener(_handleViewModelChanged)
       ..dispose();
-    _mapController.dispose();
+    _mapController?.dispose();
     super.dispose();
   }
 
-  List<LatLng> get _routePoints => _viewModel.routePoints;
+  List<ll2.LatLng> get _routePoints => _viewModel.routePoints;
   bool get _isTracking => _viewModel.isTracking;
   double get _totalDistanceMeters => _viewModel.totalDistanceMeters;
   int get _elapsedSeconds => _viewModel.elapsedSeconds;
@@ -54,7 +55,11 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       final latestPoint = _routePoints.last;
       if (_lastAnimatedPoint != latestPoint) {
         _lastAnimatedPoint = latestPoint;
-        _mapController.move(latestPoint, _mapController.camera.zoom);
+        _mapController?.animateCamera(
+          CameraUpdate.newLatLng(
+            AppMapStyle.toGoogleLatLng(latestPoint),
+          ),
+        );
       }
     }
   }
@@ -64,14 +69,21 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
 
     final result = await _viewModel.startTracking();
     if (!result.isSuccess) {
-      if (result.errorMessage != null) {
+      if (mounted && result.errorMessage != null) {
         AppFeedback.error(context, result.errorMessage!);
       }
       return;
     }
 
     _lastAnimatedPoint = result.initialPoint;
-    _mapController.move(result.initialPoint!, 16.5);
+    if (result.initialPoint != null) {
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLngZoom(
+          AppMapStyle.toGoogleLatLng(result.initialPoint!),
+          16.5,
+        ),
+      );
+    }
     HapticFeedback.lightImpact();
   }
 
@@ -114,7 +126,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       body: Stack(
         children: [
           _TrackingMap(
-            mapController: _mapController,
+            onMapCreated: (controller) => _mapController = controller,
             routePoints: _routePoints,
             isLightMode: widget.isLightMode,
           ),

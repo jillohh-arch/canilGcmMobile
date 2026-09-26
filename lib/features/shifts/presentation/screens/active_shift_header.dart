@@ -38,7 +38,7 @@ class _SectionLabel extends StatelessWidget {
 }
 
 class _ShiftHeader extends StatelessWidget {
-  final Dog dog;
+  final Dog? dog;
   final String? currentRa;
   final String? conductorPhotoUrl;
   final VoidCallback onSwitchDog;
@@ -46,7 +46,7 @@ class _ShiftHeader extends StatelessWidget {
   final VoidCallback? onProfile;
 
   const _ShiftHeader({
-    required this.dog,
+    this.dog,
     this.currentRa,
     this.conductorPhotoUrl,
     required this.onSwitchDog,
@@ -59,6 +59,9 @@ class _ShiftHeader extends StatelessWidget {
     final shiftVM = Provider.of<ShiftViewModel>(context);
     final elapsed = _formatElapsed(shiftVM.shiftStartTime);
     final vehicleLabel = shiftVM.vehicleLabel?.trim();
+    final subtitle = dog != null
+        ? 'Turno ativo · $elapsed'
+        : 'Em serviço · Sem K9 · $elapsed';
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
@@ -70,7 +73,7 @@ class _ShiftHeader extends StatelessWidget {
       ),
       child: BinomioHeader(
         dog: dog,
-        subtitle: 'Turno ativo · $elapsed',
+        subtitle: subtitle,
         subtitleColor: AppTheme.success,
         statusDotColor: AppTheme.success,
         showStatusDot: true,

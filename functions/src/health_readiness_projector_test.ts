@@ -105,6 +105,7 @@ interface FakeSources {
   health_events?: RawQuery;
   nutrition_plans?: RawQuery;
   operational_restrictions?: RawQuery;
+  clinical_events?: RawQuery;
 }
 
 const EMPTY: RawQuery = {kind: "docs", docs: []};
@@ -166,6 +167,9 @@ function createFake(
     readSubcollection: async (_dogId, collection) => {
       const query = (sources as Record<string, RawQuery | undefined>)[collection];
       return query ?? EMPTY;
+    },
+    readClinicalEvents: async (_dogId) => {
+      return sources.clinical_events ?? EMPTY;
     },
     readCurrentSummary: async (dogId) => store.get(dogId) ?? null,
     reserveProjectionGeneration: async (dogId) => {
@@ -1208,6 +1212,47 @@ async function main(): Promise<void> {
     const stored = storedSummary(fake);
     assert.strictEqual(stored["projection_generation"], 1);
     assert.strictEqual(stored["schema_version"], 1, "schema_version is not bumped");
+  });
+
+  await test("CANONICAL CONSULTATION projects directly to summary when legacy is absent", async () => {
+    // Legacy health_events has ONLY vaccination, NO consultation.
+    // Canonical clinical_events has final consultation.
+    const sources: FakeSources = {
+      weight_records: {kind: "docs", docs: [weightDoc("w-1")]},
+      vaccination_records: EMPTY,
+      health_events: {
+        kind: "docs",
+        docs: [
+          eventDoc("e-vac", "vaccination", {
+            subtype: "Antirrábica",
+            date: ts(daysAgo(2)),
+            nextDueDate: ts(daysAhead(363)),
+          }),
+        ],
+      },
+      nutrition_plans: {kind: "docs", docs: [doc("p-1", {status: "active"})]},
+      operational_restrictions: EMPTY,
+      clinical_events: {
+        kind: "docs",
+        docs: [
+          doc("ce-con-1", {
+            dog_id: "dog-1",
+            case_id: "case-1",
+            event_type: "consultation",
+            payload_type: "consultation_v1",
+            status: "final",
+            occurred_at: ts(daysAgo(5)),
+          }),
+        ],
+      },
+    };
+    const fake = createFake(sources);
+    const result = await evaluateHealthReadiness("dog-1", fake.deps);
+    assert.strictEqual(result.projectionStatus, "ready");
+    assert.strictEqual(result.readinessStatus, "operational");
+    const stored = storedSummary(fake);
+    assert.strictEqual(stored["readiness_status"], "operational");
+    assert.strictEqual(stored["last_consultation_at"] !== null, true);
   });
 
   if (failures > 0) {

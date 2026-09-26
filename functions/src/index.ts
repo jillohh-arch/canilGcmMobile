@@ -22,6 +22,10 @@ import {
   patchHumanPersonnel,
 } from "./admin_patch_human_personnel";
 import {
+  HumanPhotoTransaction,
+  patchHumanPhoto,
+} from "./admin_patch_human_photo";
+import {
   deactivateHuman,
   HumanLifecycleTransaction,
   isCurrentlyActive,
@@ -32,6 +36,11 @@ import {
   resetHumanPasswordLogic,
   ResetPasswordDeps,
 } from "./admin_reset_human_password";
+import {
+  defaultGenerateInitialPassword,
+  provisionHumanAuthLogic,
+  ProvisionHumanAuthDeps,
+} from "./admin_provision_human_auth";
 import {
   buildAdminGetAccessHomologationSnapshotHandler,
   createAdminAccessHomologationSnapshotDeps,
@@ -76,7 +85,11 @@ import type {NutritionActor} from "./health_nutrition_engine";
 import {
   buildHealthWeightCreateRecordHandler,
   createAdminWeightEngineDeps,
+  type HealthWeightCallableDeps,
 } from "./health_weight_callables";
+import {
+  isWeightActiveDog,
+} from "./health_weight_logic";
 import {
   DocumentCaller,
   runHealthDocumentFinalizeUpload,
@@ -99,6 +112,27 @@ import {
   runHealthTransitionClinicalCase,
   type ClinicalCaseCallableDeps,
 } from "./clinical_case_callables";
+import {
+  type ExamCaller,
+  type ExamProcessCallableDeps,
+  runHealthRequestExam,
+  runHealthRecordExamCollection,
+  runHealthRecordExamResult,
+  runHealthRecordExamInterpretation,
+  runHealthAssessExamImpact,
+  runHealthCancelExam,
+} from "./exam_process_callables";
+import {
+  type TreatmentCaller,
+  type TreatmentProtocolCallableDeps,
+  runHealthCreateTreatmentProtocol,
+  runHealthPauseTreatmentProtocol,
+  runHealthResumeTreatmentProtocol,
+  runHealthCompleteTreatmentProtocol,
+  runHealthCancelTreatmentProtocol,
+  runHealthAdministerTreatmentDose,
+  runHealthSkipTreatmentDose,
+} from "./treatment_protocol_callables";
 import {
   RestrictionCaller,
   runHealthRestrictionCancel,
@@ -129,6 +163,7 @@ import {
   healthReadinessProjectHealthEvent,
   healthReadinessProjectNutritionPlan,
   healthReadinessProjectRestriction,
+  healthReadinessProjectClinicalEvent,
 } from "./health_readiness_triggers";
 import {runSystemAuthoritativeTimeNow} from "./system_authoritative_time_callable";
 import {
@@ -2231,6 +2266,91 @@ export const adminResetHumanPassword = onCall({region}, async (request) => {
   return resetHumanPasswordLogic({auth: request.auth, data: request.data}, buildAdminResetHumanPasswordDeps());
 });
 
+/**
+ * F10.AUTH-PROVISIONING-CREDENTIALS-R1 — PROVISIONAMENTO DEDICADO DE AUTENTICACAO.
+ *
+ * Callable administrativo dedicado para provisionar a credencial Auth de integrante (users/{ra}).
+ * - Autoridade administrativa canonica (access.edit com fallback humans.edit);
+ * - Validacao de cadastro existente e ativo;
+ * - Idempotencia segura e sem revelacao retroativa de senha;
+ * - Ciclo de vida seguro: disabled -> persistencia firestore -> enabled;
+ * - Senha inicial forte, unica e jamais registrada em Firestore/logs.
+ */
+export function buildAdminProvisionHumanAuthDeps(): ProvisionHumanAuthDeps {
+  return {
+    authorize: async (auth) => {
+      const typedAuth = auth as
+        | {uid: string; token: admin.auth.DecodedIdToken}
+        | undefined;
+      try {
+        return await requireAccessPermission(typedAuth, "access", "edit");
+      } catch {
+        return await requireAccessPermission(typedAuth, "humans", "edit");
+      }
+    },
+    createAuthUser: async (input) => {
+      const user = await admin.auth().createUser({
+        disabled: input.disabled,
+        displayName: input.displayName,
+        email: input.email,
+        password: input.password,
+      });
+      return {
+        disabled: user.disabled,
+        displayName: user.displayName,
+        email: user.email,
+        uid: user.uid,
+      };
+    },
+    deleteAuthUser: async (uid) => {
+      await admin.auth().deleteUser(uid);
+    },
+    generateInitialPassword: defaultGenerateInitialPassword,
+    getPersonnel: async (ra) => {
+      const snap = await db.collection("users").doc(ra).get();
+      return {exists: snap.exists, data: (snap.data() ?? {}) as JsonMap};
+    },
+    lookupAuthByEmail: async (email) => {
+      const user = await lookupAuthUserByEmail(email);
+      if (!user) return null;
+      return {disabled: user.disabled, displayName: user.displayName, email: user.email, uid: user.uid};
+    },
+    lookupAuthByUid: async (uid) => {
+      const user = await lookupAuthUserByUid(uid);
+      if (!user) return null;
+      return {disabled: user.disabled, displayName: user.displayName, email: user.email, uid: user.uid};
+    },
+    lookupPersonnelByAuthUid: async (uid) => {
+      const snap = await db.collection("users").where("auth_uid", "==", uid).limit(1).get();
+      if (!snap.empty) {
+        return snap.docs[0].id;
+      }
+      const snap2 = await db.collection("users").where("authUid", "==", uid).limit(1).get();
+      if (!snap2.empty) {
+        return snap2.docs[0].id;
+      }
+      return null;
+    },
+    serverTimestamp: () => admin.firestore.Timestamp.now(),
+    updateAuthUser: async (uid, patch) => {
+      await admin.auth().updateUser(uid, patch);
+    },
+    updatePersonnelAudit: async (ra, payload) => {
+      await db.collection("users").doc(ra).set({
+        ...payload,
+        audit_trail: admin.firestore.FieldValue.arrayUnion(payload.audit_trail),
+      }, {merge: true});
+    },
+  };
+}
+
+export const adminProvisionHumanAuth = onCall({region}, async (request) => {
+  return provisionHumanAuthLogic(
+    {auth: request.auth, data: request.data},
+    buildAdminProvisionHumanAuthDeps(),
+  );
+});
+
 export const adminSeedAccessProfiles = onCall({region}, async (request) => {
   return runAdminSeedAccessProfiles(request, accessProfileWriterDeps);
 });
@@ -3318,6 +3438,35 @@ export const adminPatchHumanPersonnel = onCall({region}, async (request) => {
       auditEntry: (action, caller) => auditEntry(action, caller),
       arrayUnion: (value) => admin.firestore.FieldValue.arrayUnion(value),
       deleteField: () => admin.firestore.FieldValue.delete(),
+    },
+    request.data,
+  );
+});
+
+export const adminPatchHumanPhoto = onCall({region}, async (request) => {
+  return patchHumanPhoto(
+    {
+      authorize: () => requireAccessPermission(request.auth, "humans", "edit"),
+      runTransaction: (handler) =>
+        db.runTransaction(async (transaction) => {
+          const tx: HumanPhotoTransaction = {
+            getUser: async (ra) => {
+              const snap = await transaction.get(
+                db.collection("users").doc(ra),
+              );
+              return {exists: snap.exists, data: snap.data() ?? null};
+            },
+            patchUser: (ra, patch) => {
+              transaction.set(db.collection("users").doc(ra), patch, {
+                merge: true,
+              });
+            },
+          };
+          return handler(tx);
+        }),
+      serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+      auditEntry: (action, caller) => auditEntry(action, caller),
+      arrayUnion: (value) => admin.firestore.FieldValue.arrayUnion(value),
     },
     request.data,
   );
@@ -4966,6 +5115,20 @@ export const onTrainingPromotionRequestUpdated = onDocumentUpdated(
     if (before.status !== "pending") return;
 
     if (after.status === "approved") {
+      // Short-circuit: already processed by authoritative transactional callable (decidePromotionRequest)
+      if (after.processing_status === "completed" || after.applied_by_core === true) {
+        await resolveTrainingPromotionRequestNotifications(
+          event.params.requestId,
+          "training_promotion_approved",
+          {
+            request_id: event.params.requestId,
+            status: "approved",
+            processing_status: "completed",
+          },
+        );
+        return;
+      }
+
       let processingStatus = "completed";
       try {
         await applyApprovedTrainingPromotion(event.params.requestId, after);
@@ -4995,10 +5158,12 @@ export const onTrainingPromotionRequestUpdated = onDocumentUpdated(
 
     if (after.status === "rejected") {
       await notifyPromotionRequester("training_promotion_rejected", event.params.requestId, after);
-      await change.after.ref.set({
-        processed_at: admin.firestore.FieldValue.serverTimestamp(),
-        processing_status: "completed",
-      }, {merge: true});
+      if (after.processing_status !== "completed") {
+        await change.after.ref.set({
+          processed_at: admin.firestore.FieldValue.serverTimestamp(),
+          processing_status: "completed",
+        }, {merge: true});
+      }
       await resolveTrainingPromotionRequestNotifications(
         event.params.requestId,
         "training_promotion_rejected",
@@ -8997,6 +9162,200 @@ export const healthReopenClinicalCase = onCall({region}, async (request) => {
   return runHealthReopenClinicalCase(request, clinicalCaseDeps);
 });
 
+function toExamCaller(caller: CallerIdentity): ExamCaller {
+  return {
+    uid: caller.uid,
+    email: caller.email,
+    ra: caller.ra,
+    name: caller.name,
+  };
+}
+
+const examProcessDeps: ExamProcessCallableDeps = {
+  db,
+  requireRequestExam: async (auth) => {
+    return toExamCaller(await requireClinicalCapability(auth, "record_clinical"));
+  },
+  requireRecordClinical: async (auth) => {
+    return toExamCaller(await requireClinicalCapability(auth, "record_clinical"));
+  },
+  requireInterpretExam: async (auth) => {
+    return toExamCaller(await requireClinicalCapability(auth, "finalize_clinical"));
+  },
+  requireManageClinicalCase: async (auth) => {
+    return toExamCaller(await requireClinicalCapability(auth, "manage_clinical_case"));
+  },
+  requireDogAccess: async (auth, caller, dogId, dog) => {
+    await requireDogRecordAccess(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+      dogId,
+      dog,
+    );
+  },
+  isAdministrativeAuthority: async (auth, caller) => {
+    return isAdministrativeHealthAuthority(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+    );
+  },
+};
+
+/**
+ * F20.EXAM-V1: Solicita um exame clínico para um caso existente.
+ */
+export const healthRequestExam = onCall({region}, async (request) => {
+  return runHealthRequestExam(request, examProcessDeps);
+});
+
+/**
+ * F20.EXAM-V1: Registra coleta física de material do exame.
+ */
+export const healthRecordExamCollection = onCall({region}, async (request) => {
+  return runHealthRecordExamCollection(request, examProcessDeps);
+});
+
+/**
+ * F20.EXAM-V1: Registra laudo / resultado técnico recebido do laboratório.
+ */
+export const healthRecordExamResult = onCall({region}, async (request) => {
+  return runHealthRecordExamResult(request, examProcessDeps);
+});
+
+/**
+ * F20.EXAM-V1: Registra interpretação clínica emitida por veterinário responsável.
+ */
+export const healthRecordExamInterpretation = onCall({region}, async (request) => {
+  return runHealthRecordExamInterpretation(request, examProcessDeps);
+});
+
+/**
+ * F20.EXAM-V1: Registra avaliação de impacto operacional do exame.
+ */
+export const healthAssessExamImpact = onCall({region}, async (request) => {
+  return runHealthAssessExamImpact(request, examProcessDeps);
+});
+
+/**
+ * F20.EXAM-V1: Cancela exame com justificativa obrigatória.
+ */
+export const healthCancelExam = onCall({region}, async (request) => {
+  return runHealthCancelExam(request, examProcessDeps);
+});
+
+function toTreatmentCaller(caller: CallerIdentity): TreatmentCaller {
+  return {
+    uid: caller.uid,
+    email: caller.email,
+    ra: caller.ra,
+    name: caller.name,
+  };
+}
+
+const treatmentProtocolDeps: TreatmentProtocolCallableDeps = {
+  db,
+  requireRecordClinical: async (auth) => {
+    return toTreatmentCaller(await requireClinicalCapability(auth, "record_clinical"));
+  },
+  requireFinalizeClinical: async (auth) => {
+    return toTreatmentCaller(await requireClinicalCapability(auth, "finalize_clinical"));
+  },
+  requireAmendClinical: async (auth) => {
+    return toTreatmentCaller(await requireClinicalCapability(auth, "amend_clinical"));
+  },
+  requireRecordRoutine: async (auth) => {
+    try {
+      const caller = await requireAccessPermission(auth, "health", "record_routine");
+      return toTreatmentCaller(caller);
+    } catch {
+      return toTreatmentCaller(await requireClinicalCapability(auth, "record_clinical"));
+    }
+  },
+  requireDogAccess: async (auth, caller, dogId, dog) => {
+    await requireDogRecordAccess(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+      dogId,
+      dog,
+    );
+  },
+  isAdministrativeAuthority: async (auth, caller) => {
+    return isAdministrativeHealthAuthority(
+      auth,
+      {uid: caller.uid, email: caller.email, ra: caller.ra, name: caller.name},
+    );
+  },
+  hasOtherOpenCaseSchedule: async (dogId, caseId, excludeProtocolId) => {
+    const snap = await db
+      .collection("dogs")
+      .doc(dogId)
+      .collection("health_schedule")
+      .where("case_id", "==", caseId)
+      .where("lifecycle_status", "==", "open")
+      .limit(20)
+      .get();
+    if (snap.empty) {
+      return false;
+    }
+    for (const doc of snap.docs) {
+      const data = doc.data();
+      if (!excludeProtocolId || data.source_id !== excludeProtocolId) {
+        return true;
+      }
+    }
+    return false;
+  },
+};
+
+/**
+ * F20.TREATMENT-V1: Cria e ativa um protocolo de tratamento (prescrição externa).
+ */
+export const healthCreateTreatmentProtocol = onCall({region}, async (request) => {
+  return runHealthCreateTreatmentProtocol(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Pausa protocolo de tratamento com motivo obrigatório.
+ */
+export const healthPauseTreatmentProtocol = onCall({region}, async (request) => {
+  return runHealthPauseTreatmentProtocol(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Retoma protocolo de tratamento previamente pausado.
+ */
+export const healthResumeTreatmentProtocol = onCall({region}, async (request) => {
+  return runHealthResumeTreatmentProtocol(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Conclui protocolo de tratamento e atualiza ClinicalCase para monitoring.
+ */
+export const healthCompleteTreatmentProtocol = onCall({region}, async (request) => {
+  return runHealthCompleteTreatmentProtocol(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Cancela protocolo de tratamento com justificativa obrigatória.
+ */
+export const healthCancelTreatmentProtocol = onCall({region}, async (request) => {
+  return runHealthCancelTreatmentProtocol(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Registra administração de dose com doseId determinístico e idempotência.
+ */
+export const healthAdministerTreatmentDose = onCall({region}, async (request) => {
+  return runHealthAdministerTreatmentDose(request, treatmentProtocolDeps);
+});
+
+/**
+ * F20.TREATMENT-V1: Registra dose pulada com justificativa obrigatória.
+ */
+export const healthSkipTreatmentDose = onCall({region}, async (request) => {
+  return runHealthSkipTreatmentDose(request, treatmentProtocolDeps);
+});
+
 function toRestrictionCaller(caller: CallerIdentity): RestrictionCaller {
   return {
     uid: caller.uid,
@@ -9202,36 +9561,95 @@ export const healthNutritionCancelPlan = onCall({region}, async (request) => {
   return runHealthNutritionCancelPlan(request, healthNutritionDeps);
 });
 
-const runHealthWeightCreateRecord = buildHealthWeightCreateRecordHandler({
-  db,
-  requireHealthRecordRoutine: async (auth) => {
-    const caller = await requireAccessPermission(
-      auth,
-      "health",
-      "record_routine",
+/**
+ * PESAGEM-01 / HEALTH_WEIGHT_CANONICAL_SPEC §6.2:
+ * Acesso a K9 para registro de pesagem de rotina (health.record_routine).
+ *
+ * Um Operador K9 autorizado PODE executar a operação para qualquer K9 existente
+ * e ativo ao qual tem acesso. O operador NÃO precisa ser o condutor vinculado
+ * (dogHandlerRa) nem ter o K9 em turno ativo (callerHasActiveDog).
+ *
+ * Falha fechado se:
+ * - caller sem health.record_routine;
+ * - autorização/escopo inválido ou negado (missing user mirror, deleted, inactive profile, etc.);
+ * - K9 inexistente, inativo (status !== 'active' ou active === false) ou arquivado/excluído.
+ */
+export async function requireWeightDogAccess(
+  auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
+  caller: CallerIdentity,
+  dogId: string,
+  dog: JsonMap,
+) {
+  const accessCaller = requireAuth(auth);
+  if (accessCaller.uid !== caller.uid || accessCaller.ra !== caller.ra) {
+    throw new HttpsError("permission-denied", "Identidade do autor inconsistente.");
+  }
+
+  // 1. Validar capability health.record_routine (falha fechada se ausente)
+  await requireAccessPermission(auth, "health", "record_routine");
+
+  // 2. Resolução de escopo e integridade de autorização (falha fechada)
+  const scope = await resolveAccessScope(auth, accessCaller);
+  if (scope.kind === "denied") {
+    throw new HttpsError(
+      "permission-denied",
+      "Nao foi possivel estabelecer autorizacao valida para este acesso.",
+      {code: "authorization-state-invalid", reason: scope.reason},
     );
-    const isAdmin = await isAdministrativeHealthAuthority(auth, caller);
-    return {
-      uid: caller.uid,
-      name: caller.name,
-      ra: caller.ra,
-      internalRole: isAdmin ? "admin" : "condutor",
-    };
-  },
-  requireDogAccess: async (auth, caller, dogId, dog) => {
-    const accessCaller = requireAuth(auth);
-    if (accessCaller.uid !== caller.uid || accessCaller.ra !== caller.ra) {
-      throw new HttpsError("permission-denied", "Identidade do autor inconsistente.");
-    }
-    await requireDogRecordAccess(
-      auth,
-      accessCaller,
-      dogId,
-      dog,
+  }
+
+  // 3. Validação do K9: existente e ativo (HEALTH_WEIGHT_CANONICAL_SPEC §6.2)
+  if (!isWeightActiveDog(dog)) {
+    throw new HttpsError(
+      "permission-denied",
+      "K9 inexistente ou inativo para registro de pesagem.",
+      {code: "dog-inactive"},
     );
-  },
-  createEngineDeps: () => createAdminWeightEngineDeps(db),
-});
+  }
+
+  // 4. Operador autorizado com escopo válido (global ou own_records) possui
+  // acesso ao K9 ativo sem exigir vínculo de condutor ou turno ativo (§6.2).
+}
+
+export function buildHealthWeightCreateRecordDeps(
+  firestoreDb: admin.firestore.Firestore = db,
+): HealthWeightCallableDeps {
+  return {
+    db: firestoreDb,
+    requireHealthRecordRoutine: async (auth) => {
+      const caller = await requireAccessPermission(
+        auth,
+        "health",
+        "record_routine",
+      );
+      const isAdmin = await isAdministrativeHealthAuthority(auth, caller);
+      return {
+        uid: caller.uid,
+        name: caller.name,
+        ra: caller.ra,
+        internalRole: isAdmin ? "admin" : "condutor",
+      };
+    },
+    requireDogAccess: async (auth, caller, dogId, dog) => {
+      await requireWeightDogAccess(
+        auth,
+        {
+          uid: caller.uid,
+          email: (auth?.token?.email as string | undefined) ?? "",
+          ra: caller.ra,
+          name: caller.name,
+        },
+        dogId,
+        dog,
+      );
+    },
+    createEngineDeps: () => createAdminWeightEngineDeps(firestoreDb),
+  };
+}
+
+const runHealthWeightCreateRecord = buildHealthWeightCreateRecordHandler(
+  buildHealthWeightCreateRecordDeps(),
+);
 
 /** Create a canonical WeightRecord with durable receipt idempotency (health.record_routine). */
 export const healthWeightCreateRecord = onCall({region}, async (request) =>
@@ -9313,6 +9731,10 @@ export {healthReadinessProjectNutritionPlan};
 
 /** Readiness trigger — fires on any operational_restrictions write. */
 export {healthReadinessProjectRestriction};
+
+/** Readiness trigger — fires on any clinical_events write (canonical consultation). */
+export {healthReadinessProjectClinicalEvent};
+
 
 
 // =============================================================================

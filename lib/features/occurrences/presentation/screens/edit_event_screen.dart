@@ -17,6 +17,9 @@ import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_media_uploader.dart';
+import 'package:canil_gcm/features/occurrences/domain/upload_cancellation_token.dart';
+import 'package:canil_gcm/features/occurrences/domain/upload_orphan_tracker.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/edit_event_location_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 
@@ -30,6 +33,25 @@ class EditEventScreen extends StatefulWidget {
     this.existingEvent,
   });
 
+  @visibleForTesting
+  static String formatUploadStatus({
+    required int currentFileIndex,
+    required int totalFiles,
+    required double? fraction,
+    bool hasActiveProgress = false,
+  }) {
+    final fileNumber = currentFileIndex + 1;
+    final prefix = totalFiles == 1 ? 'Enviando foto' : 'Enviando fotos';
+    final hasCompletedBaseline = currentFileIndex > 0;
+    if (fraction != null && (hasCompletedBaseline || hasActiveProgress)) {
+      final pct = (fraction * 100).floor().clamp(0, 100);
+      return '$prefix $fileNumber/$totalFiles · $pct%';
+    }
+    return totalFiles == 1
+        ? '$prefix...'
+        : '$prefix $fileNumber/$totalFiles...';
+  }
+
   @override
   State<EditEventScreen> createState() => _EditEventScreenState();
 }
@@ -40,6 +62,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
   final _locationService = const LocationResolutionService();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+
+  UploadCancellationToken? _uploadCancelToken;
+  late final OccurrenceMediaUploader _mediaUploader = OccurrenceMediaUploader(
+    storageService: _storageService,
+  );
+  final Map<String, UploadResult> _completedPhotoUploads = {};
 
   late OccurrenceEventCategory _selectedCategory;
   late DateTime _timestamp;
@@ -52,6 +80,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
   bool _isSaving = false;
   String? _saveStatus;
+  double? _uploadFraction;
+  int _currentUploadIndex = 0;
+  bool _hasActiveUploadProgress = false;
   bool _auditExpanded = false;
   double? _gpsLat;
   double? _gpsLng;
@@ -190,6 +221,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
   @override
   void dispose() {
+    _uploadCancelToken?.cancel();
     _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
@@ -222,10 +254,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
     );
 
     if (candidate.isAfter(DateTime.now())) {
-      AppFeedback.warning(
-        context,
-        'Horário não pode ser no futuro',
-      );
+      AppFeedback.warning(context, 'Horário não pode ser no futuro');
       return;
     }
 
@@ -416,6 +445,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
     setState(() {
       _isSaving = true;
+      _uploadFraction = null;
       _saveStatus = _newPhotos.isNotEmpty
           ? 'Preparando fotos...'
           : 'Salvando evento...';
@@ -431,7 +461,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
       final allPhotoUrls = [..._existingPhotoUrls, ...newUrls];
 
       if (mounted) {
-        setState(() => _saveStatus = 'Salvando evento...');
+        setState(() {
+          _currentUploadIndex = 0;
+          _hasActiveUploadProgress = false;
+          _uploadFraction = null;
+          _saveStatus = 'Salvando evento...';
+        });
       }
       if (_isEditing) {
         await _updateEvent(allPhotoUrls);
@@ -439,7 +474,11 @@ class _EditEventScreenState extends State<EditEventScreen> {
         await _createEvent(allPhotoUrls);
       }
 
+      UploadOrphanTracker().commit(widget.occurrenceId);
+
       if (mounted) Navigator.of(context).pop('saved');
+    } on UploadCancelledException {
+      // Cancelamento cooperativo: nenhuma mensagem de erro gritante
     } catch (e) {
       if (mounted) {
         AppFeedback.error(
@@ -454,36 +493,64 @@ class _EditEventScreenState extends State<EditEventScreen> {
         setState(() {
           _isSaving = false;
           _saveStatus = null;
+          _uploadFraction = null;
+          _currentUploadIndex = 0;
+          _hasActiveUploadProgress = false;
         });
       }
     }
   }
 
   Future<List<UploadResult>> _uploadNewPhotos() async {
-    final results = <UploadResult>[];
-    for (var i = 0; i < _newPhotos.length; i++) {
-      if (mounted) {
-        setState(
-          () => _saveStatus = 'Enviando foto ${i + 1}/${_newPhotos.length}...',
-        );
-      }
-      final result = await _storageService
-          .uploadImageWithHash(
-            _newPhotos[i],
-            'occurrences/${widget.occurrenceId}/events',
-          )
-          .timeout(
-            const Duration(seconds: 90),
-            onTimeout: () => throw TimeoutException(
-              'Tempo excedido ao enviar a foto. Verifique o sinal e tente novamente.',
-            ),
+    if (_newPhotos.isEmpty) return [];
+
+    _uploadCancelToken = UploadCancellationToken();
+
+    final batchResult = await _mediaUploader.uploadBatch(
+      files: _newPhotos,
+      folder: 'occurrences/${widget.occurrenceId}/events',
+      occurrenceId: widget.occurrenceId,
+      cancelToken: _uploadCancelToken,
+      alreadyCompleted: _completedPhotoUploads,
+      onProgress: (fileIndex, totalFiles, snapshot) {
+        if (!mounted) return;
+        setState(() {
+          _currentUploadIndex = fileIndex;
+          _hasActiveUploadProgress = snapshot.hasActiveFileProgress;
+          _uploadFraction = snapshot.fraction;
+          _saveStatus = EditEventScreen.formatUploadStatus(
+            currentFileIndex: fileIndex,
+            totalFiles: totalFiles,
+            fraction: snapshot.fraction,
+            hasActiveProgress: snapshot.hasActiveFileProgress,
           );
-      if (result == null) {
-        throw StateError('A foto ${i + 1} não foi enviada. Tente novamente.');
-      }
-      results.add(result);
+        });
+      },
+      onStatusChanged: (fileIndex, totalFiles, message) {
+        if (!mounted) return;
+        setState(() {
+          _saveStatus = message;
+        });
+      },
+    );
+
+    // Salvar mídias completadas para que retry não as reenvie
+    for (final r in batchResult.completedResults) {
+      _completedPhotoUploads[r.sha256Hash] = r;
     }
-    return results;
+
+    if (batchResult.isCancelled) {
+      throw const UploadCancelledException();
+    }
+
+    if (!batchResult.isSuccess) {
+      throw batchResult.firstError ??
+          Exception(
+            batchResult.friendlyErrorMessage ?? 'Falha no envio de fotos.',
+          );
+    }
+
+    return batchResult.completedResults;
   }
 
   Future<void> _createEvent(List<String> photoUrls) async {
@@ -1181,31 +1248,58 @@ class _EditEventScreenState extends State<EditEventScreen> {
             ),
           ),
           child: _isSaving
-              ? Row(
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppTheme.textPrimary,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: Text(
+                            _saveStatus ?? 'Salvando evento...',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              color: AppTheme.textPrimary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 10),
-                    Flexible(
-                      child: Text(
-                        _saveStatus ?? 'Salvando evento...',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          color: AppTheme.textPrimary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.2,
+                    if (_uploadFraction != null) ...[
+                      const SizedBox(height: 6),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(2),
+                        child: SizedBox(
+                          height: 3,
+                          width: 180,
+                          child: LinearProgressIndicator(
+                            value:
+                                (_currentUploadIndex == 0 &&
+                                    !_hasActiveUploadProgress)
+                                ? null
+                                : _uploadFraction,
+                            backgroundColor: AppTheme.textPrimary.withAlpha(40),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              AppTheme.textPrimary,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 )
               : Text(

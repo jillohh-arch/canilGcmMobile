@@ -30,11 +30,12 @@ class _PendingScreenState extends State<PendingScreen> {
   final Set<String> _processingNotifications = <String>{};
   bool _markingAllAsRead = false;
   bool _clearingAllNotices = false;
+  bool _isNavigating = false;
 
   @override
   void initState() {
     super.initState();
-    _notificationsStream = _notificationService.getVisibleNotifications(
+    _notificationsStream = _notificationService.getAllNotifications(
       userId: widget.userId,
     );
   }
@@ -44,14 +45,33 @@ class _PendingScreenState extends State<PendingScreen> {
     return StreamBuilder<List<NotificationItem>>(
       stream: _notificationsStream,
       builder: (context, snapshot) {
-        final notifications = snapshot.data ?? const <NotificationItem>[];
-        final actionItems =
-            notifications.where((item) => item.isOpenAction).toList()
-              ..sort(_compareActionItems);
-        final notices =
-            notifications.where((item) => !item.isOpenAction).toList()
-              ..sort(_compareByCreatedAtDesc);
-        final hasUnread = notifications.any((item) => item.isUnread);
+        final allNotifications = snapshot.data ?? const <NotificationItem>[];
+        final supersededParticipationOccurrenceIds = allNotifications
+            .where((item) =>
+                item.occurrenceId.isNotEmpty &&
+                NotificationItem.supersedesParticipationRequest(item.type))
+            .map((item) => item.occurrenceId)
+            .toSet();
+
+        final visibleNotifications = allNotifications
+            .where((item) => !item.isArchived)
+            .toList();
+
+        final actionItems = visibleNotifications
+            .where((item) =>
+                item.isOpenAction &&
+                !(item.type == NotificationType.occurrenceParticipationRequested &&
+                    supersededParticipationOccurrenceIds.contains(item.occurrenceId)))
+            .toList()
+          ..sort(_compareActionItems);
+        final notices = visibleNotifications
+            .where((item) =>
+                !item.isOpenAction ||
+                (item.type == NotificationType.occurrenceParticipationRequested &&
+                    supersededParticipationOccurrenceIds.contains(item.occurrenceId)))
+            .toList()
+          ..sort(_compareByCreatedAtDesc);
+        final hasUnread = visibleNotifications.any((item) => item.isUnread);
 
         return Scaffold(
           backgroundColor: AppTheme.background,
@@ -224,11 +244,6 @@ class _PendingScreenState extends State<PendingScreen> {
   }
 
   Future<void> _archiveNotice(NotificationItem notification) async {
-    if (!notification.canBeArchived) {
-      _showSnack('Pendencia aberta nao pode ser limpa.', isError: true);
-      return;
-    }
-
     _setProcessing(notification, true);
     try {
       await _notificationService.archiveNotice(
@@ -244,7 +259,7 @@ class _PendingScreenState extends State<PendingScreen> {
   }
 
   int _countArchivableNotices(List<NotificationItem> notices) {
-    return notices.where((n) => n.canBeArchived && !n.isArchived).length;
+    return notices.where((n) => !n.isArchived).length;
   }
 
   Future<void> _clearAllNotices(List<NotificationItem> notices) async {
@@ -308,19 +323,29 @@ class _PendingScreenState extends State<PendingScreen> {
   }
 
   Future<void> _handleNotificationTap(NotificationItem notification) async {
-    if (notification.isUnread) {
-      try {
-        await _notificationService.markAsRead(
-          userId: widget.userId,
-          notificationId: notification.id,
-        );
-      } catch (error) {
-        _showSnack('Nao foi possivel marcar como lida: $error', isError: true);
+    if (_isNavigating) return;
+    _isNavigating = true;
+    try {
+      if (notification.isUnread) {
+        try {
+          await _notificationService.markAsRead(
+            userId: widget.userId,
+            notificationId: notification.id,
+          );
+        } catch (error) {
+          _showSnack('Nao foi possivel marcar como lida: $error', isError: true);
+        }
+      }
+
+      if (!mounted) return;
+      await _openNotificationTarget(notification);
+    } finally {
+      if (mounted) {
+        setState(() => _isNavigating = false);
+      } else {
+        _isNavigating = false;
       }
     }
-
-    if (!mounted) return;
-    await _openNotificationTarget(notification);
   }
 
   Future<void> _openNotificationTarget(NotificationItem notification) async {

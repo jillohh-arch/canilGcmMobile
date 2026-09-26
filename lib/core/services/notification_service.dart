@@ -1,27 +1,92 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import 'package:canil_gcm/core/domain/notification_item.dart';
+import 'package:canil_gcm/core/services/handler_identity_service.dart';
+
+typedef NotificationWriter = Future<void> Function(
+  DocumentReference document,
+  Map<String, dynamic> data,
+);
 
 class NotificationService {
-  static final NotificationService _instance = NotificationService._internal();
-  factory NotificationService() => _instance;
-  NotificationService._internal();
+  static final Set<String> _dispatchedNotificationKeys = <String>{};
 
-  final CollectionReference _notificationsCollection = FirebaseFirestore
-      .instance
-      .collection('notifications');
-  final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(
-    region: 'southamerica-east1',
-  );
+  @visibleForTesting
+  static void clearDispatchedKeysForTesting() {
+    _dispatchedNotificationKeys.clear();
+  }
 
-  // Cache do stream base compartilhado. pending_badge, binomio_header e
-  // pending_screen consomem getOpenActionCount/getVisibleNotifications, que
-  // derivam de getAllNotifications — sem cache isso abre 3 listeners Firestore
-  // simultâneos na mesma subcoleção. Com broadcast + cache por userId, fica 1.
+  static NotificationService? _instance;
+  factory NotificationService({
+    FirebaseFirestore? firestore,
+    FirebaseFunctions? functions,
+    FirebaseAuth? auth,
+    NotificationWriter? notificationWriter,
+  }) {
+    if (firestore != null ||
+        functions != null ||
+        auth != null ||
+        notificationWriter != null) {
+      return NotificationService._custom(
+        firestore: firestore,
+        functions: functions,
+        auth: auth,
+        notificationWriter: notificationWriter,
+      );
+    }
+    return _instance ??= NotificationService._internal();
+  }
+
+  NotificationService._internal()
+    : _firestore = null,
+      _functions = null,
+      _auth = null,
+      _notificationWriter = null;
+
+  NotificationService._custom({
+    FirebaseFirestore? firestore,
+    FirebaseFunctions? functions,
+    FirebaseAuth? auth,
+    NotificationWriter? notificationWriter,
+  }) : _firestore = firestore,
+       _functions = functions,
+       _auth = auth,
+       _notificationWriter = notificationWriter;
+
+  final FirebaseFirestore? _firestore;
+  final FirebaseFunctions? _functions;
+  final FirebaseAuth? _auth;
+  final NotificationWriter? _notificationWriter;
+
+  CollectionReference get _notificationsCollection =>
+      (_firestore ?? FirebaseFirestore.instance).collection('notifications');
+
+  bool _isOwnNotification(String userId) {
+    try {
+      final auth = _auth ?? FirebaseAuth.instance;
+      final currentRa = HandlerIdentityService.raFromUser(auth.currentUser);
+      if (currentRa != null && currentRa.isNotEmpty) {
+        return currentRa.toLowerCase() == userId.trim().toLowerCase();
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  // Cache do stream base compartilhado com replay do último valor conhecido.
+  // pending_badge, binomio_header e pending_screen consomem
+  // getOpenActionCount/getVisibleNotifications, que derivam de getAllNotifications.
+  // Sem replay, ouvintes tardios (ex.: PendingScreen ao abrir após a badge já ter
+  // consumido o snapshot inicial) ficam em espera infinita por nova alteração.
+  // O replay entrega o snapshot mais recente imediatamente ao novo ouvinte.
   String? _cachedUserId;
-  Stream<List<NotificationItem>>? _cachedAllStream;
+  StreamController<List<NotificationItem>>? _cachedController;
+  StreamSubscription<List<NotificationItem>>? _firestoreSubscription;
+  List<NotificationItem>? _lastKnownNotifications;
 
   /// Cria uma nova notificação para um usuário.
   Future<String> createNotification({
@@ -60,16 +125,49 @@ class NotificationService {
       data['resolved_at'] = null;
     }
 
-    if (deduplicate) {
-      final existing = await docRef.get();
-      if (!existing.exists) {
-        await docRef.set(data);
-      }
-    } else {
-      await docRef.set(data);
+    final dispatchKey = '$userId:$resolvedNotificationId';
+    if (deduplicate && _dispatchedNotificationKeys.contains(dispatchKey)) {
+      debugPrint(
+        '[NotificationService] Notificação duplicada já enviada ignorada para $userId: $resolvedNotificationId',
+      );
+      return resolvedNotificationId;
     }
 
-    debugPrint('[NotificationService] Notificação criada: $type para $userId');
+    try {
+      if (deduplicate && _isOwnNotification(userId)) {
+        final existing = await docRef.get();
+        if (existing.exists) {
+          debugPrint(
+            '[NotificationService] Notificação duplicada ignorada para $userId: $resolvedNotificationId',
+          );
+          _dispatchedNotificationKeys.add(dispatchKey);
+          return resolvedNotificationId;
+        }
+      }
+      await (_notificationWriter?.call(docRef, data) ?? docRef.set(data));
+      if (deduplicate) {
+        _dispatchedNotificationKeys.add(dispatchKey);
+      }
+      debugPrint(
+        '[NotificationService] Notificação criada: $type para $userId ($resolvedNotificationId)',
+      );
+    } on FirebaseException catch (e) {
+      // R3: nunca engolir permission-denied genérico. Falhas reais de segurança
+      // (escritor não autorizado N4, payload inválido N5, destinatário errado N6)
+      // DEVEM propagar para que o chamador observe a falha. Duplicatas legítimas
+      // em mesma sessão são suprimidas benignamente por _dispatchedNotificationKeys;
+      // falhas de segurança reais nunca chegam a registrar a chave e sempre propagam.
+      debugPrint(
+        '[NotificationService] Erro ao criar notificação $type para $userId: $e',
+      );
+      rethrow;
+    } catch (e) {
+      debugPrint(
+        '[NotificationService] Erro inesperado ao criar notificação $type para $userId: $e',
+      );
+      rethrow;
+    }
+
     return resolvedNotificationId;
   }
 
@@ -110,7 +208,7 @@ class NotificationService {
     }
   }
 
-  /// Obtém as notificações não lidas de um usuário.
+  /// Arquiva um aviso da caixa de entrada do usuário.
   Future<void> archiveNotice({
     required String userId,
     required NotificationItem notification,
@@ -147,7 +245,7 @@ class NotificationService {
     const batchSize = 400;
 
     for (var i = 0; i < toArchive.length; i += batchSize) {
-      final batch = FirebaseFirestore.instance.batch();
+      final batch = (_firestore ?? FirebaseFirestore.instance).batch();
       final chunk = toArchive.skip(i).take(batchSize);
 
       for (final notice in chunk) {
@@ -173,7 +271,10 @@ class NotificationService {
   Future<void> resolveShiftReminderNotification({
     required String notificationId,
   }) async {
-    final callable = _functions.httpsCallable(
+    final functions =
+        _functions ??
+        FirebaseFunctions.instanceFor(region: 'southamerica-east1');
+    final callable = functions.httpsCallable(
       'resolveShiftReminderNotification',
     );
     await callable.call<void>({'notification_id': notificationId});
@@ -211,23 +312,51 @@ class NotificationService {
   ///
   /// Este stream é propositalmente derivado do modelo em memória, sem query
   /// composta, para evitar depender de índice enquanto a migração/backfill roda.
+  ///
+  /// D3/R5.4: Ocorrências seladas ou com fluxo avançado (assinaturas solicitadas/
+  /// realizadas, ciência respondida) não podem reter solicitações de ciência
+  /// sob contagem acionável. O conjunto é derivado de TODAS as notificações
+  /// conhecidas do usuário (incluindo avisos arquivados ou lidos), garantindo
+  /// que arquivar um aviso não ressuscite a solicitação como ação pendente.
   Stream<List<NotificationItem>> getOpenActionNotifications({
     required String userId,
   }) {
-    return getVisibleNotifications(
+    return getAllNotifications(
       userId: userId,
-    ).map((items) => items.where((item) => item.isOpenAction).toList());
+    ).map((allItems) {
+      final supersededOccurrenceIds = allItems
+          .where((item) =>
+              item.occurrenceId.isNotEmpty &&
+              NotificationItem.supersedesParticipationRequest(item.type))
+          .map((item) => item.occurrenceId)
+          .toSet();
+
+      return allItems
+          .where((item) =>
+              !item.isArchived &&
+              item.isOpenAction &&
+              !(item.type == NotificationType.occurrenceParticipationRequested &&
+                  supersededOccurrenceIds.contains(item.occurrenceId)))
+          .toList();
+    });
   }
 
   /// Obtém todas as notificações de um usuário.
   ///
-  /// O stream é cacheado como broadcast por userId: pending_badge,
-  /// binomio_header e pending_screen derivam daqui, então um único listener
-  /// Firestore serve a todos. limit(200) evita crescimento ilimitado de leitura.
+  /// O stream é cacheado como broadcast compartilhado por userId com replay do
+  /// último valor conhecido. pending_badge, binomio_header e pending_screen
+  /// derivam daqui, consumindo um único listener Firestore simultâneo.
+  /// Ouvintes subsequentes recebem imediatamente o snapshot em memória,
+  /// evitando starvation/loading infinito em telas abertas tardiamente.
   Stream<List<NotificationItem>> getAllNotifications({required String userId}) {
-    if (_cachedUserId != userId || _cachedAllStream == null) {
+    if (_cachedUserId != userId) {
+      invalidateCache();
       _cachedUserId = userId;
-      _cachedAllStream = _notificationsCollection
+    }
+
+    if (_cachedController == null) {
+      _cachedController = StreamController<List<NotificationItem>>.broadcast();
+      _firestoreSubscription = _notificationsCollection
           .doc(userId)
           .collection('items')
           .orderBy('created_at', descending: true)
@@ -238,15 +367,63 @@ class NotificationService {
                 .map((doc) => NotificationItem.fromJson(doc.data(), doc.id))
                 .toList(),
           )
-          .asBroadcastStream();
+          .listen(
+            (items) {
+              _lastKnownNotifications = items;
+              if (_cachedController != null && !_cachedController!.isClosed) {
+                _cachedController!.add(items);
+              }
+            },
+            onError: (err, stack) {
+              if (_cachedController != null && !_cachedController!.isClosed) {
+                _cachedController!.addError(err, stack);
+              }
+            },
+          );
     }
-    return _cachedAllStream!;
+
+    late final StreamController<List<NotificationItem>> subscriberController;
+    StreamSubscription<List<NotificationItem>>? liveSubscription;
+
+    subscriberController = StreamController<List<NotificationItem>>(
+      onListen: () {
+        if (_lastKnownNotifications != null) {
+          subscriberController.add(_lastKnownNotifications!);
+        }
+        liveSubscription = _cachedController!.stream.listen(
+          (items) {
+            if (!subscriberController.isClosed) {
+              subscriberController.add(items);
+            }
+          },
+          onError: (err, stack) {
+            if (!subscriberController.isClosed) {
+              subscriberController.addError(err, stack);
+            }
+          },
+          onDone: () {
+            if (!subscriberController.isClosed) {
+              subscriberController.close();
+            }
+          },
+        );
+      },
+      onCancel: () async {
+        await liveSubscription?.cancel();
+      },
+    );
+
+    return subscriberController.stream;
   }
 
   /// Invalida o cache ao trocar de usuário (ex: logout/login).
   void invalidateCache() {
     _cachedUserId = null;
-    _cachedAllStream = null;
+    _lastKnownNotifications = null;
+    _firestoreSubscription?.cancel();
+    _firestoreSubscription = null;
+    _cachedController?.close();
+    _cachedController = null;
   }
 
   /// Conta notificações não lidas.

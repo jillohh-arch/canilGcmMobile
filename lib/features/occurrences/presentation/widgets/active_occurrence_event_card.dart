@@ -8,6 +8,7 @@ import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.
 class ActiveOccurrenceEventCard extends StatelessWidget {
   final OccurrenceEvent event;
   final bool isRecent;
+  final bool canEdit;
   final VoidCallback onTap;
   final VoidCallback? onLocationTap;
   final String? handlerName;
@@ -17,6 +18,7 @@ class ActiveOccurrenceEventCard extends StatelessWidget {
     super.key,
     required this.event,
     this.isRecent = false,
+    this.canEdit = true,
     required this.onTap,
     this.onLocationTap,
     this.handlerName,
@@ -166,32 +168,34 @@ class ActiveOccurrenceEventCard extends StatelessWidget {
                   ],
 
                   // Edit button
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: GestureDetector(
-                      onTap: onTap,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.edit_outlined,
-                            color: AppTheme.primary,
-                            size: 12,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'editar',
-                            style: GoogleFonts.inter(
+                  if (canEdit) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: GestureDetector(
+                        onTap: onTap,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.edit_outlined,
                               color: AppTheme.primary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
+                              size: 12,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 4),
+                            Text(
+                              'editar',
+                              style: GoogleFonts.inter(
+                                color: AppTheme.primary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -277,6 +281,7 @@ class _MetaChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      constraints: const BoxConstraints(maxWidth: 160),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: AppTheme.primary.withAlpha(15),
@@ -288,12 +293,16 @@ class _MetaChip extends StatelessWidget {
         children: [
           Text(icon, style: const TextStyle(fontSize: 10)),
           const SizedBox(width: 4),
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              color: AppTheme.primary,
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                color: AppTheme.primary,
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],

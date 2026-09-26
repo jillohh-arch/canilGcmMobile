@@ -20,48 +20,55 @@ class _CloseTrackingButton extends StatelessWidget {
 }
 
 class _TrackingMap extends StatelessWidget {
-  final MapController mapController;
-  final List<LatLng> routePoints;
+  final void Function(GoogleMapController controller)? onMapCreated;
+  final List<ll2.LatLng> routePoints;
   final bool isLightMode;
 
   const _TrackingMap({
-    required this.mapController,
+    required this.onMapCreated,
     required this.routePoints,
     required this.isLightMode,
   });
 
   @override
   Widget build(BuildContext context) {
-    return FlutterMap(
-      mapController: mapController,
-      options: MapOptions(
-        initialCenter: const LatLng(-22.5647, -47.4013), // Limeira/SP
-        initialZoom: 14,
-        interactionOptions: const InteractionOptions(
-          flags: InteractiveFlag.all,
-        ),
+    final gmapRoute = AppMapStyle.toGoogleLatLngList(routePoints);
+
+    return GoogleMap(
+      initialCameraPosition: const CameraPosition(
+        target: LatLng(-22.5647, -47.4013), // Limeira/SP
+        zoom: 14,
       ),
-      children: [
-        TileLayer(
-          urlTemplate:
-              'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-          subdomains: const ['a', 'b', 'c', 'd'],
-          userAgentPackageName: 'br.gov.sp.limeira.canil_gcm',
-          maxZoom: 19,
-        ),
-        if (routePoints.isNotEmpty)
-          PolylineLayer(
-            polylines: [
+      style: isLightMode ? null : AppMapStyle.darkStyle,
+      rotateGesturesEnabled: false,
+      zoomControlsEnabled: false,
+      myLocationButtonEnabled: false,
+      mapToolbarEnabled: false,
+      onMapCreated: onMapCreated,
+      polylines: gmapRoute.isNotEmpty
+          ? {
               Polyline(
-                points: routePoints,
+                polylineId: const PolylineId('live_tracking_route'),
+                points: gmapRoute,
                 color: isLightMode ? AppTheme.primary : AppTheme.warningAccent,
-                strokeWidth: 5.0,
-                strokeJoin: StrokeJoin.round,
-                strokeCap: StrokeCap.round,
+                width: 5,
+                jointType: JointType.round,
+                startCap: Cap.roundCap,
+                endCap: Cap.roundCap,
               ),
-            ],
-          ),
-      ],
+            }
+          : {},
+      markers: gmapRoute.isNotEmpty
+          ? {
+              Marker(
+                markerId: const MarkerId('current_pos'),
+                position: gmapRoute.last,
+                icon: BitmapDescriptor.defaultMarkerWithHue(
+                  isLightMode ? BitmapDescriptor.hueAzure : BitmapDescriptor.hueOrange,
+                ),
+              ),
+            }
+          : {},
     );
   }
 }

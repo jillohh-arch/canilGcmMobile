@@ -294,5 +294,58 @@ void main() {
         );
       }
     });
+
+    test('parse incident timeline document com caso vinculado e identidade estável', () {
+      final incidentDoc = <String, dynamic>{
+        'timeline_type': 'incident',
+        'source_collection': 'dogs/$dogId/clinical_cases/case_inc_001/clinical_events',
+        'source_id': 'evt_inc_001',
+        'occurred_at': nowTimestamp,
+        'recorded_at': nowTimestamp,
+        'projected_at': nowTimestamp,
+        'title': 'Intercorrência: Trauma / Lesão',
+        'subtitle': 'Cão ferido em treinamento na pata direita',
+        'dog_id': dogId,
+        'case_id': 'case_inc_001',
+        'case_title': 'Caso Clínico: Trauma em Patrulhamento',
+        'status': 'final',
+        'schema_version': 1,
+        'recorded_by': {
+          'uid': 'user_condutor_1',
+          'name': 'GCM Condutor',
+          'internal_role': 'condutor',
+        },
+      };
+
+      final view1 = CanonicalHealthTimelineEntryParser.parseDocument(
+        documentId: 'tl1_inc_001',
+        data: incidentDoc,
+        queryDogId: dogId,
+      );
+
+      expect(view1.id, equals('tl1_inc_001'));
+      expect(view1.dogId, equals(dogId));
+      expect(view1.type.known, equals(HealthTimelineType.incident));
+      expect(view1.title, equals('Intercorrência: Trauma / Lesão'));
+      expect(view1.subtitle, equals('Cão ferido em treinamento na pata direita'));
+      expect(view1.status, equals(HealthTimelineEntryStatus.finalised));
+      expect(view1.isCancelled, isFalse);
+      expect(view1.caseId, equals('case_inc_001'));
+      expect(view1.caseTitle, equals('Caso Clínico: Trauma em Patrulhamento'));
+      expect(view1.occurredAt.toUtc(), equals(now));
+      expect(view1.recordedBy?.uid, equals('user_condutor_1'));
+      expect(view1.recordedBy?.internalRole, equals('condutor'));
+
+      // Replay idempotente: reprocessamento gera exatamente a mesma entrada sem divergência
+      final view2 = CanonicalHealthTimelineEntryParser.parseDocument(
+        documentId: 'tl1_inc_001',
+        data: Map<String, dynamic>.from(incidentDoc),
+        queryDogId: dogId,
+      );
+      expect(view2.id, equals(view1.id));
+      expect(view2.occurredAt, equals(view1.occurredAt));
+      expect(view2.type.known, equals(view1.type.known));
+      expect(view2.caseId, equals(view1.caseId));
+    });
   });
 }

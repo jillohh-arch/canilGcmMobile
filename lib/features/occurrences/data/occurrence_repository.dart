@@ -13,15 +13,19 @@ import 'package:canil_gcm/features/occurrences/domain/occurrence_nature.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_status.dart';
 
-enum CloseForSignaturesResult {
-  awaitingSignatures,
-  sealedDirectly,
-}
+enum CloseForSignaturesResult { awaitingSignatures, sealedDirectly }
 
 class OccurrenceRepository {
   final FirebaseFirestore _firestore;
+  OccurrenceTransitionService? _injectedTransitionService;
 
-  OccurrenceRepository(this._firestore);
+  OccurrenceRepository(
+    this._firestore, {
+    OccurrenceTransitionService? transitionService,
+  }) : _injectedTransitionService = transitionService;
+
+  OccurrenceTransitionService get _transitionService =>
+      _injectedTransitionService ??= OccurrenceTransitionService();
 
   CollectionReference<Map<String, dynamic>> get _collection =>
       _firestore.collection('occurrences');
@@ -215,7 +219,7 @@ class OccurrenceRepository {
     int hashVersion = 2,
   }) async {
     if (hashVersion >= 4) {
-      await OccurrenceTransitionService().sealOccurrenceV4(
+      await _transitionService.sealOccurrenceV4(
         occurrenceId: id,
         finalReport: finalReport,
         results: results,
@@ -592,7 +596,7 @@ class OccurrenceRepository {
           ? finalizationPhotoHashes
           : current.finalizationPhotoHashes;
 
-      await OccurrenceTransitionService().sealOccurrenceV4(
+      await _transitionService.sealOccurrenceV4(
         occurrenceId: resolvedId,
         finalReport: resolvedFinalReport,
         results: finalResults,
@@ -606,7 +610,8 @@ class OccurrenceRepository {
           action: 'finalized_no_cosigners',
           entityType: 'occurrence',
           entityId: resolvedId,
-          summary: 'Ocorrencia finalizada diretamente (sem coassinantes elegiveis)',
+          summary:
+              'Ocorrencia finalizada diretamente (sem coassinantes elegiveis)',
           after: {
             'status': 'finalized',
             'has_final_report': true,
@@ -649,7 +654,7 @@ class OccurrenceRepository {
     final signatureRound = current.signatureRound <= 0
         ? 1
         : current.signatureRound;
-    await OccurrenceTransitionService().closeForSignatures(
+    await _transitionService.closeForSignatures(
       occurrenceId: resolvedId,
       finalReport: resolvedFinalReport,
       results: finalResults,
@@ -713,7 +718,7 @@ class OccurrenceRepository {
     final round = current.signatureRound <= 0 ? 1 : current.signatureRound;
     final roundedSignature = signature.copyWith(round: round);
 
-    await OccurrenceTransitionService().signOccurrence(
+    await _transitionService.signOccurrence(
       occurrenceId: occurrenceId,
       signature: roundedSignature,
     );
@@ -787,7 +792,7 @@ class OccurrenceRepository {
   }
 
   Future<void> revertToDraft({required String occurrenceId}) async {
-    await OccurrenceTransitionService().requestCorrection(
+    await _transitionService.requestCorrection(
       occurrenceId: occurrenceId,
       reason: 'Reabertura para correcao antes do selo',
     );
@@ -800,6 +805,10 @@ class OccurrenceRepository {
       ),
     );
     return;
+  }
+
+  Future<void> acceptParticipation({required String occurrenceId}) async {
+    await _transitionService.acceptParticipation(occurrenceId: occurrenceId);
   }
 
   Future<void> revertToDraftLocallyForLegacy({
@@ -907,6 +916,20 @@ class OccurrenceRepository {
     return occ;
   }
 
+  /// Observa reativamente uma ocorrência específica por ID.
+  ///
+  /// Garante que alterações em campos do documento pai (endereço, natureza,
+  /// observação inicial, etc.) reflitam em tempo real nos observadores
+  /// em múltiplos dispositivos conectados à mesma ocorrência.
+  Stream<Occurrence?> watchById(String id) {
+    return _collection.doc(id).snapshots().map((snap) {
+      if (!snap.exists || snap.data() == null) return null;
+      final occ = Occurrence.fromMap(snap.data()!, snap.id);
+      if (occ.isDeleted) return null;
+      return occ;
+    });
+  }
+
   Stream<List<Occurrence>> watchByDog(String dogId) {
     return _collection.where('dog_id', isEqualTo: dogId).snapshots().map((
       snap,
@@ -936,6 +959,43 @@ class OccurrenceRepository {
     });
   }
 
+  Stream<Occurrence?> watchOpenForHandler(String handlerRa) {
+    final cleanRa = handlerRa.trim();
+    if (cleanRa.isEmpty) return Stream.value(null);
+
+    return _collection
+        .where('team_handler_ids', arrayContains: cleanRa)
+        .snapshots()
+        .map((snap) {
+          final open =
+              snap.docs
+                  .map((doc) => Occurrence.fromMap(doc.data(), doc.id))
+                  .where((occ) => !occ.isDeleted && occ.status.isOpen)
+                  .toList()
+                ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+          if (open.isEmpty) return null;
+          return open.first;
+        });
+  }
+
+  Stream<List<Occurrence>> watchByHandler(String handlerRa) {
+    final cleanRa = handlerRa.trim();
+    if (cleanRa.isEmpty) return Stream.value(const []);
+
+    return _collection
+        .where('team_handler_ids', arrayContains: cleanRa)
+        .snapshots()
+        .map((snap) {
+          final occurrences =
+              snap.docs
+                  .map((doc) => Occurrence.fromMap(doc.data(), doc.id))
+                  .where((occ) => !occ.isDeleted)
+                  .toList()
+                ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
+          return occurrences;
+        });
+  }
+
   Future<Occurrence?> findOpen(String dogId) async {
     final snap = await _collection.where('dog_id', isEqualTo: dogId).get();
     final open =
@@ -946,6 +1006,54 @@ class OccurrenceRepository {
           ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     if (open.isEmpty) return null;
     return open.first;
+  }
+
+  Future<Occurrence?> findOpenForHandler(String handlerRa) async {
+    final cleanRa = handlerRa.trim();
+    if (cleanRa.isEmpty) return null;
+
+    final snap = await _collection
+        .where('team_handler_ids', arrayContains: cleanRa)
+        .get();
+    final open =
+        snap.docs
+            .map((doc) => Occurrence.fromMap(doc.data(), doc.id))
+            .where((occ) => !occ.isDeleted && occ.status.isOpen)
+            .toList();
+
+    // Compatibilidade reversa com registros legados indexados apenas por primary_handler_ra
+    final primarySnap = await _collection
+        .where('primary_handler_ra', isEqualTo: cleanRa)
+        .get();
+    for (final doc in primarySnap.docs) {
+      final occ = Occurrence.fromMap(doc.data(), doc.id);
+      if (!occ.isDeleted &&
+          occ.status.isOpen &&
+          !open.any((o) => o.id == occ.id)) {
+        open.add(occ);
+      }
+    }
+
+    if (open.isEmpty) return null;
+    open.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return open.first;
+  }
+
+  Future<Occurrence?> findOpenForContext({
+    String? dogId,
+    String? handlerRa,
+  }) async {
+    final cleanDogId = dogId?.trim();
+    final cleanRa = handlerRa?.trim();
+
+    Occurrence? open;
+    if (cleanDogId != null && cleanDogId.isNotEmpty) {
+      open = await findOpen(cleanDogId);
+    }
+    if (open == null && cleanRa != null && cleanRa.isNotEmpty) {
+      open = await findOpenForHandler(cleanRa);
+    }
+    return open;
   }
 
   Future<List<Occurrence>> getExpiredOccurrences(DateTime now) async {

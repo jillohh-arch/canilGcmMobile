@@ -117,6 +117,77 @@ void main() {
     }
   });
 
+  test('maps dog-inactive distinctly from genuine permission-denied', () {
+    // 1. dog-inactive via details Map
+    final inactiveFromMap = mapHealthWeightFunctionsError(
+      FirebaseFunctionsException(
+        code: 'permission-denied',
+        message: 'K9 inexistente ou inativo para registro de pesagem.',
+        details: {'code': 'dog-inactive'},
+      ),
+    );
+    expect(inactiveFromMap.code, HealthWeightMutationErrorCode.dogInactive);
+    expect(
+      inactiveFromMap.message,
+      'O K9 informado está inativo ou indisponível para registro de pesagem.',
+    );
+    expect(inactiveFromMap.isTransient, isFalse);
+
+    // 2. dog-inactive via details String
+    final inactiveFromString = mapHealthWeightFunctionsError(
+      FirebaseFunctionsException(
+        code: 'permission-denied',
+        message: 'K9 inativo',
+        details: 'dog-inactive',
+      ),
+    );
+    expect(inactiveFromString.code, HealthWeightMutationErrorCode.dogInactive);
+    expect(
+      inactiveFromString.message,
+      'O K9 informado está inativo ou indisponível para registro de pesagem.',
+    );
+
+    // 3. dog-inactive via message fallback
+    final inactiveFromMessage = mapHealthWeightFunctionsError(
+      FirebaseFunctionsException(
+        code: 'permission-denied',
+        message: 'Error: dog-inactive',
+      ),
+    );
+    expect(inactiveFromMessage.code, HealthWeightMutationErrorCode.dogInactive);
+
+    // 4. Genuine permission denied (capability denial) preserves health.record_routine message
+    final genuineDenied = mapHealthWeightFunctionsError(
+      FirebaseFunctionsException(
+        code: 'permission-denied',
+        message: 'Operacao nao autorizada para este usuario.',
+        details: {'code': 'permission-denied'},
+      ),
+    );
+    expect(genuineDenied.code, HealthWeightMutationErrorCode.permissionDenied);
+    expect(
+      genuineDenied.message,
+      'Seu perfil não possui a permissão health.record_routine.',
+    );
+
+    // 5. Genuine scope denial preserves health.record_routine message
+    final scopeDenied = mapHealthWeightFunctionsError(
+      FirebaseFunctionsException(
+        code: 'permission-denied',
+        message: 'Nao foi possivel estabelecer autorizacao valida.',
+        details: {
+          'code': 'authorization-state-invalid',
+          'reason': 'no_active_assignment',
+        },
+      ),
+    );
+    expect(scopeDenied.code, HealthWeightMutationErrorCode.permissionDenied);
+    expect(
+      scopeDenied.message,
+      'Seu perfil não possui a permissão health.record_routine.',
+    );
+  });
+
   test('maps every required Functions error code', () {
     const expected = {
       'unauthenticated': HealthWeightMutationErrorCode.unauthenticated,

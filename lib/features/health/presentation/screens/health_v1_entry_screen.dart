@@ -15,18 +15,17 @@ import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.da
 import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source.dart';
 import 'package:canil_gcm/features/health/data/coexistence/nutrition/coexistence_nutrition_read_source_factory.dart';
 import 'package:canil_gcm/features/health/data/coexistence/schedule/firestore_health_schedule_experience_gateway.dart';
-import 'package:canil_gcm/features/health/data/coexistence/schedule/firestore_health_schedule_global_source.dart';
 import 'package:canil_gcm/features/health/data/coexistence/schedule/firestore_health_schedule_source.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_experience_scope.dart';
-import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_global_controller.dart';
-import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_global_grouping.dart';
 import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_global_source.dart';
-import 'package:canil_gcm/features/health/presentation/schedule/health_schedule_global_view.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/coexistence_health_summary_source.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_readiness_convergence_gateway.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/health_summary_dog_context_mapper.dart';
 import 'package:canil_gcm/features/health/data/coexistence/summary/readiness_callable.dart';
 import 'package:canil_gcm/features/health/data/coexistence/timeline/coexistence_health_timeline_source.dart';
+import 'package:canil_gcm/features/health/data/canonical/restriction/firestore_health_restriction_history_reader.dart';
+import 'package:canil_gcm/features/health/domain/health_restriction_history_reader.dart';
+import 'package:canil_gcm/features/health/presentation/timeline/health_history_presentation_timeline_source.dart';
 import 'package:canil_gcm/features/health/data/config/health_timeline_flag_provider.dart';
 import 'package:canil_gcm/features/health/data/config/health_timeline_mode.dart';
 import 'package:canil_gcm/features/health/data/config/local_health_timeline_flag_provider.dart';
@@ -174,6 +173,10 @@ class HealthV1EntryScreen extends StatefulWidget {
   /// Remote Config: injeção explícita — não via default nesta Etapa 3B.
   final HealthTimelineFlagProvider timelineFlagProvider;
 
+  /// Leitor do histórico de restrições operacionais para composição de apresentação.
+  /// Produção: [FirestoreHealthRestrictionHistoryReader].
+  final HealthRestrictionHistoryReader? restrictionHistoryReader;
+
   const HealthV1EntryScreen({
     super.key,
     required this.dogId,
@@ -193,6 +196,7 @@ class HealthV1EntryScreen extends StatefulWidget {
     this.dogContextOverride,
     this.onTimelineNavigate,
     this.timelineFlagProvider = const LocalHealthTimelineFlagProvider(),
+    this.restrictionHistoryReader,
   });
 
   @override
@@ -215,18 +219,10 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
   late final HealthScheduleSource _scheduleSource;
   late final HealthScheduleController _scheduleController;
 
-  /// Agenda global: criada SOMENTE quando a experiência é global.
-  ///
-  /// Para `own_records` permanece `null` e o Global Reader nunca é chamado.
-  HealthScheduleGlobalSource? _scheduleGlobalSource;
-  HealthScheduleGlobalController? _scheduleGlobalController;
-
-  /// Experiência elegível. Enquanto `null`, a Agenda per-dog é apresentada
-  /// (fail-closed durante a resolução).
+  /// Experiência de Agenda elegível (HW-4C). Mantida para observabilidade e testes.
+  /// A Agenda neste ecrã é SEMPRE estritamente per-dog para [widget.dogId].
   HealthScheduleExperience? _scheduleExperience;
 
-  /// Primeira carga da agenda global só após visitar Agenda (lazy).
-  bool _scheduleGlobalPrimed = false;
   late final HealthScheduleMutationGateway _scheduleMutationGateway;
   late final HealthScheduleMutationController _scheduleMutationController;
   late final HealthNutritionMutationGateway _nutritionMutationGateway;
@@ -253,6 +249,10 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
   HealthTimelineSource? get timelineSourceForTest => _timelineSource;
 
   @visibleForTesting
+  HealthRestrictionHistoryReader? get restrictionHistoryReaderForTest =>
+      widget.restrictionHistoryReader;
+
+  @visibleForTesting
   HealthTimelineController? get timelineControllerForTest =>
       _timelineController;
 
@@ -267,6 +267,10 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
 
   @visibleForTesting
   bool get schedulePrimedForTest => _schedulePrimed;
+
+  @visibleForTesting
+  HealthScheduleExperience? get scheduleExperienceForTest =>
+      _scheduleExperience;
 
   /// Gateway permanente (ou fake injetado).
   @visibleForTesting
@@ -365,7 +369,15 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
   }) {
     if (_timelineController != null) return;
     _timelineSource = source;
-    _timelineController = HealthTimelineController(source: source);
+    final presentationSource =
+        source is HealthHistoryPresentationTimelineSource
+            ? source
+            : HealthHistoryPresentationTimelineSource(
+                primarySource: source,
+                restrictionReader: widget.restrictionHistoryReader ??
+                    FirestoreHealthRestrictionHistoryReader(),
+              );
+    _timelineController = HealthTimelineController(source: presentationSource);
     _filterSession = HealthTimelineFilterSession(
       controller: _timelineController!,
       dogId: widget.dogId,
@@ -445,7 +457,6 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
     _scheduleMutationController.dispose();
     _nutritionMutationController.dispose();
     _nutritionReadController.dispose();
-    _scheduleGlobalController?.dispose();
     _scheduleController.dispose();
     _controller.dispose();
     super.dispose();
@@ -500,18 +511,6 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
   }
 
   void _primeScheduleIfNeeded() {
-    // Escopo global → alimenta a Agenda do efetivo e NÃO prima a per-dog:
-    // o Global Reader é chamado apenas nesse caminho.
-    if (_isGlobalAgenda) {
-      DogViewModel? dogVM;
-      try {
-        dogVM = context.read<DogViewModel>();
-      } on ProviderNotFoundException {
-        dogVM = null;
-      }
-      _primeGlobalScheduleIfNeeded(dogVM ?? DogViewModel());
-      return;
-    }
     if (_schedulePrimed) return;
     _schedulePrimed = true;
     // ignore: discarded_futures
@@ -719,114 +718,44 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
     }
   }
 
-  /// Resolve a experiência de Agenda a partir do escopo já emitido pelo
-  /// backend (claims da sessão).
+  /// Registra a experiência de Agenda configurada ou injetada.
   ///
-  /// Read-only, sem Firestore e sem heurística: não compara `conductorRa`, não
-  /// deriva acesso de `health_schedule` e não reproduz `canAccessDogRecord`.
-  /// Falha ao resolver → permanece per-dog (fail-closed).
+  /// O ecrã [HealthV1EntryScreen] é estritamente per-dog para [widget.dogId].
+  /// Mesmo com escopo global, a aba Agenda deste ecrã é SEMPRE restrita ao cão
+  /// selecionado via [HealthScheduleScreen].
   void _resolveScheduleExperience() {
     final injected = widget.scheduleExperience;
     if (injected != null) {
       _scheduleExperience = injected;
-      if (injected == HealthScheduleExperience.global) {
-        _createGlobalScheduleStack();
-      }
       return;
     }
 
-    // Resolução delegada ao gateway (Firestore vive em data/, nunca aqui:
-    // a fronteira de apresentação não importa cloud_firestore).
-    final gateway =
-        widget.scheduleExperienceGateway ??
-        FirestoreHealthScheduleExperienceGateway.forDefault();
-
-    unawaited(
-      gateway
-          .resolve()
-          .then((experience) {
-            if (!mounted) return;
-            setState(() {
-              _scheduleExperience = experience;
-              if (experience == HealthScheduleExperience.global) {
-                _createGlobalScheduleStack();
-              }
-            });
-          })
-          .catchError((Object e) {
-            // Diagnóstico sem degradar silenciosamente: sem escopo conclusivo
-            // a experiência permanece per-dog, que é funcional.
-            debugPrint(
-              '[HealthV1Entry] escopo de agenda não resolvido; '
-              'mantendo Agenda per-dog: $e',
-            );
-            if (!mounted) return;
-            setState(() {
-              _scheduleExperience = HealthScheduleExperience.perDog;
-            });
-          }),
-    );
-  }
-
-  void _createGlobalScheduleStack() {
-    if (_scheduleGlobalController != null) return;
-    _scheduleGlobalSource =
-        widget.scheduleGlobalSource ??
-        FirestoreHealthScheduleGlobalSource.forDefault();
-    _scheduleGlobalController = HealthScheduleGlobalController(
-      source: _scheduleGlobalSource!,
-      temporalPolicy: healthSchedulePresentationPolicy(),
-    );
-  }
-
-  bool get _isGlobalAgenda =>
-      _scheduleExperience == HealthScheduleExperience.global &&
-      _scheduleGlobalController != null;
-
-  /// Alimenta a Agenda Global com o catálogo de cães legíveis.
-  ///
-  /// Só é chamado quando a experiência já é global — nesse ponto `getDogs()`
-  /// não está sendo usado como mecanismo de autorização, e sim como conjunto
-  /// de cães a exibir. As Rules seguem valendo e `permission-denied`
-  /// permanece erro.
-  void _primeGlobalScheduleIfNeeded(DogViewModel dogVM) {
-    if (!_isGlobalAgenda) return;
-    if (_scheduleGlobalPrimed) return;
-    _scheduleGlobalPrimed = true;
-    final dogIds = dogVM.dogs.map((d) => d.id).toList(growable: false);
-    // ignore: discarded_futures
-    _scheduleGlobalController!.setCatalog(dogIds);
-  }
-
-  /// Resolve identidade do K9 lendo o catálogo do Provider no ponto de uso.
-  ///
-  /// O catálogo já está materializado em memória (stream do [DogViewModel]),
-  /// então cada resolução é uma busca local — nenhum fetch por item.
-  HealthScheduleDogLabel _resolveDogLabelFromContext(String dogId) {
-    DogViewModel? dogVM;
-    try {
-      dogVM = context.read<DogViewModel>();
-    } on ProviderNotFoundException {
-      dogVM = null;
+    final gateway = widget.scheduleExperienceGateway;
+    if (gateway != null) {
+      unawaited(
+        gateway
+            .resolve()
+            .then((experience) {
+              if (!mounted) return;
+              setState(() {
+                _scheduleExperience = experience;
+              });
+            })
+            .catchError((Object e) {
+              debugPrint(
+                '[HealthV1Entry] escopo de agenda não resolvido; '
+                'mantendo Agenda per-dog: $e',
+              );
+              if (!mounted) return;
+              setState(() {
+                _scheduleExperience = HealthScheduleExperience.perDog;
+              });
+            }),
+      );
+      return;
     }
-    if (dogVM == null) return const HealthScheduleDogLabel(name: 'K9');
-    return _resolveDogLabel(dogVM, dogId);
-  }
 
-  /// Resolve identidade de exibição do K9 a partir do catálogo já
-  /// materializado em memória — zero fetch por item (sem N+1).
-  HealthScheduleDogLabel _resolveDogLabel(DogViewModel dogVM, String dogId) {
-    for (final dog in dogVM.dogs) {
-      if (dog.id == dogId) {
-        final photo = dog.profileImageUrl?.trim();
-        return HealthScheduleDogLabel(
-          name: dog.name.trim().isEmpty ? 'K9' : dog.name.trim(),
-          photoUrl: (photo == null || photo.isEmpty) ? null : photo,
-        );
-      }
-    }
-    // Cão fora do catálogo: rótulo neutro. Omitir compromisso é pior.
-    return const HealthScheduleDogLabel(name: 'K9');
+    _scheduleExperience = HealthScheduleExperience.perDog;
   }
 
   HealthSummaryDogContextView _resolveDogContext(DogViewModel dogVM) {
@@ -913,6 +842,15 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
       );
       final dog = resolved.dog;
 
+      if (target is RestrictionDetailTarget) {
+        await _openRestrictionDetail(
+          dogId: target.dogId,
+          restrictionId: target.sourceId,
+          dogName: dog.name,
+        );
+        return;
+      }
+
       // Mesmo padrão do prontuário legado / ocorrências: root navigator
       // garante push acima do shell (IndexedStack + bottom nav + PopScope).
       final navigator = Navigator.of(context, rootNavigator: true);
@@ -945,6 +883,7 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
                 );
               },
             ),
+            RestrictionDetailTarget() => const SizedBox.shrink(),
           },
         ),
       );
@@ -1090,22 +1029,15 @@ class HealthV1EntryScreenState extends State<HealthV1EntryScreen>
             onNavigate: _onTimelineNavigate,
           );
         },
-        // Escopo global → Agenda do efetivo. own_records / indeterminado →
-        // Agenda per-dog (inalterada). permission-denied do global NÃO cai
-        // automaticamente para per-dog: continua erro na própria Agenda Global.
-        agenda: (_) => _isGlobalAgenda
-            ? HealthScheduleGlobalView(
-                controller: _scheduleGlobalController!,
-                resolveDog: _resolveDogLabelFromContext,
-                bottomPadding: _timelineBottomPadding(context),
-                onRetry: _scheduleGlobalController!.refresh,
-              )
-            : HealthScheduleScreen(
-                controller: _scheduleController,
-                mutationController: _scheduleMutationController,
-                dogDisplayName: dogContext.name,
-                bottomPadding: _timelineBottomPadding(context),
-              ),
+        // A aba Agenda no Health do cão é estritamente per-dog: exibe
+        // exclusivamente os itens do cão selecionado (widget.dogId),
+        // independente do perfil ou escopo do operador.
+        agenda: (_) => HealthScheduleScreen(
+          controller: _scheduleController,
+          mutationController: _scheduleMutationController,
+          dogDisplayName: dogContext.name,
+          bottomPadding: _timelineBottomPadding(context),
+        ),
         nutricao: (_) => HealthNutritionTodayScreen(
           controller: _nutritionReadController,
           mutationController: _nutritionMutationController,

@@ -207,6 +207,7 @@ abstract final class HealthScheduleDocumentMapper {
         recurrenceRule: recurrenceRule,
         assignedToUid: assignedToUid,
         assignedToName: assignedToName,
+        isPaused: data['is_paused'] == true,
         revision: revision,
       );
     } on HealthScheduleIntegrityException {

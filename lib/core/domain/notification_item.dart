@@ -283,6 +283,21 @@ class NotificationItem {
     _ => false,
   };
 
+  /// D3/R5.4: Tipos de notificação que superam/resolvem uma solicitação de
+  /// ciência/participação de ocorrência (`occurrenceParticipationRequested`).
+  /// Evita que ciência preliminar e assinatura necessária fiquem ativas juntas
+  /// em "Requer ação".
+  static bool supersedesParticipationRequest(NotificationType type) => switch (type) {
+    NotificationType.signatureRequested ||
+    NotificationType.signatureCompleted ||
+    NotificationType.signatureDeclined ||
+    NotificationType.occurrenceFinalized ||
+    NotificationType.amendmentCreated ||
+    NotificationType.occurrenceParticipationAccepted ||
+    NotificationType.occurrenceParticipationDeclined => true,
+    _ => false,
+  };
+
   static DateTime? _dateValue(Object? value) {
     if (value is Timestamp) return value.toDate();
     if (value is DateTime) return value;

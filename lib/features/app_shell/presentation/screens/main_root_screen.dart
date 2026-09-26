@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/core/services/permission_service.dart';
+import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_provider.dart';
 import 'package:canil_gcm/core/services/authoritative_time/firebase_functions_authoritative_time_gateway.dart';
 import 'package:canil_gcm/core/services/authoritative_time/monotonic_elapsed_clock.dart';
@@ -26,6 +28,7 @@ import 'package:canil_gcm/features/health/presentation/screens/health_v1_entry_s
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_dog_context_view.dart';
 import 'package:canil_gcm/features/health/presentation/summary/health_summary_source.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_start_eligibility.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/active_occurrence_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/start_occurrence_screen.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
@@ -53,7 +56,7 @@ class MainRootScreen extends StatefulWidget {
 
 class _MainRootScreenState extends State<MainRootScreen> {
   int _currentIndex = 0;
-  String? _lastOccurrenceWatchDogId;
+  String? _lastOccurrenceWatchTarget;
   DateTime? _lastBackPress;
   late final List<Widget> _screens;
 
@@ -133,22 +136,48 @@ class _MainRootScreenState extends State<MainRootScreen> {
   Widget build(BuildContext context) {
     final shiftVM = Provider.of<ShiftViewModel>(context);
     final activeDogId = shiftVM.activeDogId;
+    final effectiveDogId = activeDogId ?? shiftVM.serviceDogId;
     final occurrenceVM = Provider.of<OccurrenceViewModel>(context);
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    final currentRa = HandlerIdentityService.raFromUser(authVM.user);
     final openOccurrence = occurrenceVM.openOccurrence;
+
+    final bool isAcceptedParticipant =
+        currentRa != null &&
+        (openOccurrence?.acceptedHandlerIds.contains(currentRa) ?? false);
+    final bool isPersonalDogOccurrence =
+        activeDogId != null && openOccurrence?.dogId == activeDogId;
+    final bool isTeamMember =
+        currentRa != null &&
+        (openOccurrence?.team.any((m) => m.handlerId.trim() == currentRa) ?? false);
+
     final activeOccurrence =
-        openOccurrence != null && openOccurrence.dogId == activeDogId
+        (openOccurrence != null &&
+            (isPersonalDogOccurrence || isAcceptedParticipant || isTeamMember))
         ? openOccurrence
         : null;
-    if (activeDogId != null &&
-        (activeDogId != _lastOccurrenceWatchDogId ||
+
+    final watchTarget = (effectiveDogId != null && effectiveDogId.isNotEmpty)
+        ? 'dog:$effectiveDogId'
+        : (currentRa != null && currentRa.isNotEmpty)
+            ? 'handler:$currentRa'
+            : null;
+
+    if (watchTarget != null &&
+        (watchTarget != _lastOccurrenceWatchTarget ||
             !occurrenceVM.isWatchingOpen)) {
-      _lastOccurrenceWatchDogId = activeDogId;
+      _lastOccurrenceWatchTarget = watchTarget;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        Provider.of<OccurrenceViewModel>(
+        final vm = Provider.of<OccurrenceViewModel>(
           context,
           listen: false,
-        ).watchOpen(activeDogId);
+        );
+        if (watchTarget.startsWith('dog:')) {
+          vm.watchOpen(watchTarget.substring(4));
+        } else {
+          vm.watchOpenForHandler(watchTarget.substring(8));
+        }
       });
     }
 
@@ -164,14 +193,14 @@ class _MainRootScreenState extends State<MainRootScreen> {
         body: Stack(
           children: [
             IndexedStack(index: _currentIndex, children: _screens),
-            if (activeDogId != null && activeOccurrence != null)
+            if (activeOccurrence != null)
               Positioned(
                 left: 14,
                 right: 14,
                 bottom: 100,
                 child: _ActiveOccurrenceBanner(
                   occurrence: activeOccurrence,
-                  dogName: _dogNameFor(context, activeDogId),
+                  dogName: _dogNameFor(context, activeOccurrence.dogId),
                   onTap: () => _continueActiveOccurrence(
                     context,
                     occurrence: activeOccurrence,
@@ -180,7 +209,7 @@ class _MainRootScreenState extends State<MainRootScreen> {
               ),
           ],
         ),
-        bottomNavigationBar: _buildBottomNavigation(context, activeDogId),
+        bottomNavigationBar: _buildBottomNavigation(context, effectiveDogId),
       ),
     );
   }

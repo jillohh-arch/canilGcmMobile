@@ -32,6 +32,7 @@ class HealthTimelineQuickTypeChips extends StatelessWidget {
     ('Medicamentos', HealthTimelineType.dose),
     ('Intercorrências', HealthTimelineType.incident),
     ('Documentos', HealthTimelineType.document),
+    ('Restrições', HealthTimelineType.restriction),
   ];
 
   @override

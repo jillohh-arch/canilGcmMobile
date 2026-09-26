@@ -53,6 +53,7 @@ final class HealthWeightMutationReceipt {
 enum HealthWeightMutationErrorCode {
   unauthenticated,
   permissionDenied,
+  dogInactive,
   invalidArgument,
   notFound,
   failedPrecondition,

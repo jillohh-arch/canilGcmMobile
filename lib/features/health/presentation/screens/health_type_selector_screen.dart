@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
+import 'package:canil_gcm/features/health/presentation/clinical/clinical_consultation_screen.dart';
+import 'package:canil_gcm/features/health/presentation/clinical/clinical_incident_screen.dart';
+import 'package:canil_gcm/features/health/presentation/clinical/exam_process_flow_screen.dart';
+import 'package:canil_gcm/features/health/presentation/clinical/treatment_execution_screen.dart';
 import 'health_event_form_screen.dart';
 
 class HealthTypeSelectorScreen extends StatefulWidget {
@@ -110,6 +114,14 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
       group: _HealthActionGroup.clinical,
     ),
     const _HealthActionCategory(
+      id: 'incident',
+      label: 'Intercorrência',
+      subtitle: 'Registrar intercorrência clínica',
+      icon: Icons.warning_amber_rounded,
+      color: AppTheme.error,
+      group: _HealthActionGroup.clinical,
+    ),
+    const _HealthActionCategory(
       id: 'symptom',
       label: 'Sintoma',
       subtitle: 'Adicionar reação ou sintoma',
@@ -208,6 +220,61 @@ class _HealthTypeSelectorScreenState extends State<HealthTypeSelectorScreen> {
       final saved = await widget.onRegisterRestriction?.call(context) ?? false;
       if (!mounted) return;
       if (saved && widget.popOnSave) Navigator.pop(context, true);
+      return;
+    }
+
+    // Consulta Veterinária tem tela dedicada: grava no caminho clínico
+    // canônico (ClinicalCase/ClinicalEvent) em vez do HealthLog legado.
+    // Os demais tipos seguem no formulário genérico abaixo, inalterados.
+    if (selectedId == 'consultation') {
+      final saved = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ClinicalConsultationScreen(dogId: widget.dogId),
+        ),
+      );
+      if (!mounted) return;
+      if (saved == true && widget.popOnSave) Navigator.pop(context, true);
+      return;
+    }
+
+    // Exames Clínicos possuem fluxo canônico próprio e ciclo de vida completo
+    // (F20.EXAM-V1: Solicitação -> Coleta -> Resultado -> Interpretação -> Impacto)
+    if (selectedId == 'exam') {
+      final saved = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ExamProcessFlowScreen(dogId: widget.dogId),
+        ),
+      );
+      if (!mounted) return;
+      if (saved == true && widget.popOnSave) Navigator.pop(context, true);
+      return;
+    }
+
+    // Tratamentos / Medicações possuem fluxo canônico de execução (F20.TREATMENT-V1)
+    if (selectedId == 'medication') {
+      final saved = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => TreatmentExecutionScreen(dogId: widget.dogId),
+        ),
+      );
+      if (!mounted) return;
+      if (saved == true && widget.popOnSave) Navigator.pop(context, true);
+      return;
+    }
+
+    // Intercorrência Clínica possui fluxo canônico próprio (F20.INTERCORRENCIA-V1)
+    if (selectedId == 'incident' || selectedId == 'symptom') {
+      final saved = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ClinicalIncidentScreen(dogId: widget.dogId),
+        ),
+      );
+      if (!mounted) return;
+      if (saved == true && widget.popOnSave) Navigator.pop(context, true);
       return;
     }
 

@@ -183,6 +183,7 @@ function fakeStorage(
       sourceGeneration: string;
       destinationPath: string;
       sealMetadata: Record<string, string>;
+      contentType?: string;
     }) => {
       const source = store.get(params.sourcePath);
       if (!source || source.exists !== true) {
@@ -202,8 +203,12 @@ function fakeStorage(
       if (store.has(params.destinationPath)) return {sealed: false};
       seals += 1;
       // O selo é gravado no destino junto com os bytes, no mesmo request.
+      // Modela a semântica real do GCS rewriteTo: custom metadata sem contentType
+      // reseta o contentType no destino para undefined. Apenas se params.contentType
+      // for explicitamente fornecido o destino preserva o contentType.
       store.set(params.destinationPath, {
         ...source,
+        contentType: params.contentType,
         generation: `sealed-${seals}`,
         customMetadata: {...params.sealMetadata},
       });
@@ -1068,6 +1073,135 @@ async function testSealHappyPath() {
     validObject.generation,
     "audit também registra a generation de origem selada",
   );
+
+  // Destino canônico preserva contentType, custom seal metadata e generation
+  const canonicalObj = storage._store.get(canonicalPath)!;
+  assert.strictEqual(
+    canonicalObj.contentType,
+    validObject.contentType,
+    "contentType preservado no destino canônico",
+  );
+  assert.strictEqual(
+    canonicalObj.contentType,
+    "application/pdf",
+    "contentType do destino canônico é application/pdf",
+  );
+  assert.ok(
+    canonicalObj.customMetadata?.k9_health_seal_fingerprint,
+    "custom seal metadata presente no destino canônico",
+  );
+  assert.strictEqual(
+    canonicalObj.generation,
+    "sealed-1",
+    "generation definida no canônico",
+  );
+}
+
+async function testSealObjectSemanticsDirect() {
+  const staging = "health_document_uploads/dog-1/doc-direct";
+  const canonical = "health_documents/dog-1/doc-direct";
+  const storage = fakeStorage({
+    [staging]: {
+      exists: true,
+      contentType: "application/pdf",
+      size: 2048,
+      md5Hash: "hash-direct",
+      crc32c: "crc-direct",
+      generation: "gen-direct",
+    },
+  });
+
+  // a) Staged object com contentType -> sealObject preserva contentType no destino,
+  //    custom seal metadata está presente e generation é definida.
+  const res = await storage.sealObject({
+    sourcePath: staging,
+    sourceGeneration: "gen-direct",
+    destinationPath: canonical,
+    sealMetadata: {k9_health_seal_fingerprint: "fp-direct"},
+    contentType: "application/pdf",
+  });
+  assert.strictEqual(res.sealed, true, "primeira selagem deve ter sucesso");
+
+  const canonicalObj = await storage.getSealedMetadata(canonical);
+  assert.strictEqual(canonicalObj.exists, true, "destino existe");
+  assert.strictEqual(
+    canonicalObj.contentType,
+    "application/pdf",
+    "contentType preservado no destino canônico",
+  );
+  assert.deepStrictEqual(
+    canonicalObj.customMetadata,
+    {k9_health_seal_fingerprint: "fp-direct"},
+    "custom seal metadata presente no destino canônico",
+  );
+  assert.strictEqual(
+    canonicalObj.generation,
+    "sealed-1",
+    "generation definida no destino canônico",
+  );
+
+  // c) Idempotência / create-only: destino já existe -> retorna {sealed: false}
+  const idemp = await storage.sealObject({
+    sourcePath: staging,
+    sourceGeneration: "gen-direct",
+    destinationPath: canonical,
+    sealMetadata: {k9_health_seal_fingerprint: "fp-direct-2"},
+    contentType: "application/pdf",
+  });
+  assert.strictEqual(
+    idemp.sealed,
+    false,
+    "destino já existente retorna sealed: false sem sobrescrever",
+  );
+
+  // c) Precondition de generation da fonte: generation diferente -> 412
+  await assert.rejects(
+    async () => {
+      await storage.sealObject({
+        sourcePath: staging,
+        sourceGeneration: "gen-incorreta",
+        destinationPath: "health_documents/dog-1/doc-outra",
+        sealMetadata: {k9_health_seal_fingerprint: "fp-direct"},
+        contentType: "application/pdf",
+      });
+    },
+    (err: {code?: number}) => err.code === 412,
+    "generation divergente da fonte dispara precondition 412",
+  );
+}
+
+async function testSealDroppingContentTypeRegression() {
+  const documentId = idFor("dog-1", "op-1");
+  const staging = stagingFor("dog-1", documentId);
+  const db = dbWithDog();
+  const storage = fakeStorage({[staging]: validObject});
+
+  // Simula o bug pre-repair: sealObject descarta contentType
+  const originalSeal = storage.sealObject;
+  storage.sealObject = async (params) => {
+    return originalSeal({
+      ...params,
+      contentType: undefined,
+    });
+  };
+
+  let caughtError: unknown;
+  try {
+    await runHealthDocumentFinalizeUpload(
+      mockRequest(validPayload),
+      depsFor({db, storage}),
+    );
+  } catch (err) {
+    caughtError = err;
+  }
+  assert.ok(caughtError, "esperava erro de integridade ao descartar contentType");
+  const details = (caughtError as {details?: {code?: string}}).details;
+  assert.strictEqual(details?.code, "integrity", "code deve ser integrity");
+  const message = (caughtError as Error).message;
+  assert.ok(
+    message.includes("Metadata do objeto sem contentType."),
+    `mensagem esperada continha 'Metadata do objeto sem contentType.', obteve: '${message}'`,
+  );
 }
 
 async function testSealSourceMissing() {
@@ -1591,6 +1725,8 @@ const tests: Array<[string, () => Promise<void>]> = [
   ["FINALIZE actor admin", testAdminRole],
   ["FINALIZE concorrência", testConcurrentFinalize],
   ["SELO caminho feliz e cleanup", testSealHappyPath],
+  ["SELO semântica direta de contentType e idempotência", testSealObjectSemanticsDirect],
+  ["SELO regressão: perda de contentType falha fechado com erro de integridade", testSealDroppingContentTypeRegression],
   ["SELO fonte ausente", testSealSourceMissing],
   ["SELO generation da fonte mudou", testSealSourceGenerationChanged],
   ["SELO metadata sem generation", testSealMissingGeneration],

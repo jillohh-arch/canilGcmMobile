@@ -62,10 +62,6 @@ export type AccessProfileAuditEntryFactory = (
  */
 export type AccessProfileAction =
   | "view"
-  // Leitura clínica (Clinical Read). Historicamente ausente desta união
-  // embora já persistida nos perfis canônicos: a validação de permissões era
-  // key-agnostic, então `health.read` gravava sem nunca constar do tipo.
-  | "read"
   | "create"
   | "edit"
   | "archive"
@@ -218,9 +214,10 @@ export const CANONICAL_ACCESS_PROFILE_CAPABILITIES: Record<string, ReadonlySet<s
   me: new Set<string>(["view", "edit"]),
   // `health` acumula o conjunto administrativo do seed mais as capabilities
   // clínicas/operacionais próprias do domínio.
+  // CT3.AUTH-HEALTH-01 / CT3.F10.HEALTH-READ-ACTION-SCHEMA-CLOSURE-R2:
+  // "read" removido da taxonomia canônica de escritas de perfil.
   health: new Set<string>([
     ...BASE_ACCESS_PROFILE_ACTIONS,
-    "read",
     "manage_nutrition_plan",
     "record_routine",
     "issue_restriction",

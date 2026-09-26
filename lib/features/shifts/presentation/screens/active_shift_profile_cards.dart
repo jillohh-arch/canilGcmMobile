@@ -3,15 +3,20 @@ part of 'active_shift_dashboard_screen.dart';
 /// ─────────────────────────────────────────────────────────────
 /// Card unificado "EM SERVIÇO" — funde Binômio + Guarnição
 /// ─────────────────────────────────────────────────────────────
-class _EmServicoCard extends StatelessWidget {
-  final Dog dog;
+typedef _EmServicoCard = EmServicoCard;
+
+class EmServicoCard extends StatelessWidget {
+  final Dog? dog;
   final String callsign;
   final String? conductorPhotoUrl;
+  final VehicleCrewService? crewService;
 
-  const _EmServicoCard({
-    required this.dog,
+  const EmServicoCard({
+    super.key,
+    this.dog,
     required this.callsign,
     required this.conductorPhotoUrl,
+    this.crewService,
   });
 
   @override
@@ -28,13 +33,20 @@ class _EmServicoCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // FAIXA 1 — BINÔMIO (sempre presente com turno ativo)
-          _BinomioFaixa(
-            dog: dog,
-            callsign: callsign,
-            conductorPhotoUrl: conductorPhotoUrl,
-            hasVehicle: hasVehicle,
-          ),
+          // FAIXA 1 — BINÔMIO (com cão) OU CONDUTOR SOLO (sem cão)
+          if (dog != null)
+            _BinomioFaixa(
+              dog: dog!,
+              callsign: callsign,
+              conductorPhotoUrl: conductorPhotoUrl,
+              hasVehicle: hasVehicle,
+            )
+          else
+            _SoloFaixa(
+              callsign: callsign,
+              conductorPhotoUrl: conductorPhotoUrl,
+              hasVehicle: hasVehicle,
+            ),
           // Divisor
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 14),
@@ -42,7 +54,10 @@ class _EmServicoCard extends StatelessWidget {
             color: AppTheme.textPrimary.withAlpha(12),
           ),
           // FAIXA 2 — GUARNIÇÃO (estado-dependente)
-          _GuarnicaoFaixa(hasVehicle: hasVehicle, dog: dog),
+          _GuarnicaoFaixa(
+            hasVehicle: hasVehicle,
+            crewService: crewService,
+          ),
         ],
       ),
     );
@@ -194,6 +209,106 @@ class _BinomioFaixa extends StatelessWidget {
   }
 }
 
+/// FAIXA 1 (Alternativa Solo) — Condutor em serviço sem K9 associado.
+class _SoloFaixa extends StatelessWidget {
+  final String callsign;
+  final String? conductorPhotoUrl;
+  final bool hasVehicle;
+
+  const _SoloFaixa({
+    required this.callsign,
+    required this.conductorPhotoUrl,
+    required this.hasVehicle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final shiftVM = context.watch<ShiftViewModel>();
+    final handlerId = shiftVM.handlerId;
+    final crewRole = shiftVM.crewRole;
+    final condutorPapel = hasVehicle && crewRole != null
+        ? _roleLabelCapitalized(crewRole)
+        : null;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      child: Row(
+        children: [
+          // Avatar do condutor
+          _BinomioAvatar(
+            size: 64,
+            imageUrl: conductorPhotoUrl,
+            icon: Icons.person_rounded,
+            accent: AppTheme.primary,
+          ),
+          const SizedBox(width: 12),
+          // Info do condutor
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  callsign,
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Condutor${handlerId != null ? ' · RA $handlerId' : ''}',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Em serviço · Sem K9',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textTertiary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (condutorPapel != null) ...[
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withAlpha(20),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: AppTheme.primary.withAlpha(50)),
+                    ),
+                    child: Text(
+                      condutorPapel,
+                      style: GoogleFonts.robotoMono(
+                        color: AppTheme.primary,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Avatar generoso do card binômio.
 class _BinomioAvatar extends StatelessWidget {
   final double size;
@@ -252,9 +367,12 @@ class _BinomioAvatar extends StatelessWidget {
 /// FAIXA 2 — Guarnição: estado-dependente (sem viatura ou embarcado).
 class _GuarnicaoFaixa extends StatelessWidget {
   final bool hasVehicle;
-  final Dog? dog;
+  final VehicleCrewService? crewService;
 
-  const _GuarnicaoFaixa({required this.hasVehicle, required this.dog});
+  const _GuarnicaoFaixa({
+    required this.hasVehicle,
+    this.crewService,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -265,7 +383,7 @@ class _GuarnicaoFaixa extends StatelessWidget {
       child: hasVehicle
           ? _GuarnicaoEmbarcada(
               key: const ValueKey('embarcado'),
-              dog: dog,
+              crewService: crewService,
             )
           : _GuarnicaoSemViatura(key: const ValueKey('sem_viatura')),
     );
@@ -335,9 +453,9 @@ class _GuarnicaoSemViatura extends StatelessWidget {
 
 /// Estado 2: embarcado — grade 2×2 dos postos.
 class _GuarnicaoEmbarcada extends StatefulWidget {
-  final Dog? dog;
+  final VehicleCrewService? crewService;
 
-  const _GuarnicaoEmbarcada({super.key, required this.dog});
+  const _GuarnicaoEmbarcada({super.key, this.crewService});
 
   @override
   State<_GuarnicaoEmbarcada> createState() => _GuarnicaoEmbarcadaState();
@@ -347,15 +465,17 @@ class _GuarnicaoEmbarcadaState extends State<_GuarnicaoEmbarcada>
     with SingleTickerProviderStateMixin {
   late AnimationController _staggerController;
   late Animation<double> _staggerAnimation;
-  final _crewService = VehicleCrewService();
+  late final VehicleCrewService _crewService;
 
   String? _crewId;
+  Stream<VehicleCrew?>? _crewStream;
   Stream<List<VehicleCrewMember>>? _membersStream;
   Future<String>? _statusFuture;
 
   @override
   void initState() {
     super.initState();
+    _crewService = widget.crewService ?? VehicleCrewService();
     _staggerController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
@@ -383,6 +503,7 @@ class _GuarnicaoEmbarcadaState extends State<_GuarnicaoEmbarcada>
     // Cache the stream and status — only recreate if crewId changes
     if (_crewId != crewId) {
       _crewId = crewId;
+      _crewStream = _crewService.watchCrew(crewId);
       _membersStream = _crewService.watchMembers(crewId);
       _statusFuture = _crewService.getCrewOperationalStatus(crewId);
     }
@@ -442,33 +563,94 @@ class _GuarnicaoEmbarcadaState extends State<_GuarnicaoEmbarcada>
             ),
             const SizedBox(height: 10),
             // Grade 2×2: planta da viatura
-            StreamBuilder<List<VehicleCrewMember>>(
-              stream: _membersStream,
-              builder: (context, snapshot) {
-                final members = snapshot.data ?? [];
-                final activeMembers = {
-                  for (final m in members.where((m) => m.isActive)) m.role: m
-                };
+            StreamBuilder<VehicleCrew?>(
+              stream: _crewStream,
+              builder: (context, crewSnapshot) {
+                final crew = crewSnapshot.data;
+                final crewServiceDogId = crew?.serviceDogId.trim() ?? '';
 
-                return Column(
-                  children: [
-                    // Grade principal (MOT, ENC, AUX1, K9)
-                    _VehicleGrid(
-                      activeMembers: activeMembers,
-                      currentHandlerId: currentHandlerId,
-                      staggerAnimation: _staggerAnimation,
-                      dog: widget.dog,
-                      dogName: widget.dog?.name ?? '',
-                    ),
-                    // Linha AUX2 se ocupado (senao invisivel)
-                    if (activeMembers.containsKey('auxiliar_2')) ...[
-                      const SizedBox(height: 6),
-                      _Aux2CompactRow(
-                        member: activeMembers['auxiliar_2']!,
-                        isCurrentUser: activeMembers['auxiliar_2']!.handlerId == currentHandlerId,
-                      ),
-                    ],
-                  ],
+                return StreamBuilder<List<VehicleCrewMember>>(
+                  stream: _membersStream,
+                  builder: (context, snapshot) {
+                    final members = snapshot.data ?? [];
+                    final activeMembers = {
+                      for (final m in members.where((m) => m.isActive)) m.role: m
+                    };
+
+                    // DETERMINISTIC RESOLUTION CONTRACT:
+                    // 1. crew.serviceDogId é a autoridade canônica do K9 da guarnição.
+                    // 2. Se vazio: SEM K9 (crewDog = null).
+                    // 3. Se não vazio: resolver o cão exato com esse ID.
+                    Dog? crewDog;
+                    String? conductorName;
+
+                    if (crewServiceDogId.isNotEmpty) {
+                      DogViewModel? dogVM;
+                      try {
+                        dogVM = Provider.of<DogViewModel>(context, listen: false);
+                      } catch (_) {}
+
+                      if (dogVM != null) {
+                        for (final d in dogVM.dogs) {
+                          if (d.id == crewServiceDogId) {
+                            crewDog = d;
+                            break;
+                          }
+                        }
+                      }
+
+                      crewDog ??= Dog(
+                        id: crewServiceDogId,
+                        name: crewServiceDogId,
+                        breed: '',
+                        dateOfBirth: DateTime(2020),
+                        weight: 0,
+                        status: 'Ativo',
+                      );
+
+                      // 4. Conductor: membro ativo onde member.dogId == crew.serviceDogId.
+                      // Não seleciona membro arbitrário. Se houver inconsistência,
+                      // preserva crew.serviceDogId e não inventa condutor.
+                      VehicleCrewMember? matchingMember;
+                      for (final m in activeMembers.values) {
+                        if (m.dogId != null && m.dogId!.trim() == crewServiceDogId) {
+                          matchingMember = m;
+                          break;
+                        }
+                      }
+
+                      if (matchingMember != null) {
+                        UserViewModel? userVM;
+                        try {
+                          userVM = Provider.of<UserViewModel>(context, listen: false);
+                        } catch (_) {}
+                        conductorName = matchingMember.name?.trim().isNotEmpty == true
+                            ? matchingMember.name
+                            : (userVM?.displayNameFor(ra: matchingMember.handlerId) ?? matchingMember.handlerId);
+                      }
+                    }
+
+                    return Column(
+                      children: [
+                        // Grade principal (MOT, ENC, AUX1, K9)
+                        _VehicleGrid(
+                          activeMembers: activeMembers,
+                          currentHandlerId: currentHandlerId,
+                          staggerAnimation: _staggerAnimation,
+                          crewDog: crewDog,
+                          crewDogConductorName: conductorName,
+                        ),
+                        // Linha AUX2 se ocupado (senao invisivel)
+                        if (activeMembers.containsKey('auxiliar_2')) ...[
+                          const SizedBox(height: 6),
+                          _Aux2CompactRow(
+                            member: activeMembers['auxiliar_2']!,
+                            isCurrentUser: activeMembers['auxiliar_2']!.handlerId == currentHandlerId,
+                          ),
+                        ],
+                      ],
+                    );
+                  },
                 );
               },
             ),
@@ -486,15 +668,15 @@ class _VehicleGrid extends StatelessWidget {
   final Map<String, VehicleCrewMember> activeMembers;
   final String? currentHandlerId;
   final Animation<double> staggerAnimation;
-  final Dog? dog;
-  final String dogName;
+  final Dog? crewDog;
+  final String? crewDogConductorName;
 
   const _VehicleGrid({
     required this.activeMembers,
     required this.currentHandlerId,
     required this.staggerAnimation,
-    required this.dog,
-    required this.dogName,
+    required this.crewDog,
+    this.crewDogConductorName,
   });
 
   @override
@@ -531,7 +713,10 @@ class _VehicleGrid extends StatelessWidget {
               child: Transform.translate(
                 offset: Offset(0, 8 * (1 - progress)),
                 child: post == CrewPost.k9
-                    ? _K9Card(dog: dog, dogName: dogName)
+                    ? _K9Card(
+                        crewDog: crewDog,
+                        conductorName: crewDogConductorName,
+                      )
                     : _CrewPostCard(
                         post: post,
                         member: member,
@@ -548,10 +733,13 @@ class _VehicleGrid extends StatelessWidget {
 
 /// Card do K9 na grade (baixo-direita) — acento teal/cyan quente, sem dourado.
 class _K9Card extends StatelessWidget {
-  final Dog? dog;
-  final String dogName;
+  final Dog? crewDog;
+  final String? conductorName;
 
-  const _K9Card({required this.dog, required this.dogName});
+  const _K9Card({
+    required this.crewDog,
+    this.conductorName,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -559,16 +747,7 @@ class _K9Card extends StatelessWidget {
     const k9Accent = Color(0xFF26C6DA); // cyan mais quente
     const k9AccentBg = Color(0xFF0A2E35); // background card
 
-    // Buscar quem é o condutor deste cão
-    final shiftVM = context.watch<ShiftViewModel>();
-    final userVM = Provider.of<UserViewModel>(context, listen: false);
-
-    final handlerId = shiftVM.handlerId;
-    final conductorName = handlerId != null
-        ? userVM.displayNameFor(ra: handlerId)
-        : null;
-
-    final hasDog = dog != null && dog!.id.trim().isNotEmpty;
+    final hasDog = crewDog != null && crewDog!.id.trim().isNotEmpty;
 
     return Container(
       padding: const EdgeInsets.all(8),
@@ -585,7 +764,7 @@ class _K9Card extends StatelessWidget {
                 // Foto do cão — retangular crachá (~3:4)
                 _K9Photo(
                   size: 56,
-                  imageUrl: dog?.profileImageUrl,
+                  imageUrl: crewDog?.profileImageUrl,
                   accent: k9Accent,
                 ),
                 const SizedBox(width: 8),
@@ -608,7 +787,7 @@ class _K9Card extends StatelessWidget {
                       ),
                       const SizedBox(height: 1),
                       Text(
-                        dogName.isNotEmpty ? dogName : dog!.name,
+                        crewDog!.name,
                         style: GoogleFonts.inter(
                           color: AppTheme.textPrimary,
                           fontSize: 13,
@@ -617,7 +796,7 @@ class _K9Card extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (conductorName != null) ...[
+                      if (conductorName != null && conductorName!.trim().isNotEmpty) ...[
                         const SizedBox(height: 1),
                         Text(
                           'com $conductorName',

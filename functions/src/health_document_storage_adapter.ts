@@ -126,6 +126,7 @@ export function createAdminHealthDocumentStorageAdapter(
       sourceGeneration: string;
       destinationPath: string;
       sealMetadata: Record<string, string>;
+      contentType?: string;
     }): Promise<{sealed: boolean}> => {
       const bucket = resolveBucket();
       const source = bucket.file(params.sourcePath, {
@@ -135,6 +136,7 @@ export function createAdminHealthDocumentStorageAdapter(
       try {
         await source.copy(destination, {
           preconditionOpts: {ifGenerationMatch: 0},
+          contentType: params.contentType,
           // `CopyOptions.metadata` é serializado como o corpo do `rewriteTo`,
           // que é um Object resource — e nele a chave `metadata` É o mapa de
           // custom metadata. Portanto o mapa vai FLAT aqui (aninhar produziria

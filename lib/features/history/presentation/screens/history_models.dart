@@ -156,6 +156,52 @@ class RecordDetail {
     required this.source,
   });
 
+  RecordDetail copyWith({
+    String? id,
+    HistoryEntryType? type,
+    String? category,
+    String? title,
+    String? subtitle,
+    String? location,
+    DateTime? dateTime,
+    String? author,
+    String? dogName,
+    String? handlerName,
+    String? status,
+    String? syncStatus,
+    String? duration,
+    String? team,
+    String? notes,
+    IconData? icon,
+    Color? color,
+    List<InternalEvent>? internalEvents,
+    List<AuditEvent>? auditEvents,
+    HistoryEntry? source,
+  }) {
+    return RecordDetail(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      category: category ?? this.category,
+      title: title ?? this.title,
+      subtitle: subtitle ?? this.subtitle,
+      location: location ?? this.location,
+      dateTime: dateTime ?? this.dateTime,
+      author: author ?? this.author,
+      dogName: dogName ?? this.dogName,
+      handlerName: handlerName ?? this.handlerName,
+      status: status ?? this.status,
+      syncStatus: syncStatus ?? this.syncStatus,
+      duration: duration ?? this.duration,
+      team: team ?? this.team,
+      notes: notes ?? this.notes,
+      icon: icon ?? this.icon,
+      color: color ?? this.color,
+      internalEvents: internalEvents ?? this.internalEvents,
+      auditEvents: auditEvents ?? this.auditEvents,
+      source: source ?? this.source,
+    );
+  }
+
   String get typeLabel {
     switch (type) {
       case HistoryEntryType.health:
@@ -213,8 +259,13 @@ class RecordDetail {
     // ('Ragonha'/'GCM ...'), não inventar condutor nem responsável técnico.
     final isAuthorlessWeight =
         details['_healthKind'] == 'weight' && entry.author.trim().isEmpty;
+    final isOccurrence = entry.type == HistoryEntryType.occurrence;
 
-    final author = isAuthorlessWeight ? '' : _normalizeAuthor(entry.author);
+    final author = isAuthorlessWeight
+        ? ''
+        : isOccurrence
+            ? _normalizeOccurrenceAuthor(entry.author)
+            : _normalizeAuthor(entry.author);
     final handlerName = isAuthorlessWeight
         ? _detailValue(details, const [
             'Condutor',
@@ -228,11 +279,11 @@ class RecordDetail {
               'Responsavel',
             ]),
             author.replaceFirst('GCM ', ''),
-            'Ragonha',
+            isOccurrence ? 'Não informado' : 'Ragonha',
           ]);
     final dogName = _firstNonEmpty([
       _detailValue(details, const ['Cão', 'Cao', 'Dog', 'dogName']),
-      'Bono',
+      isOccurrence ? 'Sem cão' : 'Bono',
     ]);
 
     final rawStatus = _firstNonEmpty([
@@ -260,7 +311,9 @@ class RecordDetail {
     final duration = _firstNonEmpty([
       _detailValue(details, const ['Duração', 'Duracao', 'DuraÃÂ§ÃÂ£o']),
       _occurrenceDuration(entry),
-      entry.type == HistoryEntryType.occurrence ? '42 min' : 'Não informado',
+      entry.type == HistoryEntryType.occurrence
+          ? (entry.isInProgress ? 'Em andamento' : 'Não informado')
+          : 'Não informado',
     ]);
 
     return RecordDetail(
@@ -280,7 +333,7 @@ class RecordDetail {
       team: _firstNonEmpty([
         _detailValue(details, const ['Equipe', 'team']),
         entry.type == HistoryEntryType.occurrence
-            ? '2 GCMs'
+            ? 'Não informada'
             : 'Equipe não informada',
       ]),
       notes: notes,
@@ -348,6 +401,16 @@ class RecordDetail {
     return 'GCM $cleaned';
   }
 
+  static String _normalizeOccurrenceAuthor(String author) {
+    final cleaned = _cleanText(author).trim();
+    if (cleaned.isEmpty) return 'Não informado';
+    if (cleaned == 'Você') return 'Você';
+    if (cleaned.startsWith('GCM ') || cleaned.startsWith('Veterinário')) {
+      return cleaned;
+    }
+    return 'GCM $cleaned';
+  }
+
   static String _normalizeStatus(String status) {
     final cleaned = _cleanText(status).trim();
     final lower = cleaned.toLowerCase();
@@ -372,21 +435,27 @@ class RecordDetail {
     if (startRaw.isEmpty || endRaw.isEmpty) return '';
 
     final start = _parseTimeOnDate(startRaw, entry.time);
-    final end = _parseTimeOnDate(endRaw, entry.time);
-    if (start == null || end == null || end.isBefore(start)) return '';
+    var end = _parseTimeOnDate(endRaw, entry.time);
+    if (start == null || end == null) return '';
+    if (end.isBefore(start)) {
+      end = end.add(const Duration(days: 1));
+    }
 
+    final diffSeconds = end.difference(start).inSeconds;
+    if (diffSeconds == 0) return '0 min';
+    if (diffSeconds < 60) return '< 1 min';
     final minutes = end.difference(start).inMinutes;
-    if (minutes <= 0) return '';
     return '$minutes min';
   }
 
   static DateTime? _parseTimeOnDate(String raw, DateTime date) {
-    final match = RegExp(r'(\d{1,2}):(\d{2})').firstMatch(raw);
+    final match = RegExp(r'(\d{1,2}):(\d{2})(?::(\d{2}))?').firstMatch(raw);
     if (match == null) return null;
     final hour = int.tryParse(match.group(1)!);
     final minute = int.tryParse(match.group(2)!);
-    if (hour == null || minute == null) return null;
-    return DateTime(date.year, date.month, date.day, hour, minute);
+    final second = match.group(3) != null ? int.tryParse(match.group(3)!) : 0;
+    if (hour == null || minute == null || second == null) return null;
+    return DateTime(date.year, date.month, date.day, hour, minute, second);
   }
 
   static List<InternalEvent> _internalEventsFor(HistoryEntry entry) {
@@ -657,4 +726,199 @@ class AuditEvent {
     required this.action,
     this.user = '',
   });
+}
+
+class OccurrenceHistoryBuilder {
+  static String formatDuration(DateTime start, DateTime end) {
+    var normalizedEnd = end;
+    if (normalizedEnd.isBefore(start)) {
+      normalizedEnd = normalizedEnd.add(const Duration(days: 1));
+    }
+    final diffSeconds = normalizedEnd.difference(start).inSeconds;
+    if (diffSeconds == 0) {
+      return '0 min';
+    }
+    if (diffSeconds < 60) {
+      return '< 1 min';
+    }
+    final diffMinutes = normalizedEnd.difference(start).inMinutes;
+    return '$diffMinutes min';
+  }
+
+  static List<Map<String, dynamic>> aggregateMediaAttachments({
+    List<dynamic> baseAttachments = const [],
+    List<OccurrenceEvent> events = const [],
+    Occurrence? occurrence,
+  }) {
+    final seenUrls = <String>{};
+    final aggregated = <Map<String, dynamic>>[];
+
+    // 1. Process active-event media
+    for (final event in events) {
+      for (final rawUrl in event.photoUrls) {
+        final url = rawUrl.trim();
+        if (url.isEmpty) continue;
+        if (seenUrls.add(url)) {
+          final item = <String, dynamic>{
+            'url': url,
+            'timestamp': event.timestamp,
+            'category': 'evento',
+            'source': 'evento',
+          };
+          if (event.id.trim().isNotEmpty) {
+            item['eventId'] = event.id.trim();
+          }
+          if (event.title?.trim().isNotEmpty == true) {
+            item['title'] = event.title!.trim();
+          }
+          aggregated.add(item);
+        }
+      }
+    }
+
+    // 2. Process finalization media from root occurrence if available
+    if (occurrence != null && occurrence.finalizationPhotos.isNotEmpty) {
+      final finTimestamp = occurrence.finalizedAt ?? occurrence.updatedAt;
+      for (final rawUrl in occurrence.finalizationPhotos) {
+        final url = rawUrl.trim();
+        if (url.isEmpty) continue;
+        if (seenUrls.add(url)) {
+          aggregated.add({
+            'url': url,
+            'timestamp': finTimestamp,
+            'category': 'finalizacao',
+            'source': 'finalizacao',
+          });
+        }
+      }
+    }
+
+    // 3. Process base attachments (e.g. from existing details['_mediaAttachments'])
+    for (final item in baseAttachments) {
+      if (item is Map) {
+        final rawUrl = item['url']?.toString() ?? '';
+        final url = rawUrl.trim();
+        if (url.isEmpty) continue;
+        if (seenUrls.add(url)) {
+          final copy = Map<String, dynamic>.from(item);
+          copy['url'] = url;
+          copy.putIfAbsent('source', () => copy['category'] ?? 'finalizacao');
+          copy.putIfAbsent('category', () => 'finalizacao');
+          aggregated.add(copy);
+        }
+      } else if (item is String) {
+        final url = item.trim();
+        if (url.isEmpty) continue;
+        if (seenUrls.add(url)) {
+          aggregated.add({
+            'url': url,
+            'timestamp': occurrence?.finalizedAt ?? occurrence?.updatedAt,
+            'category': 'finalizacao',
+            'source': 'finalizacao',
+          });
+        }
+      }
+    }
+
+    return aggregated;
+  }
+
+  static RecordDetail enrichDetailWithEvents(
+    RecordDetail detail,
+    List<OccurrenceEvent> events,
+  ) {
+    if (events.isEmpty) {
+      return detail;
+    }
+
+    final occ = detail.source.originalModel is Occurrence
+        ? detail.source.originalModel as Occurrence
+        : null;
+
+    final baseAttachments =
+        detail.source.details['_mediaAttachments'] as List<dynamic>? ??
+        const [];
+
+    final aggregated = aggregateMediaAttachments(
+      baseAttachments: baseAttachments,
+      events: events,
+      occurrence: occ,
+    );
+
+    final updatedDetails = Map<String, dynamic>.from(detail.source.details);
+    updatedDetails['_mediaAttachments'] = aggregated;
+
+    final updatedSource = detail.source.copyWith(details: updatedDetails);
+    return detail.copyWith(source: updatedSource);
+  }
+
+  static HistoryEntry buildEntry(
+    Occurrence occ, {
+    String resolvedDogName = 'Sem cão',
+    bool isYou = true,
+    String author = 'Você',
+    List<OccurrenceEvent>? events,
+  }) {
+    final isOpen =
+        occ.status == OccurrenceStatus.inProgress ||
+        occ.status == OccurrenceStatus.finalizing;
+
+    String? duration;
+    if (occ.finalizedAt != null) {
+      duration = formatDuration(occ.startedAt, occ.finalizedAt!);
+    } else if (occ.durationTotal != null && occ.durationTotal! > 0) {
+      duration = '${occ.durationTotal} min';
+    } else if (isOpen) {
+      duration = 'Em andamento';
+    }
+
+    String teamSummary = 'Não informada';
+    if (occ.team.isNotEmpty) {
+      final count = occ.team.length;
+      teamSummary = '$count integrante${count > 1 ? 's' : ''}';
+    }
+
+    final mediaAttachments = aggregateMediaAttachments(
+      events: events ?? const [],
+      occurrence: occ,
+    );
+
+    return HistoryEntry(
+      id: occ.id,
+      type: HistoryEntryType.occurrence,
+      title: 'Ocorrência · ${occ.typeName}',
+      subtitle: occ.locationAddress?.trim().isNotEmpty == true
+          ? occ.locationAddress!.trim()
+          : 'Local não informado',
+      time: occ.startedAt,
+      author: isYou ? 'Você' : author,
+      authorId: occ.primaryHandlerId,
+      tag: isYou ? 'VOCÊ' : 'OCORRÊNCIA',
+      icon: Icons.assignment_outlined,
+      color: isYou ? _hYellow : _hCyan,
+      location: occ.locationAddress ?? '',
+      isInProgress: isOpen,
+      editedAt: occ.auditTrail.length > 1 ? occ.updatedAt : null,
+      originalModel: occ,
+      details: {
+        'Tipo': occ.typeName,
+        'Status': occ.status.toMap(),
+        'Cão': resolvedDogName,
+        if (occ.locationAddress?.isNotEmpty == true)
+          'Local': occ.locationAddress,
+        'Condutor': author,
+        'Início': DateFormat('HH:mm').format(occ.startedAt),
+        if (occ.finalizedAt != null)
+          'Fim': DateFormat('HH:mm').format(occ.finalizedAt!),
+        if (duration != null && duration.isNotEmpty) 'Duração': duration,
+        'Equipe': teamSummary,
+        if (occ.finalReport?.isNotEmpty == true) 'Descrição': occ.finalReport,
+        if (occ.results.isNotEmpty)
+          '_outcomes': occ.results.map((r) => r.toMap()).toList(),
+        if (occ.auditTrail.isNotEmpty) '_auditTrail': occ.auditTrail,
+        if (mediaAttachments.isNotEmpty)
+          '_mediaAttachments': mediaAttachments,
+      },
+    );
+  }
 }

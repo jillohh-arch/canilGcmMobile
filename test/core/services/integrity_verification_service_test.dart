@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 import 'package:canil_gcm/core/domain/occurrence_participation.dart';
 import 'package:canil_gcm/core/domain/occurrence_signature.dart';
@@ -10,6 +14,33 @@ import 'package:canil_gcm/features/occurrences/domain/occurrence.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_event_category.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
+
+/// FF-OCC-09: `verifyById` passou a obter o estado documental do verificador
+/// oficial. Os testes que o exercitam injetam a resposta autoritativa para
+/// permanecerem herméticos — nenhuma requisição real é feita.
+MockClient _authoritativeClient({
+  required String occurrenceId,
+  required String storedHash,
+  required int hashVersion,
+  String status = 'intact',
+  bool documentIntact = true,
+}) {
+  return MockClient((_) async {
+    return http.Response(
+      jsonEncode({
+        'occurrence_id': occurrenceId,
+        'status': status,
+        'sealed': true,
+        'intact': documentIntact,
+        'document_intact': documentIntact,
+        'stored_hash': storedHash,
+        'hash_version': hashVersion,
+      }),
+      200,
+      headers: const {'content-type': 'application/json'},
+    );
+  });
+}
 
 void main() {
   group('IntegrityVerificationService', () {
@@ -121,41 +152,46 @@ void main() {
       }
     });
 
-    test(
-      'verificacao profunda quebra selo quando bytes da foto mudam',
-      () async {
-        final db = FakeFirebaseFirestore();
-        final event = _event(photoHash: 'foto-a');
-        final base = _occurrence();
-        final hash = OccurrenceFinalizationService.calculateIntegrityHashV2For(
-          base,
-          events: [event],
-        );
-        final sealed = base.copyWith(integrityHash: hash, hashVersion: 2);
-        await db.collection('occurrences').doc(sealed.id).set(sealed.toMap());
-        await db
-            .collection('occurrences')
-            .doc(sealed.id)
-            .collection('events')
-            .doc(event.id)
-            .set(event.toMap());
+    test('verificacao profunda detecta midia divergente sem quebrar o selo '
+        'documental', () async {
+      final db = FakeFirebaseFirestore();
+      final event = _event(photoHash: 'foto-a');
+      final base = _occurrence();
+      final hash = OccurrenceFinalizationService.calculateIntegrityHashV2For(
+        base,
+        events: [event],
+      );
+      final sealed = base.copyWith(integrityHash: hash, hashVersion: 2);
+      await db.collection('occurrences').doc(sealed.id).set(sealed.toMap());
+      await db
+          .collection('occurrences')
+          .doc(sealed.id)
+          .collection('events')
+          .doc(event.id)
+          .set(event.toMap());
 
-        final service = IntegrityVerificationService(
-          firestore: db,
-          mediaHashReader: (_, {int maxBytes = 20 * 1024 * 1024}) async =>
-              'foto-trocada',
-        );
+      final service = IntegrityVerificationService(
+        firestore: db,
+        httpClient: _authoritativeClient(
+          occurrenceId: sealed.id,
+          storedHash: hash,
+          hashVersion: 2,
+        ),
+        mediaHashReader: (_, {int maxBytes = 20 * 1024 * 1024}) async =>
+            'foto-trocada',
+      );
 
-        final verdict = await service.verifyById(
-          sealed.id,
-          verifyMediaBytes: true,
-        );
+      final verdict = await service.verifyById(
+        sealed.id,
+        verifyMediaBytes: true,
+      );
 
-        expect(verdict.status, IntegrityStatus.broken);
-        expect(verdict.checkedMediaCount, 1);
-        expect(verdict.mediaIssues.single, contains('SHA-256'));
-      },
-    );
+      // FF-OCC-09: o documento continua integro segundo a autoridade; a
+      // divergencia de midia e reportada pelo canal proprio.
+      expect(verdict.status, IntegrityStatus.intact);
+      expect(verdict.checkedMediaCount, 1);
+      expect(verdict.mediaIssues.single, contains('SHA-256'));
+    });
 
     test('verificacao profunda mantem selo quando bytes conferem', () async {
       final db = FakeFirebaseFirestore();
@@ -176,6 +212,11 @@ void main() {
 
       final service = IntegrityVerificationService(
         firestore: db,
+        httpClient: _authoritativeClient(
+          occurrenceId: sealed.id,
+          storedHash: hash,
+          hashVersion: 2,
+        ),
         mediaHashReader: (_, {int maxBytes = 20 * 1024 * 1024}) async =>
             'foto-a',
       );

@@ -271,5 +271,153 @@ void main() {
         expect(result, isNull);
       });
     });
+
+    group('findOpenForHandler', () {
+      test('retorna ocorrencia aberta para integrante da equipe sem cao pessoal', () async {
+        final occ = Occurrence(
+          id: 'occ-aux',
+          shiftId: 'shift-001',
+          primaryHandlerId: 'uid-titular',
+          primaryHandlerRa: '691755',
+          dogId: 'dog-service',
+          typeCode: 'AVERIGUACAO',
+          typeName: 'Averiguação',
+          startedAt: now,
+          createdAt: now,
+          updatedAt: now,
+          status: OccurrenceStatus.inProgress,
+          team: [
+            OccurrenceTeamMember(
+              handlerId: '691755',
+              role: TeamRole.titular,
+              addedAt: now,
+              addedBy: '691755',
+            ),
+            OccurrenceTeamMember(
+              handlerId: '691640',
+              role: TeamRole.integrante,
+              addedAt: now,
+              addedBy: '691755',
+            ),
+          ],
+        );
+        await repository.create(occ);
+
+        final result = await repository.findOpenForHandler('691640');
+        expect(result, isNotNull);
+        expect(result!.id, equals('occ-aux'));
+        expect(result.primaryHandlerRa, equals('691755'));
+      });
+
+      test('retorna null se todas ocorrencias do condutor estao finalizadas', () async {
+        final occ = Occurrence(
+          id: 'occ-closed',
+          shiftId: 'shift-001',
+          primaryHandlerId: 'uid-titular',
+          primaryHandlerRa: '691755',
+          dogId: 'dog-service',
+          typeCode: 'AVERIGUACAO',
+          typeName: 'Averiguação',
+          startedAt: now,
+          createdAt: now,
+          updatedAt: now,
+          status: OccurrenceStatus.finalized,
+          team: [
+            OccurrenceTeamMember(
+              handlerId: '691640',
+              role: TeamRole.integrante,
+              addedAt: now,
+              addedBy: '691755',
+            ),
+          ],
+        );
+        await repository.create(occ);
+
+        final result = await repository.findOpenForHandler('691640');
+        expect(result, isNull);
+      });
+    });
+
+    group('findOpenForContext', () {
+      test('prioriza busca por cao quando fornecido e encontrado', () async {
+        await repository.create(buildOccurrence(id: 'occ-by-dog', dogId: 'dog-alpha'));
+        final result = await repository.findOpenForContext(
+          dogId: 'dog-alpha',
+          handlerRa: '691640',
+        );
+        expect(result, isNotNull);
+        expect(result!.id, equals('occ-by-dog'));
+      });
+
+      test('faz fallback para handlerRa quando dogId e null ou nao encontra', () async {
+        final occ = Occurrence(
+          id: 'occ-fallback',
+          shiftId: 'shift-001',
+          primaryHandlerId: 'uid-titular',
+          primaryHandlerRa: '691755',
+          dogId: '',
+          typeCode: 'AVERIGUACAO',
+          typeName: 'Averiguação',
+          startedAt: now,
+          createdAt: now,
+          updatedAt: now,
+          status: OccurrenceStatus.inProgress,
+          team: [
+            OccurrenceTeamMember(
+              handlerId: '691640',
+              role: TeamRole.integrante,
+              addedAt: now,
+              addedBy: '691755',
+            ),
+          ],
+        );
+        await repository.create(occ);
+
+        final resultWithNullDog = await repository.findOpenForContext(
+          dogId: null,
+          handlerRa: '691640',
+        );
+        expect(resultWithNullDog, isNotNull);
+        expect(resultWithNullDog!.id, equals('occ-fallback'));
+
+        final resultWithOtherDog = await repository.findOpenForContext(
+          dogId: 'dog-non-existent',
+          handlerRa: '691640',
+        );
+        expect(resultWithOtherDog, isNotNull);
+        expect(resultWithOtherDog!.id, equals('occ-fallback'));
+      });
+    });
+
+    group('watchOpenForHandler', () {
+      test('emite ocorrencia aberta para integrante da equipe', () async {
+        final occ = Occurrence(
+          id: 'occ-stream',
+          shiftId: 'shift-001',
+          primaryHandlerId: 'uid-titular',
+          primaryHandlerRa: '691755',
+          dogId: '',
+          typeCode: 'AVERIGUACAO',
+          typeName: 'Averiguação',
+          startedAt: now,
+          createdAt: now,
+          updatedAt: now,
+          status: OccurrenceStatus.inProgress,
+          team: [
+            OccurrenceTeamMember(
+              handlerId: '691640',
+              role: TeamRole.integrante,
+              addedAt: now,
+              addedBy: '691755',
+            ),
+          ],
+        );
+        await repository.create(occ);
+
+        final emitted = await repository.watchOpenForHandler('691640').first;
+        expect(emitted, isNotNull);
+        expect(emitted!.id, equals('occ-stream'));
+      });
+    });
   });
 }

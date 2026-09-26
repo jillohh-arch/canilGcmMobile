@@ -31,7 +31,7 @@ import 'package:canil_gcm/features/users/presentation/screens/profile_screen.dar
 /// )
 /// ```
 class BinomioHeader extends StatelessWidget {
-  final Dog dog;
+  final Dog? dog;
 
   /// Texto abaixo do binômio (ex: "Turno ativo · há 5h", "MANUTENÇÃO OPERACIONAL")
   final String? subtitle;
@@ -89,7 +89,7 @@ class BinomioHeader extends StatelessWidget {
 
   const BinomioHeader({
     super.key,
-    required this.dog,
+    this.dog,
     this.subtitle,
     this.subtitleColor,
     this.dogBorderColor,
@@ -115,7 +115,7 @@ class BinomioHeader extends StatelessWidget {
     final userVM = Provider.of<UserViewModel>(context);
     final authVM = Provider.of<AuthViewModel>(context);
     final currentRa = HandlerIdentityService.raFromUser(authVM.user);
-    final handlerRa = currentRa ?? dog.conductorRa;
+    final handlerRa = currentRa ?? dog?.conductorRa;
     final notificationRa = notificationUserId?.trim().isNotEmpty == true
         ? notificationUserId!.trim()
         : currentRa;
@@ -153,35 +153,43 @@ class BinomioHeader extends StatelessWidget {
         ),
         const SizedBox(width: 10),
 
-        // Avatares sobrepostos
-        SizedBox(
-          width: avatarSize * 1.7,
-          height: avatarSize + 4,
-          child: Stack(
-            children: [
-              Positioned(
-                left: 0,
-                top: 2,
-                child: _BinomioAvatar(
-                  imageUrl: dog.profileImageUrl,
-                  fallbackText: dog.name.isNotEmpty ? dog.name[0] : 'K',
-                  borderColor: dogColor,
-                  size: avatarSize,
+        // Avatares
+        if (dog != null)
+          SizedBox(
+            width: avatarSize * 1.7,
+            height: avatarSize + 4,
+            child: Stack(
+              children: [
+                Positioned(
+                  left: 0,
+                  top: 2,
+                  child: _BinomioAvatar(
+                    imageUrl: dog!.profileImageUrl,
+                    fallbackText: dog!.name.isNotEmpty ? dog!.name[0] : 'K',
+                    borderColor: dogColor,
+                    size: avatarSize,
+                  ),
                 ),
-              ),
-              Positioned(
-                left: avatarSize * 0.65,
-                top: 2,
-                child: _BinomioAvatar(
-                  imageUrl: resolvedConductorPhotoUrl,
-                  fallbackIcon: Icons.person_rounded,
-                  borderColor: conductorColor,
-                  size: avatarSize,
+                Positioned(
+                  left: avatarSize * 0.65,
+                  top: 2,
+                  child: _BinomioAvatar(
+                    imageUrl: resolvedConductorPhotoUrl,
+                    fallbackIcon: Icons.person_rounded,
+                    borderColor: conductorColor,
+                    size: avatarSize,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
+          )
+        else
+          _BinomioAvatar(
+            imageUrl: resolvedConductorPhotoUrl,
+            fallbackIcon: Icons.person_rounded,
+            borderColor: conductorColor,
+            size: avatarSize,
           ),
-        ),
         const SizedBox(width: 12),
 
         // Nomes + subtitle
@@ -191,7 +199,7 @@ class BinomioHeader extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '${dog.name} · $handlerName',
+                dog != null ? '${dog!.name} · $handlerName' : handlerName,
                 style: GoogleFonts.inter(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
@@ -235,7 +243,7 @@ class BinomioHeader extends StatelessWidget {
         if (trailing != null) ...[const SizedBox(width: 8), trailing!],
         if (showNotificationButton && notificationRa != null) ...[
           const SizedBox(width: 8),
-          _HeaderNotificationBell(userId: notificationRa),
+          HeaderNotificationBell(userId: notificationRa),
         ],
         const SizedBox(width: 8),
       ],
@@ -291,10 +299,10 @@ class _HeaderMenuVisualButton extends StatelessWidget {
   }
 }
 
-class _HeaderNotificationBell extends StatelessWidget {
+class HeaderNotificationBell extends StatelessWidget {
   final String userId;
 
-  const _HeaderNotificationBell({required this.userId});
+  const HeaderNotificationBell({super.key, required this.userId});
 
   @override
   Widget build(BuildContext context) {
@@ -360,14 +368,14 @@ class _HeaderNotificationBell extends StatelessWidget {
 enum _HeaderMenuAction { profile, team, dog, switchDog, endShift, logout }
 
 class _HeaderMenuButton extends StatelessWidget {
-  final Dog dog;
+  final Dog? dog;
   final bool showProfile;
   final VoidCallback? onProfileTap;
   final VoidCallback? onDogHealthTap;
   final VoidCallback? onSwitchDog;
 
   const _HeaderMenuButton({
-    required this.dog,
+    this.dog,
     required this.showProfile,
     required this.onProfileTap,
     required this.onDogHealthTap,
@@ -409,11 +417,12 @@ class _HeaderMenuButton extends StatelessWidget {
               'Minha equipe',
               enabled: hasCrew,
             ),
-            _menuItem(_HeaderMenuAction.dog, Icons.pets_rounded, 'Meu K9'),
+            if (dog != null)
+              _menuItem(_HeaderMenuAction.dog, Icons.pets_rounded, 'Meu K9'),
             _menuItem(
               _HeaderMenuAction.switchDog,
               Icons.compare_arrows_rounded,
-              'Trocar K9',
+              dog != null ? 'Trocar K9' : 'Associar K9',
               enabled: hasActiveShift && onSwitchDog != null,
             ),
             const PopupMenuDivider(height: 10),
@@ -495,12 +504,13 @@ class _HeaderMenuButton extends StatelessWidget {
         );
         break;
       case _HeaderMenuAction.dog:
+        if (dog == null) break;
         if (onDogHealthTap != null) {
           onDogHealthTap!();
         } else {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => DogHealthProntuarioScreen(dogId: dog.id),
+              builder: (_) => DogHealthProntuarioScreen(dogId: dog!.id),
             ),
           );
         }
@@ -550,6 +560,11 @@ class _HeaderMenuButton extends StatelessWidget {
     // Sem guard de mounted: ao encerrar o turno o app troca de tela e desmonta
     // este widget. O AppFeedback detecta isso e roteia para o messenger global,
     // que sobrevive à navegação.
+    if (shiftVM.error != null && shiftVM.error!.trim().isNotEmpty) {
+      // ignore: use_build_context_synchronously
+      AppFeedback.error(context, shiftVM.error!);
+      return;
+    }
     // ignore: use_build_context_synchronously
     AppFeedback.success(context, 'Expediente finalizado. Bom descanso, GCM!', title: 'Até logo');
   }

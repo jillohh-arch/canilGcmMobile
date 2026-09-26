@@ -25,16 +25,19 @@ class OccurrenceViewModel extends ChangeNotifier {
   final OccurrenceRepository _repository;
   final OccurrenceEventRepository _eventRepository;
   final SignatureRepository _signatureRepository;
+  final NotificationService _notificationService;
   final bool _sendTeamNotifications;
 
   OccurrenceViewModel({
     required OccurrenceRepository repository,
     required OccurrenceEventRepository eventRepository,
     SignatureRepository? signatureRepository,
+    NotificationService? notificationService,
     bool sendTeamNotifications = true,
   }) : _repository = repository,
        _eventRepository = eventRepository,
        _signatureRepository = signatureRepository ?? SignatureRepository(),
+       _notificationService = notificationService ?? NotificationService(),
        _sendTeamNotifications = sendTeamNotifications;
 
   // ─── Estado ─────────────────────────────────────────────────────────
@@ -79,6 +82,22 @@ class OccurrenceViewModel extends ChangeNotifier {
         );
   }
 
+  void watchByHandler(String handlerRa) {
+    _occurrencesSub?.cancel();
+    _occurrencesSub = _repository
+        .watchByHandler(handlerRa)
+        .listen(
+          (list) {
+            _occurrences = list;
+            notifyListeners();
+          },
+          onError: (e) {
+            _error = 'Erro ao carregar ocorrências: $e';
+            notifyListeners();
+          },
+        );
+  }
+
   void watchOpen(String dogId) {
     _openSub?.cancel();
     _openSub = _repository
@@ -92,6 +111,26 @@ class OccurrenceViewModel extends ChangeNotifier {
             debugPrint('[OccurrenceViewModel] watchOpen error: $e');
           },
         );
+  }
+
+  void watchOpenForHandler(String handlerRa) {
+    _openSub?.cancel();
+    _openSub = _repository
+        .watchOpenForHandler(handlerRa)
+        .listen(
+          (occ) {
+            _openOccurrence = occ;
+            notifyListeners();
+          },
+          onError: (e) {
+            debugPrint('[OccurrenceViewModel] watchOpenForHandler error: $e');
+          },
+        );
+  }
+
+  /// Retorna o stream reativo de uma ocorrência por ID.
+  Stream<Occurrence?> watchById(String id) {
+    return _repository.watchById(id);
   }
 
   void watchEvents(String occurrenceId) {
@@ -238,7 +277,6 @@ class OccurrenceViewModel extends ChangeNotifier {
   Future<void> _notifyTeamOccurrenceOpened(Occurrence occurrence) async {
     if (!_sendTeamNotifications) return;
 
-    final notificationService = NotificationService();
     final primaryRa = occurrence.primaryHandlerRa?.trim();
     final recipients = occurrence.team.where((member) {
       final handlerId = member.handlerId.trim();
@@ -248,7 +286,7 @@ class OccurrenceViewModel extends ChangeNotifier {
     for (final member in recipients) {
       try {
         final handlerId = member.handlerId.trim();
-        await notificationService.createNotification(
+        await _notificationService.createNotification(
           userId: handlerId,
           type: NotificationType.occurrenceParticipationRequested,
           occurrenceId: occurrence.id,
@@ -259,9 +297,9 @@ class OccurrenceViewModel extends ChangeNotifier {
           targetScreen: 'occurrence_active',
           actionRequired: true,
         );
-      } catch (error) {
+      } catch (error, stackTrace) {
         debugPrint(
-          '[OccurrenceViewModel] Falha ao notificar integrante ${member.handlerId}: $error',
+          '[OccurrenceViewModel] Falha ao notificar integrante ${member.handlerId}: $error\n$stackTrace',
         );
       }
     }
@@ -510,6 +548,20 @@ class OccurrenceViewModel extends ChangeNotifier {
 
   Future<Occurrence?> findOpen(String dogId) async {
     return _repository.findOpen(dogId);
+  }
+
+  Future<Occurrence?> findOpenForHandler(String handlerRa) async {
+    return _repository.findOpenForHandler(handlerRa);
+  }
+
+  Future<Occurrence?> findOpenForContext({
+    String? dogId,
+    String? handlerRa,
+  }) async {
+    return _repository.findOpenForContext(
+      dogId: dogId,
+      handlerRa: handlerRa,
+    );
   }
 
   Future<List<OccurrenceEvent>> getEvents(String occurrenceId) async {

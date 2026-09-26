@@ -23,6 +23,7 @@ import 'package:canil_gcm/features/occurrences/domain/occurrence_result.dart';
 import 'package:canil_gcm/features/occurrences/domain/amendment.dart';
 import 'package:canil_gcm/features/occurrences/data/amendment_repository.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/create_amendment_screen.dart';
+import 'package:canil_gcm/core/services/pdf_generator/occurrence_pdf_generator.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
@@ -41,13 +42,40 @@ const Color _green = AppTheme.success;
 const Color _amber = AppTheme.warning;
 const Color _red = AppTheme.error;
 
-class RegistroDetalhePage extends StatelessWidget {
+/// FF-OCC-09.C3.1: costura de testabilidade do card de integridade.
+///
+/// Representa somente a operação que o card precisa — obter o veredito — e não
+/// a dependência concreta de Firestore/HTTP. Em produção fica `null` e o
+/// caminho real (`IntegrityVerificationService().verifyById`) é usado sem
+/// alteração. Nos testes de widget, substitui a borda para permitir render
+/// hermético, sem trocar nenhuma regra de apresentação.
+typedef IntegrityVerifier =
+    Future<IntegrityVerdict> Function({required bool verifyMediaBytes});
+
+class RegistroDetalhePage extends StatefulWidget {
   final HistoryEntry entry;
-  const RegistroDetalhePage({super.key, required this.entry});
+  final Future<Uint8List> Function(BuildContext context, RecordDetail detail)?
+  pdfBytesBuilder;
+
+  const RegistroDetalhePage({
+    super.key,
+    required this.entry,
+    this.pdfBytesBuilder,
+  });
+
+  @override
+  State<RegistroDetalhePage> createState() => _RegistroDetalhePageState();
+}
+
+class _RegistroDetalhePageState extends State<RegistroDetalhePage> {
+  bool _isGeneratingPdf = false;
+  bool _isSharingPdf = false;
+
+  bool get _isBusy => _isGeneratingPdf || _isSharingPdf;
 
   @override
   Widget build(BuildContext context) {
-    final detail = RecordDetail.fromEntry(entry);
+    final detail = RecordDetail.fromEntry(widget.entry);
 
     // Determine the specialized body widget
     final Widget specificBody;
@@ -80,50 +108,57 @@ class RegistroDetalhePage extends StatelessWidget {
     return HistoryDetailScaffold(
       detail: detail,
       body: specificBody,
-      onPdfTap: () => _handlePdfAction(context, detail, share: false),
-      onShareTap: () => _handlePdfAction(context, detail, share: true),
+      onPdfTap: _isBusy ? null : () => _handlePdfAction(detail, share: false),
+      onShareTap: _isBusy ? null : () => _handlePdfAction(detail, share: true),
       onMenuTap: () => _openRecordMenu(context),
+      isGeneratingPdf: _isGeneratingPdf,
+      isSharingPdf: _isSharingPdf,
     );
   }
 
   Future<void> _handlePdfAction(
-    BuildContext context,
     RecordDetail detail, {
     required bool share,
   }) async {
+    if (_isBusy) return;
     final original = detail.source.originalModel;
     if (original is! Occurrence) {
       _notify(context, 'PDF disponível apenas para ocorrências.');
       return;
     }
 
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    AppFeedback.info(
-      context,
-      share ? 'Preparando compartilhamento...' : 'Gerando PDF...',
-    );
+    setState(() {
+      if (share) {
+        _isSharingPdf = true;
+      } else {
+        _isGeneratingPdf = true;
+      }
+    });
 
     final occurrenceVM = context.read<OccurrenceViewModel>();
     final dogVM = context.read<DogViewModel>();
     final authVM = context.read<AuthViewModel>();
     try {
-      final latestOcc = await occurrenceVM.getById(original.id) ?? original;
-      final events = await occurrenceVM.getEvents(original.id);
-      final matchingDogs = dogVM.dogs.where((d) => d.id == latestOcc.dogId);
-      final dog = matchingDogs.isNotEmpty ? matchingDogs.first : null;
-      if (dog == null) throw Exception('Dados do cão não disponíveis');
+      final Uint8List bytes;
+      if (widget.pdfBytesBuilder != null) {
+        bytes = await widget.pdfBytesBuilder!(context, detail);
+      } else {
+        final latestOcc = await occurrenceVM.getById(original.id) ?? original;
+        final events = await occurrenceVM.getEvents(original.id);
+        final matchingDogs = dogVM.dogs.where((d) => d.id == latestOcc.dogId);
+        final dog = matchingDogs.isNotEmpty ? matchingDogs.first : null;
+        if (dog == null) throw Exception('Dados do cão não disponíveis');
 
-      final bytes = await occurrenceVM.generatePdf(
-        occurrence: latestOcc,
-        events: events,
-        dog: dog,
-        handlerName: detail.handlerName,
-        handlerRa: HandlerIdentityService.raFromUser(authVM.user) ?? '',
-      );
+        bytes = await occurrenceVM.generatePdf(
+          occurrence: latestOcc,
+          events: events,
+          dog: dog,
+          handlerName: detail.handlerName,
+          handlerRa: HandlerIdentityService.raFromUser(authVM.user) ?? '',
+        );
+      }
 
-      if (!context.mounted) return;
-      messenger.hideCurrentSnackBar();
+      if (!mounted) return;
       final filename = 'Ocorrencia_${original.id.substring(0, 8)}.pdf';
       if (share) {
         await Printing.sharePdf(bytes: bytes, filename: filename);
@@ -131,9 +166,15 @@ class RegistroDetalhePage extends StatelessWidget {
         await Printing.layoutPdf(onLayout: (_) => bytes, name: filename);
       }
     } catch (e) {
-      if (!context.mounted) return;
-      messenger.hideCurrentSnackBar();
+      if (!mounted) return;
       AppFeedback.error(context, e, fallback: 'Erro ao gerar PDF.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGeneratingPdf = false;
+          _isSharingPdf = false;
+        });
+      }
     }
   }
 
@@ -194,9 +235,14 @@ class RegistroDetalhePage extends StatelessWidget {
 class HistoryDetailScaffold extends StatelessWidget {
   final RecordDetail detail;
   final Widget body;
-  final VoidCallback onPdfTap;
-  final VoidCallback onShareTap;
+  final VoidCallback? onPdfTap;
+  final VoidCallback? onShareTap;
   final VoidCallback onMenuTap;
+  final bool isGeneratingPdf;
+  final bool isSharingPdf;
+
+  /// Somente para testes de widget. `null` em produção.
+  final IntegrityVerifier? integrityVerifier;
 
   const HistoryDetailScaffold({
     super.key,
@@ -205,6 +251,9 @@ class HistoryDetailScaffold extends StatelessWidget {
     required this.onPdfTap,
     required this.onShareTap,
     required this.onMenuTap,
+    this.isGeneratingPdf = false,
+    this.isSharingPdf = false,
+    this.integrityVerifier,
   });
 
   @override
@@ -249,7 +298,12 @@ class HistoryDetailScaffold extends StatelessWidget {
               left: 0,
               right: 0,
               bottom: 0,
-              child: _CtaBar(onPdfTap: onPdfTap, onShareTap: onShareTap),
+              child: _CtaBar(
+                onPdfTap: onPdfTap,
+                onShareTap: onShareTap,
+                isGeneratingPdf: isGeneratingPdf,
+                isSharingPdf: isSharingPdf,
+              ),
             ),
           ],
         ),
@@ -361,8 +415,19 @@ class HistoryDetailScaffold extends StatelessWidget {
 
     // Secondary line representation
     String secondInfoLabel = 'OPERAÇÃO';
-    String secondInfoValue = '13:33 → 13:40';
-    if (detail.type == HistoryEntryType.training) {
+    String secondInfoValue = 'Não informado';
+    if (detail.type == HistoryEntryType.occurrence) {
+      secondInfoLabel = 'OPERAÇÃO';
+      final startStr = detail.source.details['Início']?.toString() ??
+          DateFormat('HH:mm').format(detail.dateTime);
+      final endStr = detail.source.details['Fim']?.toString();
+      if (endStr != null && endStr.isNotEmpty) {
+        secondInfoValue = '$startStr → $endStr';
+      } else {
+        secondInfoValue =
+            detail.source.isInProgress ? '$startStr → Em andamento' : startStr;
+      }
+    } else if (detail.type == HistoryEntryType.training) {
       secondInfoLabel = 'LINHA';
       secondInfoValue =
           detail.source.details['Linha'] ??
@@ -589,6 +654,7 @@ class HistoryDetailScaffold extends StatelessWidget {
       return _VerifiedOccurrenceIntegrityCard(
         detail: detail,
         occurrenceHash: occurrenceHash!,
+        integrityVerifier: integrityVerifier,
         onAuditTrail: () => _showAuditTrail(context),
         onCreateAmendment: () => _openCreateAmendment(context),
       );
@@ -999,11 +1065,15 @@ class _VerifiedOccurrenceIntegrityCard extends StatefulWidget {
   final VoidCallback onAuditTrail;
   final VoidCallback onCreateAmendment;
 
+  /// Somente para testes de widget. `null` em produção.
+  final IntegrityVerifier? integrityVerifier;
+
   const _VerifiedOccurrenceIntegrityCard({
     required this.detail,
     required this.occurrenceHash,
     required this.onAuditTrail,
     required this.onCreateAmendment,
+    this.integrityVerifier,
   });
 
   @override
@@ -1032,6 +1102,10 @@ class _VerifiedOccurrenceIntegrityCardState
   }
 
   Future<IntegrityVerdict> _verify({required bool verifyMediaBytes}) {
+    final override = widget.integrityVerifier;
+    if (override != null) {
+      return override(verifyMediaBytes: verifyMediaBytes);
+    }
     return IntegrityVerificationService().verifyById(
       widget.detail.id,
       verifyMediaBytes: verifyMediaBytes,
@@ -1052,25 +1126,36 @@ class _VerifiedOccurrenceIntegrityCardState
       builder: (context, snapshot) {
         final verdict = snapshot.data;
         final verifying = snapshot.connectionState == ConnectionState.waiting;
+        // FF-OCC-09.C2: somente um veredito intact comprovado pode aparecer
+        // como verificado. Ausencia de veredito, erro, verificacao
+        // indisponivel e documento nao selado sao estados de incerteza — nao
+        // podem herdar o verde/escudo de sucesso.
+        final status = verdict?.status;
+        final isSuccess = status == IntegrityStatus.intact;
+        final isBroken = status == IntegrityStatus.broken;
+        final isLegacy = status == IntegrityStatus.legacy;
         final color = verifying
             ? _cyan
-            : verdict?.status == IntegrityStatus.broken
+            : isBroken
             ? _red
-            : verdict?.status == IntegrityStatus.legacy
-            ? _amber
-            : _green;
+            : isSuccess
+            ? _green
+            : _amber;
         final icon = verifying
             ? Icons.hourglass_top_rounded
-            : verdict?.status == IntegrityStatus.broken
+            : isBroken
             ? Icons.gpp_bad_outlined
-            : verdict?.status == IntegrityStatus.legacy
+            : isSuccess
+            ? Icons.verified_user_outlined
+            : isLegacy
             ? Icons.history_edu_outlined
-            : Icons.verified_user_outlined;
+            : Icons.help_outline_rounded;
         final title = verifying
             ? (_deepMediaVerification
                   ? 'VERIFICANDO MIDIAS NO STORAGE'
                   : 'VERIFICANDO SELO SHA-256')
-            : '${(verdict?.label ?? 'Documento integro').toUpperCase()} - HASH V${verdict?.hashVersion ?? '?'}';
+            : '${(verdict?.label ?? 'Verificacao nao disponivel').toUpperCase()}'
+                  ' - HASH V${verdict?.hashVersion ?? '?'}';
 
         return _buildCard(
           color: color,
@@ -1276,13 +1361,93 @@ class _VerifiedOccurrenceIntegrityCardState
   }
 }
 
-class HistoryOccurrenceBody extends StatelessWidget {
+class HistoryOccurrenceBody extends StatefulWidget {
   final RecordDetail detail;
+  final List<OccurrenceEvent>? events;
+  final Future<List<OccurrenceEvent>>? eventsFuture;
 
-  const HistoryOccurrenceBody({super.key, required this.detail});
+  const HistoryOccurrenceBody({
+    super.key,
+    required this.detail,
+    this.events,
+    this.eventsFuture,
+  });
+
+  @override
+  State<HistoryOccurrenceBody> createState() => _HistoryOccurrenceBodyState();
+}
+
+class _HistoryOccurrenceBodyState extends State<HistoryOccurrenceBody> {
+  Future<List<OccurrenceEvent>>? _eventsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _initEventsFuture();
+  }
+
+  @override
+  void didUpdateWidget(covariant HistoryOccurrenceBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.detail.id != widget.detail.id ||
+        oldWidget.events != widget.events ||
+        oldWidget.eventsFuture != widget.eventsFuture) {
+      _initEventsFuture();
+    }
+  }
+
+  void _initEventsFuture() {
+    if (widget.events != null) {
+      _eventsFuture = null;
+    } else if (widget.eventsFuture != null) {
+      _eventsFuture = widget.eventsFuture;
+    } else {
+      _eventsFuture = _loadEvents();
+    }
+  }
+
+  Future<List<OccurrenceEvent>> _loadEvents() {
+    if (widget.detail.id.isEmpty) {
+      return Future.value(<OccurrenceEvent>[]);
+    }
+    try {
+      final occVM = Provider.of<OccurrenceViewModel>(context, listen: false);
+      return occVM.getEvents(widget.detail.id);
+    } catch (_) {
+      return Future.value(<OccurrenceEvent>[]);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (widget.events != null) {
+      final effectiveDetail = OccurrenceHistoryBuilder.enrichDetailWithEvents(
+        widget.detail,
+        widget.events!,
+      );
+      return _buildContent(context, effectiveDetail, widget.events);
+    }
+
+    return FutureBuilder<List<OccurrenceEvent>>(
+      future: _eventsFuture,
+      builder: (context, snapshot) {
+        final events = snapshot.data;
+        final effectiveDetail = (events != null && events.isNotEmpty)
+            ? OccurrenceHistoryBuilder.enrichDetailWithEvents(
+                widget.detail,
+                events,
+              )
+            : widget.detail;
+        return _buildContent(context, effectiveDetail, events);
+      },
+    );
+  }
+
+  Widget _buildContent(
+    BuildContext context,
+    RecordDetail detail,
+    List<OccurrenceEvent>? events,
+  ) {
     final outcomes = detail.source.details['_outcomes'] as List? ?? [];
     final mediaList = detail.source.details['_mediaAttachments'] as List? ?? [];
 
@@ -1311,6 +1476,13 @@ class HistoryOccurrenceBody extends StatelessWidget {
             } else if (o is String) {
               final res = OccurrenceResult.fromMap(o);
               label = res.label;
+              final occ = detail.source.originalModel;
+              if (occ is Occurrence && occ.details != null) {
+                if (res == OccurrenceResult.drugSeized) {
+                  final raw = occ.details!['drug_seized'];
+                  desc = OccurrencePdfGenerator.formatDrugDescription(raw);
+                }
+              }
             }
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
@@ -1369,7 +1541,11 @@ class HistoryOccurrenceBody extends StatelessWidget {
         const SizedBox(height: 16),
 
         // Timeline
-        _OccurrenceTimelineSection(occurrenceId: detail.id, fallback: detail),
+        _OccurrenceTimelineSection(
+          occurrenceId: detail.id,
+          fallback: detail,
+          events: events,
+        ),
         const SizedBox(height: 16),
 
         // Relato
@@ -1407,11 +1583,20 @@ class HistoryOccurrenceBody extends StatelessWidget {
               itemBuilder: (context, idx) {
                 final map = mediaList[idx] as Map;
                 final url = map['url']?.toString() ?? '';
-                final timestampStr = map['timestamp'] != null
-                    ? DateFormat(
-                        'HH:mm',
-                      ).format((map['timestamp'] as Timestamp).toDate())
-                    : '13:38';
+                final rawTs = map['timestamp'];
+                final DateTime? parsedTs;
+                if (rawTs is Timestamp) {
+                  parsedTs = rawTs.toDate();
+                } else if (rawTs is DateTime) {
+                  parsedTs = rawTs;
+                } else if (rawTs is String) {
+                  parsedTs = DateTime.tryParse(rawTs);
+                } else {
+                  parsedTs = null;
+                }
+                final timestampStr = parsedTs != null
+                    ? DateFormat('HH:mm').format(parsedTs)
+                    : '';
                 return Container(
                   width: 96,
                   height: 96,
@@ -3297,13 +3482,21 @@ class _MenuRow extends StatelessWidget {
 }
 
 class _CtaBar extends StatelessWidget {
-  final VoidCallback onPdfTap;
-  final VoidCallback onShareTap;
+  final VoidCallback? onPdfTap;
+  final VoidCallback? onShareTap;
+  final bool isGeneratingPdf;
+  final bool isSharingPdf;
 
-  const _CtaBar({required this.onPdfTap, required this.onShareTap});
+  const _CtaBar({
+    required this.onPdfTap,
+    required this.onShareTap,
+    this.isGeneratingPdf = false,
+    this.isSharingPdf = false,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final isBusy = isGeneratingPdf || isSharingPdf;
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 14, 18, 24),
       decoration: const BoxDecoration(
@@ -3317,9 +3510,18 @@ class _CtaBar extends StatelessWidget {
         children: [
           Expanded(
             child: ElevatedButton.icon(
-              onPressed: onPdfTap,
-              icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
-              label: const Text('Gerar PDF'),
+              onPressed: isBusy ? null : onPdfTap,
+              icon: isGeneratingPdf
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(_bg),
+                      ),
+                    )
+                  : const Icon(Icons.picture_as_pdf_outlined, size: 16),
+              label: Text(isGeneratingPdf ? 'Gerando...' : 'Gerar PDF'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _cyan,
                 foregroundColor: _bg,
@@ -3337,9 +3539,18 @@ class _CtaBar extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: OutlinedButton.icon(
-              onPressed: onShareTap,
-              icon: const Icon(Icons.share_outlined, size: 16),
-              label: const Text('Compartilhar'),
+              onPressed: isBusy ? null : onShareTap,
+              icon: isSharingPdf
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(_cyan),
+                      ),
+                    )
+                  : const Icon(Icons.share_outlined, size: 16),
+              label: Text(isSharingPdf ? 'Preparando...' : 'Compartilhar'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: _cyan,
                 side: const BorderSide(color: _cyan, width: 1.2),
@@ -3412,10 +3623,12 @@ class _OccurrenceDisplacementSectionState
 class _OccurrenceTimelineSection extends StatefulWidget {
   final String occurrenceId;
   final RecordDetail fallback;
+  final List<OccurrenceEvent>? events;
 
   const _OccurrenceTimelineSection({
     required this.occurrenceId,
     required this.fallback,
+    this.events,
   });
 
   @override
@@ -3452,6 +3665,29 @@ class _OccurrenceTimelineSectionState
 
   @override
   Widget build(BuildContext context) {
+    if (widget.events != null) {
+      final events = widget.events!;
+      if (events.isEmpty) {
+        return _buildTimelineList(
+          widget.fallback.internalEvents
+              .map(
+                (e) => OccurrenceEvent(
+                  id: '',
+                  occurrenceId: '',
+                  category: OccurrenceEventCategory.other,
+                  timestamp: e.time,
+                  title: e.title,
+                  description: e.subtitle,
+                  createdAt: e.time,
+                  updatedAt: e.time,
+                ),
+              )
+              .toList(),
+        );
+      }
+      return _buildTimelineList(events);
+    }
+
     if (widget.occurrenceId.isEmpty) {
       return _buildTimelineList(
         widget.fallback.internalEvents

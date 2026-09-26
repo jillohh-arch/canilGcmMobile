@@ -13,6 +13,7 @@ import 'package:canil_gcm/features/auth/presentation/viewmodels/auth_viewmodel.d
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/dogs/presentation/viewmodels/dog_viewmodel.dart';
 import 'package:canil_gcm/features/occurrences/domain/occurrence_nature.dart';
+import 'package:canil_gcm/features/occurrences/domain/occurrence_start_eligibility.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurrence_binomio.dart';
 import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurrence_cta.dart';
@@ -23,11 +24,78 @@ import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurr
 import 'package:canil_gcm/features/occurrences/presentation/widgets/start_occurrence_time_chips.dart';
 import 'package:canil_gcm/features/occurrences/presentation/screens/active_occurrence_screen.dart';
 import 'package:canil_gcm/features/shifts/data/vehicle_crew_service.dart';
+import 'package:canil_gcm/features/shifts/domain/vehicle_crew.dart';
 import 'package:canil_gcm/features/shifts/presentation/viewmodels/shift_viewmodel.dart';
 import 'package:canil_gcm/features/users/presentation/viewmodels/user_viewmodel.dart';
 
 class StartOccurrenceScreen extends StatefulWidget {
-  const StartOccurrenceScreen({super.key});
+  final VehicleCrewService? crewService;
+
+  const StartOccurrenceScreen({super.key, this.crewService});
+
+  static Dog? findDogForId(DogViewModel? dogVM, String? dogId) {
+    if (dogVM == null || dogId == null || dogId.isEmpty) return null;
+    for (final dog in dogVM.dogs) {
+      if (dog.id == dogId) return dog;
+    }
+    return null;
+  }
+
+  static List<OccurrenceTeamMember> buildGuarnicaoSnapshotMembers({
+    required List<VehicleCrewMember> activeMembers,
+    required String currentRa,
+    String? handlerAuthUid,
+    String? handlerEmail,
+    String? currentHandlerActiveDogId,
+    DogViewModel? dogVM,
+    UserViewModel? userVM,
+    DateTime? now,
+  }) {
+    final effectiveNow = now ?? DateTime.now();
+    final members = <OccurrenceTeamMember>[];
+    final seenHandlers = <String>{};
+
+    for (final member in activeMembers) {
+      final ra = member.handlerId.trim();
+      if (ra.isEmpty || !seenHandlers.add(ra)) continue;
+      final isCurrentHandler = ra == currentRa;
+
+      final rawMemberDogId = member.dogId?.trim();
+      final assignedDogId = (rawMemberDogId != null && rawMemberDogId.isNotEmpty)
+          ? rawMemberDogId
+          : (isCurrentHandler &&
+                  currentHandlerActiveDogId != null &&
+                  currentHandlerActiveDogId.trim().isNotEmpty)
+              ? currentHandlerActiveDogId.trim()
+              : null;
+      final assignedDog = findDogForId(dogVM, assignedDogId);
+
+      members.add(
+        OccurrenceTeamMember(
+          handlerId: ra,
+          authUid: member.authUid ?? (isCurrentHandler ? handlerAuthUid : null),
+          handlerEmail:
+              member.handlerEmail ??
+              (isCurrentHandler ? handlerEmail : null) ??
+              HandlerIdentityService.emailFromRa(ra),
+          displayName: userVM?.displayNameFor(ra: ra) ?? ra,
+          dogId: assignedDog?.id ?? assignedDogId,
+          dogName: assignedDog?.name,
+          dogMatricula: assignedDog?.registrationNumber,
+          dogBreed: assignedDog?.breed,
+          role: isCurrentHandler ? TeamRole.titular : TeamRole.integrante,
+          addedAt: effectiveNow,
+          addedBy: currentRa,
+        ),
+      );
+    }
+
+    members.sort((a, b) {
+      if (a.role != b.role) return a.role == TeamRole.titular ? -1 : 1;
+      return a.handlerId.compareTo(b.handlerId);
+    });
+    return members;
+  }
 
   @override
   State<StartOccurrenceScreen> createState() => _StartOccurrenceScreenState();
@@ -35,7 +103,7 @@ class StartOccurrenceScreen extends StatefulWidget {
 
 class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
   final _locationService = const LocationResolutionService();
-  final _crewService = VehicleCrewService();
+  late final VehicleCrewService _crewService;
   final _natureController = TextEditingController();
   final _natureFocusNode = FocusNode();
   final _observationController = TextEditingController();
@@ -64,6 +132,7 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
   @override
   void initState() {
     super.initState();
+    _crewService = widget.crewService ?? VehicleCrewService();
     _captureGps();
     _loadNatures();
     _checkOpenOccurrence();
@@ -251,10 +320,7 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
     );
 
     if (candidate.isAfter(DateTime.now())) {
-      AppFeedback.warning(
-        context,
-        'Horário não pode ser no futuro',
-      );
+      AppFeedback.warning(context, 'Horário não pode ser no futuro');
       return;
     }
 
@@ -445,50 +511,16 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
       );
     }
 
-    final serviceDog =
-        _dogForId(dogVM, crew.serviceDogId) ??
-        _dogForId(dogVM, shiftVM.serviceDogId) ??
-        _dogForId(dogVM, shiftVM.activeDogId);
-    final members = <OccurrenceTeamMember>[];
-    final seenHandlers = <String>{};
-
-    for (final member in activeMembers) {
-      final ra = member.handlerId.trim();
-      if (ra.isEmpty || !seenHandlers.add(ra)) continue;
-      final isCurrentHandler = ra == currentRa;
-      members.add(
-        OccurrenceTeamMember(
-          handlerId: ra,
-          authUid: member.authUid ?? (isCurrentHandler ? handlerAuthUid : null),
-          handlerEmail:
-              member.handlerEmail ??
-              (isCurrentHandler ? handlerEmail : null) ??
-              HandlerIdentityService.emailFromRa(ra),
-          displayName: userVM.displayNameFor(ra: ra),
-          dogId: serviceDog?.id ?? crew.serviceDogId,
-          dogName: serviceDog?.name,
-          dogMatricula: serviceDog?.registrationNumber,
-          dogBreed: serviceDog?.breed,
-          role: isCurrentHandler ? TeamRole.titular : TeamRole.integrante,
-          addedAt: now,
-          addedBy: currentRa,
-        ),
-      );
-    }
-
-    members.sort((a, b) {
-      if (a.role != b.role) return a.role == TeamRole.titular ? -1 : 1;
-      return a.handlerId.compareTo(b.handlerId);
-    });
-    return members;
-  }
-
-  Dog? _dogForId(DogViewModel dogVM, String? dogId) {
-    if (dogId == null || dogId.isEmpty) return null;
-    for (final dog in dogVM.dogs) {
-      if (dog.id == dogId) return dog;
-    }
-    return null;
+    return StartOccurrenceScreen.buildGuarnicaoSnapshotMembers(
+      activeMembers: activeMembers,
+      currentRa: currentRa,
+      handlerAuthUid: handlerAuthUid,
+      handlerEmail: handlerEmail,
+      currentHandlerActiveDogId: shiftVM.activeDogId,
+      dogVM: dogVM,
+      userVM: userVM,
+      now: now,
+    );
   }
 
   // ─── Create ─────────────────────────────────────────────────────────
@@ -567,6 +599,45 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
   @override
   Widget build(BuildContext context) {
     final shiftVM = context.watch<ShiftViewModel>();
+
+    // FF-OCC-03 M6: guarda defensiva central, avaliada ANTES de ler os demais
+    // ViewModels. Os entrypoints já barram a navegação, mas um caller
+    // futuro/direto não pode encontrar um formulário utilizável sem guarnição.
+    // Reativa via `context.watch`: se a viatura for liberada com a tela aberta,
+    // o formulário é substituído. Sem efeito colateral no build — nada de pop,
+    // SnackBar ou mutação aqui.
+    final eligibility = evaluateOccurrenceStartEligibility(
+      isLoading: shiftVM.isLoading,
+      shiftError: shiftVM.error,
+      hasActiveShift: shiftVM.hasActiveShift,
+      vehicleCrewId: shiftVM.vehicleCrewId,
+    );
+    if (!eligibility.canStart) {
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) async {
+          if (didPop) return;
+          await _requestExit();
+        },
+        child: Scaffold(
+          backgroundColor: AppTheme.background,
+          body: SafeArea(
+            child: Column(
+              children: [
+                StartOccurrenceHeader(
+                  onBack: _requestExit,
+                  onClose: _requestExit,
+                ),
+                Expanded(
+                  child: _StartOccurrenceBlockedCard(eligibility: eligibility),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     final dogVM = context.watch<DogViewModel>();
     final authVM = context.watch<AuthViewModel>();
     final userVM = context.watch<UserViewModel>();
@@ -694,6 +765,56 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// FF-OCC-03: apresentação bloqueante quando a abertura não está elegível.
+///
+/// Estática e sem efeito colateral — pode ser reconstruída livremente pelo
+/// `context.watch` da tela. `loading` recebe tratamento visual neutro; os
+/// demais estados usam âmbar de aviso. Nunca acusa ausência de viatura durante
+/// o carregamento.
+class _StartOccurrenceBlockedCard extends StatelessWidget {
+  final OccurrenceStartEligibility eligibility;
+
+  const _StartOccurrenceBlockedCard({required this.eligibility});
+
+  @override
+  Widget build(BuildContext context) {
+    final isLoading = eligibility == OccurrenceStartEligibility.loading;
+    final color = isLoading ? AppTheme.primary : AppTheme.warning;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (isLoading)
+              SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  valueColor: AlwaysStoppedAnimation<Color>(color),
+                ),
+              )
+            else
+              Icon(Icons.info_outline_rounded, color: color, size: 34),
+            const SizedBox(height: 18),
+            Text(
+              occurrenceStartBlockMessage(eligibility) ?? '',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                height: 1.45,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+          ],
         ),
       ),
     );

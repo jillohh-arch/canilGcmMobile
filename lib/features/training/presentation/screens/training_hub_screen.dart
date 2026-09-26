@@ -35,20 +35,41 @@ import 'package:canil_gcm/features/training/domain/detection/detection_line.dart
 part 'training_hub_categories.dart';
 
 class TrainingHubScreen extends StatefulWidget {
-  const TrainingHubScreen({super.key});
+  const TrainingHubScreen({
+    super.key,
+    this.dogService,
+    this.trainingService,
+  });
+
+  final DogService? dogService;
+  final TrainingService? trainingService;
 
   @override
-  State<TrainingHubScreen> createState() => _TrainingHubScreenState();
+  State<TrainingHubScreen> createState() => TrainingHubScreenState();
 }
 
-class _TrainingHubScreenState extends State<TrainingHubScreen> {
-  final DogService _dogService = DogService();
-  final TrainingService _trainingService = TrainingService();
+@visibleForTesting
+class TrainingHubScreenState extends State<TrainingHubScreen> {
+  late final DogService _dogService = widget.dogService ?? DogService();
+  late final TrainingService _trainingService =
+      widget.trainingService ?? TrainingService();
 
   String? _boundDogId;
   Stream<Dog?>? _dogStream;
   Stream<List<TrainingSpecialtyModel>>? _specialtiesStream;
   Stream<List<TrainingHubSession>>? _sessionsStream;
+
+  @visibleForTesting
+  String? get boundDogId => _boundDogId;
+
+  @visibleForTesting
+  bool get hasBoundDogStreams => _dogStream != null;
+
+  static String? normalizeDogId(String? dogId) {
+    if (dogId == null) return null;
+    final trimmed = dogId.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
 
   void _bindDogStreams(String dogId) {
     if (_boundDogId == dogId) return;
@@ -58,6 +79,25 @@ class _TrainingHubScreenState extends State<TrainingHubScreen> {
     _sessionsStream = _trainingService.watchSessionsForDog(dogId);
   }
 
+  void _unbindDogStreams() {
+    if (_boundDogId == null &&
+        _dogStream == null &&
+        _specialtiesStream == null &&
+        _sessionsStream == null) {
+      return;
+    }
+    _boundDogId = null;
+    _dogStream = null;
+    _specialtiesStream = null;
+    _sessionsStream = null;
+  }
+
+  @override
+  void dispose() {
+    _unbindDogStreams();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final shiftVM = Provider.of<ShiftViewModel>(context);
@@ -65,11 +105,17 @@ class _TrainingHubScreenState extends State<TrainingHubScreen> {
     final userVM = Provider.of<UserViewModel>(context);
     final authVM = Provider.of<AuthViewModel>(context);
 
-    if (!shiftVM.hasActiveShift || shiftVM.activeDogId == null) {
+    if (!shiftVM.hasActiveShift) {
+      _unbindDogStreams();
       return const _TrainingNoShift();
     }
 
-    final dogId = shiftVM.activeDogId!;
+    final dogId = normalizeDogId(shiftVM.activeDogId);
+    if (dogId == null) {
+      _unbindDogStreams();
+      return const _TrainingNoActiveDog();
+    }
+
     _bindDogStreams(dogId);
 
     final currentRa =
@@ -435,6 +481,51 @@ class _TrainingMissingDog extends StatelessWidget {
         child: Text(
           'K9 do turno não encontrado.',
           style: TextStyle(color: AppTheme.textSoft),
+        ),
+      ),
+    );
+  }
+}
+
+class _TrainingNoActiveDog extends StatelessWidget {
+  const _TrainingNoActiveDog();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: AppTheme.background,
+      body: Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.pets_outlined,
+                size: 48,
+                color: AppTheme.textMuted,
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Turno ativo sem K9 associado',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Associe um K9 ao turno para acessar o hub de treinos.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppTheme.textSoft,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:canil_gcm/features/occurrences/domain/upload_cancellation_token.dart';
+
 /// Resultado de upload com hash do binário para integridade.
 class UploadResult {
   final String url;
@@ -17,22 +19,46 @@ class StorageService {
   static const Duration _uploadTimeout = Duration(seconds: 75);
   static const Duration _downloadUrlTimeout = Duration(seconds: 20);
 
-  final FirebaseStorage _storage = FirebaseStorage.instance;
+  final FirebaseStorage _storage;
   final Uuid _uuid = const Uuid();
 
+  StorageService({FirebaseStorage? storage})
+    : _storage = storage ?? FirebaseStorage.instance;
+
   /// Faz upload de uma imagem JPEG e retorna a URL pública gerada pelo Storage.
-  Future<String?> uploadImage(File file, String folder) async {
-    return uploadFile(file, folder, mimeType: 'image/jpeg', extension: 'jpg');
+  Future<String?> uploadImage(
+    File file,
+    String folder, {
+    String? customFileName,
+    UploadCancellationToken? cancelToken,
+  }) async {
+    return uploadFile(
+      file,
+      folder,
+      mimeType: 'image/jpeg',
+      extension: 'jpg',
+      customFileName: customFileName,
+      cancelToken: cancelToken,
+    );
   }
 
   /// Faz upload de uma imagem e retorna URL + SHA-256 do binário.
   /// Usado para fotos que precisam de verificação de integridade.
-  Future<UploadResult?> uploadImageWithHash(File file, String folder) async {
+  Future<UploadResult?> uploadImageWithHash(
+    File file,
+    String folder, {
+    String? customFileName,
+    UploadCancellationToken? cancelToken,
+    void Function(int bytesTransferred, int totalBytes)? onProgress,
+  }) async {
     return uploadFileWithHash(
       file,
       folder,
       mimeType: 'image/jpeg',
       extension: 'jpg',
+      customFileName: customFileName,
+      cancelToken: cancelToken,
+      onProgress: onProgress,
     );
   }
 
@@ -48,45 +74,67 @@ class StorageService {
     String folder, {
     String? mimeType,
     String? extension,
+    String? customFileName,
+    UploadCancellationToken? cancelToken,
   }) async {
+    if (cancelToken?.isCancelled == true) {
+      throw const UploadCancelledException();
+    }
     try {
       final String ext = extension ?? _extensionFromPath(file.path);
       final String resolvedMime = mimeType ?? _mimeTypeFromExtension(ext);
-      final String fileName = '${_uuid.v4()}.$ext';
+      final String fileName = customFileName ?? '${_uuid.v4()}.$ext';
 
       final String cleanFolder = folder.replaceAll(RegExp(r'^/+|/+$'), '');
       final Reference ref = _storage.ref().child(cleanFolder).child(fileName);
 
       final bytes = await file.readAsBytes();
+      if (cancelToken?.isCancelled == true) {
+        throw const UploadCancelledException();
+      }
+
       final UploadTask uploadTask = ref.putData(
         bytes,
         SettableMetadata(contentType: resolvedMime),
       );
 
+      cancelToken?.onCancel(() {
+        unawaited(uploadTask.cancel());
+      });
+
       final TaskSnapshot snapshot = await _awaitUpload(uploadTask);
+      if (cancelToken?.isCancelled == true) {
+        throw const UploadCancelledException();
+      }
 
       if (snapshot.state == TaskState.success) {
-        final String downloadUrl = await snapshot.ref.getDownloadURL().timeout(
-          _downloadUrlTimeout,
-        );
+        final String downloadUrl = await _getDownloadUrlWithRetry(snapshot.ref);
         return downloadUrl;
       } else {
+        if (snapshot.state == TaskState.canceled ||
+            cancelToken?.isCancelled == true) {
+          throw const UploadCancelledException();
+        }
         throw Exception('O upload não foi concluído com sucesso.');
       }
+    } on UploadCancelledException {
+      rethrow;
     } on TimeoutException {
       throw TimeoutException(
         'Tempo excedido ao enviar arquivo. Verifique o sinal e tente novamente.',
       );
     } on FirebaseException catch (e) {
-      if (e.code == 'object-not-found') {
-        debugPrint(
-          '[StorageService] Aviso object-not-found (ignorado): ${e.message}',
-        );
-        return null;
+      if (cancelToken?.isCancelled == true ||
+          e.code == 'canceled' ||
+          e.code == 'cancelled') {
+        throw const UploadCancelledException();
       }
       debugPrint('[StorageService] Erro Firebase: ${e.code} - ${e.message}');
-      throw Exception('Falha ao subir arquivo: ${e.message}');
+      rethrow;
     } catch (e) {
+      if (cancelToken?.isCancelled == true) {
+        throw const UploadCancelledException();
+      }
       debugPrint('[StorageService] Erro genérico: $e');
       throw Exception('Falha ao subir arquivo. Verifique sua conexão.');
     }
@@ -99,49 +147,77 @@ class StorageService {
     String folder, {
     String? mimeType,
     String? extension,
+    String? customFileName,
+    UploadCancellationToken? cancelToken,
+    void Function(int bytesTransferred, int totalBytes)? onProgress,
   }) async {
+    if (cancelToken?.isCancelled == true) {
+      throw const UploadCancelledException();
+    }
     try {
       final String ext = extension ?? _extensionFromPath(file.path);
       final String resolvedMime = mimeType ?? _mimeTypeFromExtension(ext);
-      final String fileName = '${_uuid.v4()}.$ext';
-
-      final String cleanFolder = folder.replaceAll(RegExp(r'^/+|/+$'), '');
-      final Reference ref = _storage.ref().child(cleanFolder).child(fileName);
-
       final bytes = await file.readAsBytes();
+      if (cancelToken?.isCancelled == true) {
+        throw const UploadCancelledException();
+      }
 
       // Calcular SHA-256 do binário antes do upload
       final hash = sha256.convert(bytes).toString();
+      final String fileName = customFileName ?? '${_uuid.v4()}.$ext';
+
+      final String cleanFolder = folder.replaceAll(RegExp(r'^/+|/+$'), '');
+      final Reference ref = _storage.ref().child(cleanFolder).child(fileName);
 
       final UploadTask uploadTask = ref.putData(
         bytes,
         SettableMetadata(contentType: resolvedMime),
       );
 
-      final TaskSnapshot snapshot = await _awaitUpload(uploadTask);
+      cancelToken?.onCancel(() {
+        unawaited(uploadTask.cancel());
+      });
+
+      final TaskSnapshot snapshot = onProgress == null
+          ? await _awaitUpload(uploadTask)
+          : await runTransferWithProgress<TaskSnapshot>(
+              completionFactory: () => _awaitUpload(uploadTask),
+              progressEvents: uploadProgressEvents(uploadTask),
+              onProgress: onProgress,
+            );
+
+      if (cancelToken?.isCancelled == true) {
+        throw const UploadCancelledException();
+      }
 
       if (snapshot.state == TaskState.success) {
-        final String downloadUrl = await snapshot.ref.getDownloadURL().timeout(
-          _downloadUrlTimeout,
-        );
+        final String downloadUrl = await _getDownloadUrlWithRetry(snapshot.ref);
         return UploadResult(url: downloadUrl, sha256Hash: hash);
       } else {
+        if (snapshot.state == TaskState.canceled ||
+            cancelToken?.isCancelled == true) {
+          throw const UploadCancelledException();
+        }
         throw Exception('O upload não foi concluído com sucesso.');
       }
+    } on UploadCancelledException {
+      rethrow;
     } on TimeoutException {
       throw TimeoutException(
         'Tempo excedido ao enviar arquivo. Verifique o sinal e tente novamente.',
       );
     } on FirebaseException catch (e) {
-      if (e.code == 'object-not-found') {
-        debugPrint(
-          '[StorageService] Aviso object-not-found (ignorado): ${e.message}',
-        );
-        return null;
+      if (cancelToken?.isCancelled == true ||
+          e.code == 'canceled' ||
+          e.code == 'cancelled') {
+        throw const UploadCancelledException();
       }
       debugPrint('[StorageService] Erro Firebase: ${e.code} - ${e.message}');
-      throw Exception('Falha ao subir arquivo: ${e.message}');
+      rethrow;
     } catch (e) {
+      if (cancelToken?.isCancelled == true) {
+        throw const UploadCancelledException();
+      }
       debugPrint('[StorageService] Erro genérico: $e');
       throw Exception('Falha ao subir arquivo. Verifique sua conexão.');
     }
@@ -196,7 +272,7 @@ class StorageService {
 
       final TaskSnapshot snapshot = await _awaitUpload(uploadTask);
       if (snapshot.state == TaskState.success) {
-        return snapshot.ref.getDownloadURL().timeout(_downloadUrlTimeout);
+        return _getDownloadUrlWithRetry(snapshot.ref);
       }
       throw Exception('O upload não foi concluído com sucesso.');
     } on TimeoutException {
@@ -204,14 +280,8 @@ class StorageService {
         'Tempo excedido ao enviar arquivo. Verifique o sinal e tente novamente.',
       );
     } on FirebaseException catch (e) {
-      if (e.code == 'object-not-found') {
-        debugPrint(
-          '[StorageService] Aviso object-not-found (ignorado): ${e.message}',
-        );
-        return null;
-      }
       debugPrint('[StorageService] Erro Firebase: ${e.code} - ${e.message}');
-      throw Exception('Falha ao subir arquivo: ${e.message}');
+      rethrow;
     } catch (e) {
       debugPrint('[StorageService] Erro genérico: $e');
       throw Exception('Falha ao subir arquivo. Verifique sua conexão.');
@@ -231,6 +301,26 @@ class StorageService {
         throw TimeoutException('Tempo excedido ao enviar arquivo.');
       },
     );
+  }
+
+  Future<String> _getDownloadUrlWithRetry(Reference ref) async {
+    int attempts = 0;
+    const maxAttempts = 3;
+    while (true) {
+      attempts++;
+      try {
+        return await ref.getDownloadURL().timeout(_downloadUrlTimeout);
+      } on FirebaseException catch (e) {
+        if (e.code == 'object-not-found' && attempts < maxAttempts) {
+          debugPrint(
+            '[StorageService] getDownloadURL retornou object-not-found (tentativa $attempts/$maxAttempts). Aguardando propagação...',
+          );
+          await Future<void>.delayed(Duration(milliseconds: 300 * attempts));
+          continue;
+        }
+        rethrow;
+      }
+    }
   }
 
   String _mimeTypeFromExtension(String ext) {
@@ -264,6 +354,55 @@ class StorageService {
       }
     } catch (e) {
       debugPrint('[StorageService] Erro genérico ao deletar: $e');
+    }
+  }
+}
+
+// ─── FF-OCC-02: Progress Bridge Helpers ─────────────────────────────
+
+@visibleForTesting
+Stream<(int, int)> uploadProgressEvents(UploadTask task) {
+  return task.snapshotEvents.map(
+    (snapshot) => (snapshot.bytesTransferred, snapshot.totalBytes),
+  );
+}
+
+@visibleForTesting
+Future<T> runTransferWithProgress<T>({
+  required Future<T> Function() completionFactory,
+  required Stream<(int, int)> progressEvents,
+  required void Function(int transferred, int total)? onProgress,
+}) async {
+  if (onProgress == null) {
+    return completionFactory();
+  }
+
+  StreamSubscription<(int, int)>? subscription;
+  try {
+    subscription = progressEvents.listen(
+      (event) {
+        try {
+          onProgress(event.$1, event.$2);
+        } catch (e, st) {
+          debugPrint('[StorageService] Erro no callback onProgress: $e\n$st');
+        }
+      },
+      onError: (Object error, StackTrace st) {
+        debugPrint('[StorageService] Erro no stream de progresso: $error\n$st');
+      },
+      cancelOnError: false,
+    );
+
+    return await completionFactory();
+  } finally {
+    if (subscription != null) {
+      try {
+        await subscription.cancel();
+      } catch (e, st) {
+        debugPrint(
+          '[StorageService] Erro ao cancelar subscription de progresso: $e\n$st',
+        );
+      }
     }
   }
 }

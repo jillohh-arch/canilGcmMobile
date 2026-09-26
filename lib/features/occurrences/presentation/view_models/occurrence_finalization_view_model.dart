@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'package:canil_gcm/core/domain/occurrence_signature.dart';
@@ -191,7 +193,7 @@ class OccurrenceFinalizationViewModel extends OccurrenceTeamViewModel {
   @override
   Future<void> addSignature({
     required OccurrenceSignature signature,
-    required void Function(String) onSuccess,
+    required FutureOr<void> Function(String) onSuccess,
     required void Function(String) onError,
   }) async {
     await super.addSignature(
@@ -200,7 +202,7 @@ class OccurrenceFinalizationViewModel extends OccurrenceTeamViewModel {
         if (areAllSignaturesCollected) {
           await _checkAutoFinalization();
         }
-        onSuccess(message);
+        await onSuccess(message);
       },
       onError: onError,
     );

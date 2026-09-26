@@ -19,7 +19,16 @@ import 'package:canil_gcm/features/dogs/data/dog_service.dart';
 
 /// Bottom sheet full-height com fluxo de 2 passos para assumir posto na guarnição.
 class VehicleCrewPostSheet extends StatefulWidget {
-  const VehicleCrewPostSheet({super.key});
+  final Vehicle? initialVehicle;
+  final VehicleService? vehicleService;
+  final VehicleCrewService? crewService;
+
+  const VehicleCrewPostSheet({
+    super.key,
+    this.initialVehicle,
+    this.vehicleService,
+    this.crewService,
+  });
 
   static Future<void> show(BuildContext context) {
     return showModalBottomSheet<void>(
@@ -35,9 +44,17 @@ class VehicleCrewPostSheet extends StatefulWidget {
 }
 
 class _VehicleCrewPostSheetState extends State<VehicleCrewPostSheet> {
-  final VehicleService _vehicleService = VehicleService();
-  final VehicleCrewService _crewService = VehicleCrewService();
+  late final VehicleService _vehicleService;
+  late final VehicleCrewService _crewService;
   Vehicle? _selectedVehicle;
+
+  @override
+  void initState() {
+    super.initState();
+    _vehicleService = widget.vehicleService ?? VehicleService();
+    _crewService = widget.crewService ?? VehicleCrewService();
+    _selectedVehicle = widget.initialVehicle;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -304,7 +321,7 @@ class _VehicleCrewSummaryCardState extends State<_VehicleCrewSummaryCard> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                _OccupancyBadge(
+                OccupancyBadge(
                   occupancy: occupancy,
                   crewSize: widget.vehicle.crewSize,
                 ),
@@ -318,11 +335,12 @@ class _VehicleCrewSummaryCardState extends State<_VehicleCrewSummaryCard> {
 }
 
 /// Badge de ocupação da guarnição.
-class _OccupancyBadge extends StatelessWidget {
+class OccupancyBadge extends StatelessWidget {
   final int occupancy;
   final int crewSize;
 
-  const _OccupancyBadge({
+  const OccupancyBadge({
+    super.key,
     required this.occupancy,
     required this.crewSize,
   });
@@ -370,58 +388,63 @@ class _PostBoardStep extends StatelessWidget {
   Widget build(BuildContext context) {
     final crewId = vehicle.id;
 
-    return Column(
-      children: [
-        // Header com status da guarnição
-        _PostBoardHeader(vehicle: vehicle, crewService: crewService),
-        const Divider(color: AppTheme.outlineVariant, height: 1),
-        // Botão "Selecionar outra viatura" - ação discreta
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: onBack,
-              icon: const Icon(Icons.swap_horiz_rounded, size: 16),
-              label: const Text('Trocar viatura'),
-              style: TextButton.styleFrom(
-                foregroundColor: AppTheme.textTertiary,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                textStyle: GoogleFonts.inter(fontSize: 12),
+    return StreamBuilder<List<VehicleCrewMember>>(
+      stream: crewService.watchMembers(crewId),
+      builder: (context, snapshot) {
+        final members = snapshot.data ?? [];
+        final activeMembersList = members.where((m) => m.isActive).toList()
+          ..sort((a, b) => a.role.compareTo(b.role));
+        final activeMembers = {
+          for (final m in activeMembersList) m.role: m
+        };
+        final occupancy = activeMembersList.length;
+
+        // Verificar se o usuário logado é condutor de binômio ativo
+        final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
+        final hasBinomioActive = shiftVM.hasActiveShift &&
+            shiftVM.activeDogId != null &&
+            shiftVM.activeDogId!.trim().isNotEmpty;
+
+        return Column(
+          children: [
+            // Header com status da guarnição e badge de ocupação
+            _PostBoardHeader(
+              vehicle: vehicle,
+              crewService: crewService,
+              occupancy: occupancy,
+            ),
+            const Divider(color: AppTheme.outlineVariant, height: 1),
+            // Botão "Selecionar outra viatura" - ação discreta
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: onBack,
+                  icon: const Icon(Icons.swap_horiz_rounded, size: 16),
+                  label: const Text('Trocar viatura'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppTheme.textTertiary,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    textStyle: GoogleFonts.inter(fontSize: 12),
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-        // Quadro de postos
-        Expanded(
-          child: StreamBuilder<List<VehicleCrewMember>>(
-            stream: crewService.watchMembers(crewId),
-            builder: (context, snapshot) {
-              final members = snapshot.data ?? [];
-              final activeMembersList = members.where((m) => m.isActive).toList()
-                ..sort((a, b) => a.role.compareTo(b.role));
-              final activeMembers = {
-                for (final m in activeMembersList) m.role: m
-              };
-
-              // Verificar se o usuário logado é condutor de binômio ativo
-              final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
-              final hasBinomioActive = shiftVM.hasActiveShift &&
-                  shiftVM.activeDogId != null &&
-                  shiftVM.activeDogId!.trim().isNotEmpty;
-
-              return _PostBoard(
+            // Quadro de postos
+            Expanded(
+              child: _PostBoard(
                 vehicle: vehicle,
                 activeMembers: activeMembers,
                 hasBinomioActive: hasBinomioActive,
                 onPostSelected: (role) =>
                     _confirmAndAssumePost(context, vehicle, role),
                 onLeaveVehicle: () => _confirmLeaveVehicle(context, vehicle),
-              );
-            },
-          ),
-        ),
-      ],
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -602,14 +625,16 @@ class _PostBoardStep extends StatelessWidget {
   }
 }
 
-/// Header do quadro de postos com status OPERACIONAL/INCOMPLETA.
+/// Header do quadro de postos com status OPERACIONAL/INCOMPLETA e ocupação.
 class _PostBoardHeader extends StatefulWidget {
   final Vehicle vehicle;
   final VehicleCrewService crewService;
+  final int? occupancy;
 
   const _PostBoardHeader({
     required this.vehicle,
     required this.crewService,
+    this.occupancy,
   });
 
   @override
@@ -665,13 +690,25 @@ class _PostBoardHeaderState extends State<_PostBoardHeader> {
                   ],
                 ),
               ),
-              // Status chip — future cached in initState
-              FutureBuilder<String>(
-                future: _statusFuture,
-                builder: (context, snapshot) {
-                  final status = snapshot.data ?? 'empty';
-                  return _OperationalStatusChip(status: status);
-                },
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.occupancy != null) ...[
+                    OccupancyBadge(
+                      occupancy: widget.occupancy!,
+                      crewSize: widget.vehicle.crewSize,
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  // Status chip — future cached in initState
+                  FutureBuilder<String>(
+                    future: _statusFuture,
+                    builder: (context, snapshot) {
+                      final status = snapshot.data ?? 'empty';
+                      return _OperationalStatusChip(status: status);
+                    },
+                  ),
+                ],
               ),
             ],
           ),
@@ -728,14 +765,18 @@ class _OperationalStatusChip extends StatelessWidget {
 /// 4 postos humanos (K9 é vínculo, não posto).
 /// Role 'k9' mantido no enum/rule por retrocompatibilidade.
 /// Cada member com dog_id preenchido é o condutor responsável pelo cão.
-class _PostBoard extends StatelessWidget {
+typedef _PostBoard = VehicleCrewPostBoard;
+
+@visibleForTesting
+class VehicleCrewPostBoard extends StatelessWidget {
   final Vehicle vehicle;
   final Map<String, VehicleCrewMember> activeMembers;
   final bool hasBinomioActive;
   final void Function(String role) onPostSelected;
   final VoidCallback onLeaveVehicle;
 
-  const _PostBoard({
+  const VehicleCrewPostBoard({
+    super.key,
     required this.vehicle,
     required this.activeMembers,
     required this.hasBinomioActive,
@@ -743,7 +784,24 @@ class _PostBoard extends StatelessWidget {
     required this.onLeaveVehicle,
   });
 
-  static const _roles = ['motorista', 'encarregado', 'auxiliar_1', 'auxiliar_2'];
+  static const roles = ['motorista', 'encarregado', 'auxiliar_1', 'auxiliar_2'];
+
+  /// Retorna os postos canônicos compatíveis com a capacidade (vehicle.crewSize)
+  /// e inclui quaisquer postos com membros ativos (para acomodar dados legados/atípicos).
+  static List<String> rolesFor(Vehicle vehicle, [Map<String, VehicleCrewMember>? activeMembers]) {
+    final capacity = vehicle.crewSize;
+    final allowedCount = capacity.clamp(1, roles.length);
+    final allowedRoles = roles.take(allowedCount).toList();
+
+    if (activeMembers != null) {
+      for (final role in roles) {
+        if (activeMembers.containsKey(role) && !allowedRoles.contains(role)) {
+          allowedRoles.add(role);
+        }
+      }
+    }
+    return allowedRoles;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -752,6 +810,10 @@ class _PostBoard extends StatelessWidget {
     final currentCrewId = shiftVM.vehicleCrewId;
     final currentHandlerId = shiftVM.handlerId;
     final isInThisCrew = currentCrewId == vehicle.id;
+
+    final occupancy = activeMembers.length;
+    final isFull = occupancy >= vehicle.crewSize;
+    final displayRoles = rolesFor(vehicle, activeMembers);
 
     // Identificar o membro com cão embarcado (condutor K9 = vínculo)
     VehicleCrewMember? k9Member;
@@ -767,15 +829,16 @@ class _PostBoard extends StatelessWidget {
         Expanded(
           child: ListView.separated(
             padding: const EdgeInsets.all(16),
-            itemCount: _roles.length + 1, // 4 postos + 1 linha K9
+            itemCount: displayRoles.length + 1, // postos compatíveis + 1 linha K9
             separatorBuilder: (context, index) => const SizedBox(height: 10),
             itemBuilder: (context, index) {
-              if (index < _roles.length) {
-                final role = _roles[index];
+              if (index < displayRoles.length) {
+                final role = displayRoles[index];
                 final member = activeMembers[role];
                 final isOccupied = member != null;
+                final isAssumable = !isOccupied && !isFull;
                 // Badge K9 se o membro tem cão embarcado
-                final hasK9 = isOccupied && member.dogId!.trim().isNotEmpty;
+                final hasK9 = isOccupied && (member.dogId?.trim().isNotEmpty ?? false);
                 // Verificar se este slot é do usuário atual
                 final isCurrentUser = isOccupied && member.handlerId == currentHandlerId;
 
@@ -783,9 +846,10 @@ class _PostBoard extends StatelessWidget {
                   role: role,
                   member: member,
                   isOccupied: isOccupied,
+                  isAssumable: isAssumable,
                   hasK9: hasK9,
                   isCurrentUser: isCurrentUser,
-                  onTap: isOccupied ? null : () => onPostSelected(role),
+                  onTap: isAssumable ? () => onPostSelected(role) : null,
                 );
               } else {
                 // Linha K9: vínculo, não posto
@@ -829,6 +893,7 @@ class _PostSlot extends StatelessWidget {
   final VehicleCrewMember? member;
   final bool hasK9; // badge K9 se este membro é o condutor do cão
   final bool isOccupied;
+  final bool isAssumable;
   final bool isCurrentUser; // destaca o slot do usuário atual
   final VoidCallback? onTap;
 
@@ -837,6 +902,7 @@ class _PostSlot extends StatelessWidget {
     required this.member,
     required this.hasK9,
     required this.isOccupied,
+    required this.isAssumable,
     required this.isCurrentUser,
     this.onTap,
   });
@@ -860,7 +926,7 @@ class _PostSlot extends StatelessWidget {
         ),
         child: isOccupied
             ? _OccupiedSlot(member: member!, role: role, hasK9: hasK9, isCurrentUser: isCurrentUser)
-            : _VacantSlot(role: role),
+            : _VacantSlot(role: role, isAssumable: isAssumable),
       ),
     );
   }
@@ -963,11 +1029,15 @@ class _OccupiedSlot extends StatelessWidget {
   }
 }
 
-/// Slot vago com botão ASSUMIR.
+/// Slot vago com botão ASSUMIR (se assumível) ou indicador de indisponível.
 class _VacantSlot extends StatelessWidget {
   final String role;
+  final bool isAssumable;
 
-  const _VacantSlot({required this.role});
+  const _VacantSlot({
+    required this.role,
+    this.isAssumable = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1024,7 +1094,7 @@ class _VacantSlot extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Vago',
+                isAssumable ? 'Vago' : 'Indisponível',
                 style: GoogleFonts.inter(
                   color: AppTheme.textTertiary,
                   fontSize: 14,
@@ -1034,24 +1104,25 @@ class _VacantSlot extends StatelessWidget {
             ],
           ),
         ),
-        // Botão ASSUMIR
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: AppTheme.primary.withAlpha(20),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: AppTheme.primary.withAlpha(60)),
-          ),
-          child: Text(
-            'ASSUMIR',
-            style: GoogleFonts.inter(
-              color: AppTheme.primary,
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0.5,
+        // Botão ASSUMIR apenas quando o posto é assumível
+        if (isAssumable)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withAlpha(20),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: AppTheme.primary.withAlpha(60)),
+            ),
+            child: Text(
+              'ASSUMIR',
+              style: GoogleFonts.inter(
+                color: AppTheme.primary,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.5,
+              ),
             ),
           ),
-        ),
       ],
     );
   }

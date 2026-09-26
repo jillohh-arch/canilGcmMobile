@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'package:canil_gcm/core/domain/notification_item.dart';
@@ -221,7 +223,7 @@ class OccurrenceTeamViewModel extends ChangeNotifier {
 
   Future<void> addSignature({
     required OccurrenceSignature signature,
-    required void Function(String) onSuccess,
+    required FutureOr<void> Function(String) onSuccess,
     required void Function(String) onError,
   }) async {
     final occurrence = _occurrence;
@@ -261,7 +263,7 @@ class OccurrenceTeamViewModel extends ChangeNotifier {
       }
 
       notifyListeners();
-      onSuccess('Assinatura adicionada com sucesso');
+      await onSuccess('Assinatura adicionada com sucesso');
     } catch (error) {
       onError(error.toString());
     }

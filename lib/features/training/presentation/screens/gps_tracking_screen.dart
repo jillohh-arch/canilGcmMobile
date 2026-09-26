@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:latlong2/latlong.dart' as ll2;
 
 import 'package:canil_gcm/core/services/gps_tracking_service.dart';
+import 'package:canil_gcm/core/theme/app_map_style.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/widgets/app_feedback.dart';
 
@@ -12,7 +13,7 @@ import 'gps_tracking_summary_screen.dart';
 
 /// Tela de rastreamento GPS ao vivo.
 ///
-/// Mostra mapa OSM dark com a rota sendo desenhada, métricas em tempo real,
+/// Mostra mapa dark com a rota sendo desenhada, métricas em tempo real,
 /// e controles de pausar/retomar/finalizar.
 ///
 /// Ao finalizar, navega para o summary e retorna o [GpsTrackResult] via pop.
@@ -39,7 +40,7 @@ class GpsTrackingScreen extends StatefulWidget {
 }
 
 class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
-  late final MapController _mapController;
+  GoogleMapController? _mapController;
   bool _mapReady = false;
 
   GpsTrackingService get _service => widget.trackingService;
@@ -47,7 +48,6 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
   @override
   void initState() {
     super.initState();
-    _mapController = MapController();
     _service.addListener(_onServiceUpdate);
     _startIfNeeded();
   }
@@ -68,10 +68,11 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
     if (!mounted) return;
     setState(() {});
     // Centralizar mapa na posição atual
-    if (_mapReady && _service.currentPosition != null) {
-      _mapController.move(
-        _service.currentPosition!,
-        _mapController.camera.zoom,
+    if (_mapReady && _service.currentPosition != null && _mapController != null) {
+      _mapController!.animateCamera(
+        CameraUpdate.newLatLng(
+          AppMapStyle.toGoogleLatLng(_service.currentPosition!),
+        ),
       );
     }
   }
@@ -79,6 +80,7 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
   @override
   void dispose() {
     _service.removeListener(_onServiceUpdate);
+    _mapController?.dispose();
     super.dispose();
   }
 
@@ -228,112 +230,78 @@ class _GpsTrackingScreenState extends State<GpsTrackingScreen> {
   }
 
   Widget _buildMap() {
-    final center = _service.currentPosition ?? const LatLng(-22.5646, -47.4015);
-    final route = _service.polyline;
+    final rawCenter = _service.currentPosition ?? const ll2.LatLng(-22.5646, -47.4015);
+    final center = AppMapStyle.toGoogleLatLng(rawCenter);
+    final route = AppMapStyle.toGoogleLatLngList(_service.polyline);
+
+    final markers = <Marker>{};
+
+    if (_service.startPosition != null) {
+      markers.add(
+        Marker(
+          markerId: const MarkerId('start'),
+          position: AppMapStyle.toGoogleLatLng(_service.startPosition!),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          infoWindow: const InfoWindow(title: 'Início'),
+        ),
+      );
+    }
+
+    if (_service.currentPosition != null) {
+      markers.add(
+        Marker(
+          markerId: const MarkerId('current'),
+          position: AppMapStyle.toGoogleLatLng(_service.currentPosition!),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueCyan),
+          infoWindow: const InfoWindow(title: 'Posição Atual'),
+        ),
+      );
+    }
+
+    for (int i = 0; i < _service.events.length; i++) {
+      final event = _service.events[i];
+      if (event.point != null) {
+        markers.add(
+          Marker(
+            markerId: MarkerId('event_$i'),
+            position: AppMapStyle.toGoogleLatLng(event.point!.latLng),
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+            infoWindow: InfoWindow(
+              title: event.type.label,
+              snippet: 'Evento #${i + 1}',
+            ),
+          ),
+        );
+      }
+    }
 
     return Stack(
       children: [
-        FlutterMap(
-          mapController: _mapController,
-          options: MapOptions(
-            initialCenter: center,
-            initialZoom: 17,
-            onMapReady: () => _mapReady = true,
-            interactionOptions: const InteractionOptions(
-              flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-            ),
+        GoogleMap(
+          initialCameraPosition: CameraPosition(
+            target: center,
+            zoom: 17,
           ),
-          children: [
-            // OSM dark tiles
-            TileLayer(
-              urlTemplate:
-                  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-              subdomains: const ['a', 'b', 'c', 'd'],
-              userAgentPackageName: 'com.gcm.limeira.canilk9',
-              maxZoom: 19,
-            ),
-            // Route polyline
-            if (route.length >= 2)
-              PolylineLayer(
-                polylines: [
+          style: AppMapStyle.darkStyle,
+          rotateGesturesEnabled: false,
+          zoomControlsEnabled: false,
+          myLocationButtonEnabled: false,
+          mapToolbarEnabled: false,
+          onMapCreated: (controller) {
+            _mapController = controller;
+            _mapReady = true;
+          },
+          polylines: route.length >= 2
+              ? {
                   Polyline(
+                    polylineId: const PolylineId('tracking_route'),
                     points: route,
                     color: AppTheme.primary,
-                    strokeWidth: 4.5,
+                    width: 5,
                   ),
-                ],
-              ),
-            // Markers
-            MarkerLayer(
-              markers: [
-                // Start marker (green)
-                if (_service.startPosition != null)
-                  Marker(
-                    point: _service.startPosition!,
-                    width: 16,
-                    height: 16,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppTheme.success,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppTheme.background,
-                          width: 2.5,
-                        ),
-                      ),
-                    ),
-                  ),
-                // Current position (cyan, pulsing)
-                if (_service.currentPosition != null)
-                  Marker(
-                    point: _service.currentPosition!,
-                    width: 20,
-                    height: 20,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppTheme.primary,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppTheme.background,
-                          width: 2.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.primary.withAlpha(153),
-                            blurRadius: 12,
-                            spreadRadius: 4,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ..._service.events
-                    .where((event) => event.point != null)
-                    .map(
-                      (event) => Marker(
-                        point: event.point!.latLng,
-                        width: 28,
-                        height: 28,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: _eventColor(event.type),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: AppTheme.background,
-                              width: 2,
-                            ),
-                          ),
-                          child: Icon(
-                            _eventIcon(event.type),
-                            color: AppTheme.background,
-                            size: 14,
-                          ),
-                        ),
-                      ),
-                    ),
-              ],
-            ),
-          ],
+                }
+              : {},
+          markers: markers,
         ),
         // Recording badge
         Positioned(

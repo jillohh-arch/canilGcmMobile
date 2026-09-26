@@ -1,4 +1,6 @@
 import * as assert from "assert";
+import * as fs from "fs";
+import * as path from "path";
 import {CallableRequest, HttpsError} from "firebase-functions/v2/https";
 import {
   runCreateWeightRecord,
@@ -7,7 +9,10 @@ import {
   WeightTxDocSnap,
   WeightTxn,
 } from "./health_weight_engine";
-import {WeightCaller} from "./health_weight_logic";
+import {
+  isWeightActiveDog,
+  WeightCaller,
+} from "./health_weight_logic";
 import {
   buildHealthWeightCreateRecordHandler,
   HealthWeightCallableDeps,
@@ -440,6 +445,252 @@ async function main() {
       (err: unknown) => err instanceof HttpsError && err.code === "permission-denied",
     );
     assert.strictEqual(engineRuns.count, 0);
+  });
+
+  await test("13. isWeightActiveDog valida K9 existente e ativo conforme §6.2", async () => {
+    // Casos válidos: existente e ativo (aceita "Ativo" canônico e "active", case-insensitive)
+    assert.strictEqual(isWeightActiveDog({status: "active", active: true}), true);
+    assert.strictEqual(isWeightActiveDog({status: "active"}), true);
+    assert.strictEqual(isWeightActiveDog({status: "Ativo", active: true}), true);
+    assert.strictEqual(isWeightActiveDog({status: "Ativo"}), true);
+    assert.strictEqual(isWeightActiveDog({status: "ativo"}), true);
+    assert.strictEqual(isWeightActiveDog({status: "ACTIVE"}), true);
+    assert.strictEqual(isWeightActiveDog({name: "Thor", status: "active", active: true}), true);
+    assert.strictEqual(isWeightActiveDog({name: "Bono", status: "Ativo", active: true}), true);
+
+    // Casos inválidos / inativos (fail-closed)
+    assert.strictEqual(isWeightActiveDog({status: "active", active: false}), false);
+    assert.strictEqual(isWeightActiveDog({status: "Ativo", active: false}), false);
+    assert.strictEqual(isWeightActiveDog({status: "inactive", active: true}), false);
+    assert.strictEqual(isWeightActiveDog({status: "Inativo", active: true}), false);
+    assert.strictEqual(isWeightActiveDog({status: "Inativo"}), false);
+    assert.strictEqual(isWeightActiveDog({status: "inativo"}), false);
+    assert.strictEqual(isWeightActiveDog({status: "archived"}), false);
+    assert.strictEqual(isWeightActiveDog({status: "Licença"}), false);
+    assert.strictEqual(isWeightActiveDog({status: "Aposentado"}), false);
+    assert.strictEqual(isWeightActiveDog({name: "Thor", active: true}), false);
+    assert.strictEqual(isWeightActiveDog({status: "active", deleted_at: new Date()}), false);
+    assert.strictEqual(isWeightActiveDog({status: "active", archived_at: new Date()}), false);
+    assert.strictEqual(isWeightActiveDog({status: "Ativo", deleted_at: new Date()}), false);
+    assert.strictEqual(isWeightActiveDog({status: "Ativo", archived_at: new Date()}), false);
+    assert.strictEqual(isWeightActiveDog({status: "Ativo", deleted: true}), false);
+    assert.strictEqual(isWeightActiveDog({status: "Ativo", archived: true}), false);
+    assert.strictEqual(isWeightActiveDog({}), false);
+    assert.strictEqual(isWeightActiveDog(null), false);
+    assert.strictEqual(isWeightActiveDog(undefined), false);
+    assert.strictEqual(isWeightActiveDog("active" as unknown as Record<string, unknown>), false);
+    assert.strictEqual(isWeightActiveDog(123 as unknown as Record<string, unknown>), false);
+  });
+
+  await test("14. CANONICAL §6.2 (PESAGEM-01): condutor autorizado sem vínculo direto e sem turno ativo registra pesagem", async () => {
+    // Testa com status canônico do banco ("Ativo") e "active"
+    for (const activeStatus of ["Ativo", "active"]) {
+      const engineRuns = {count: 0};
+      const handler = buildHealthWeightCreateRecordHandler({
+        db: {
+          collection: (collection: string) => ({
+            doc: (id: string) => ({
+              get: async () => ({
+                exists: collection === "dogs" && id === "dog_a",
+                data: () => ({
+                  name: "Bono",
+                  status: activeStatus,
+                  active: true,
+                  conductorRa: "condutor_oficial",
+                }),
+              }),
+            }),
+          }),
+        } as unknown as HealthWeightCallableDeps["db"],
+        requireHealthRecordRoutine: async () => ({
+          uid: "usr_outro",
+          name: "GCM Outro",
+          ra: "condutor_outro",
+          internalRole: "condutor",
+        }),
+        requireDogAccess: async (_auth, caller, _dogId, dog) => {
+          assert.notStrictEqual(dog.conductorRa, caller.ra, "caller não é o condutor vinculado");
+          if (!isWeightActiveDog(dog)) {
+            throw new HttpsError("permission-denied", "K9 inativo", {code: "dog-inactive"});
+          }
+        },
+        createEngineDeps: () => {
+          engineRuns.count += 1;
+          const store: Store = new Map();
+          store.set("dogs/dog_a", {name: "Bono", status: activeStatus, active: true, conductorRa: "condutor_oficial"});
+          return createFakeEngineDeps(store);
+        },
+      });
+
+      const result = await handler(callableRequest());
+      assert.strictEqual(result.dogId, "dog_a");
+      assert.strictEqual(engineRuns.count, 1);
+    }
+  });
+
+  await test("15. CANONICAL §6.2: K9 inativo (status != 'active'/'Ativo' ou active == false) falha fechado com dog-inactive", async () => {
+    for (const inactiveDog of [
+      {name: "Bono", status: "inactive", active: true},
+      {name: "Bono", status: "active", active: false},
+      {name: "Bono", status: "Ativo", active: false},
+      {name: "Bono", status: "Inativo"},
+      {name: "Bono", status: "inativo", active: true},
+      {name: "Bono", status: "Licença"},
+      {name: "Bono", status: "Aposentado"},
+      {name: "Bono", active: true}, // sem status
+    ]) {
+      const engineRuns = {count: 0};
+      const handler = buildHealthWeightCreateRecordHandler({
+        db: {
+          collection: () => ({
+            doc: () => ({
+              get: async () => ({
+                exists: true,
+                data: () => inactiveDog,
+              }),
+            }),
+          }),
+        } as unknown as HealthWeightCallableDeps["db"],
+        requireHealthRecordRoutine: async () => mockActor,
+        requireDogAccess: async (_auth, _caller, _dogId, dog) => {
+          if (!isWeightActiveDog(dog)) {
+            throw new HttpsError("permission-denied", "K9 inexistente ou inativo para registro de pesagem.", {code: "dog-inactive"});
+          }
+        },
+        createEngineDeps: () => {
+          engineRuns.count += 1;
+          return createFakeEngineDeps(new Map());
+        },
+      });
+
+      await assert.rejects(
+        handler(callableRequest()),
+        (err: unknown) => {
+          assert.ok(err instanceof HttpsError);
+          assert.strictEqual(err.code, "permission-denied");
+          assert.strictEqual((err.details as Record<string, unknown>)?.code, "dog-inactive");
+          return true;
+        },
+      );
+      assert.strictEqual(engineRuns.count, 0, "engine não deve executar para K9 inativo");
+    }
+  });
+
+  await test("16. CANONICAL §6.2: K9 soft-deleted ou arquivado falha fechado com dog-inactive", async () => {
+    for (const deadDog of [
+      {name: "Bono", status: "active", active: true, deleted_at: new Date()},
+      {name: "Bono", status: "active", active: true, archived_at: new Date()},
+      {name: "Bono", status: "Ativo", active: true, deleted_at: new Date()},
+      {name: "Bono", status: "Ativo", active: true, archived_at: new Date()},
+      {name: "Bono", status: "Ativo", active: true, deleted: true},
+      {name: "Bono", status: "Ativo", active: true, archived: true},
+    ]) {
+      const engineRuns = {count: 0};
+      const handler = buildHealthWeightCreateRecordHandler({
+        db: {
+          collection: () => ({
+            doc: () => ({
+              get: async () => ({
+                exists: true,
+                data: () => deadDog,
+              }),
+            }),
+          }),
+        } as unknown as HealthWeightCallableDeps["db"],
+        requireHealthRecordRoutine: async () => mockActor,
+        requireDogAccess: async (_auth, _caller, _dogId, dog) => {
+          if (!isWeightActiveDog(dog)) {
+            throw new HttpsError("permission-denied", "K9 inexistente ou inativo para registro de pesagem.", {code: "dog-inactive"});
+          }
+        },
+        createEngineDeps: () => {
+          engineRuns.count += 1;
+          return createFakeEngineDeps(new Map());
+        },
+      });
+
+      await assert.rejects(
+        handler(callableRequest()),
+        (err: unknown) => err instanceof HttpsError && (err.details as Record<string, unknown>)?.code === "dog-inactive",
+      );
+      assert.strictEqual(engineRuns.count, 0);
+    }
+  });
+
+  await test("17. Arquitetura: healthWeightCreateRecord usa requireWeightDogAccess e não impõe vínculo de condutor", async () => {
+    const SRC_DIR = __dirname.endsWith("lib") ?
+      path.join(__dirname, "..", "src") :
+      __dirname;
+    const indexCode = fs.readFileSync(path.join(SRC_DIR, "index.ts"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+
+    // requireWeightDogAccess exportado e implementado
+    assert.ok(
+      indexCode.includes("export async function requireWeightDogAccess"),
+      "requireWeightDogAccess deve ser exportada em index.ts",
+    );
+
+    // buildHealthWeightCreateRecordDeps conecta requireWeightDogAccess
+    const depsIdx = indexCode.indexOf("buildHealthWeightCreateRecordDeps");
+    assert.ok(depsIdx > 0, "buildHealthWeightCreateRecordDeps deve existir");
+    const depsBody = indexCode.slice(depsIdx, indexCode.indexOf("const runHealthWeightCreateRecord", depsIdx));
+    assert.ok(
+      depsBody.includes("requireWeightDogAccess"),
+      "buildHealthWeightCreateRecordDeps deve conectar requireWeightDogAccess",
+    );
+    assert.ok(
+      !depsBody.includes("requireDogRecordAccess"),
+      "buildHealthWeightCreateRecordDeps NÃO deve chamar requireDogRecordAccess",
+    );
+
+    // requireWeightDogAccess não verifica dogHandlerRa nem callerHasActiveDog
+    const reqFnIdx = indexCode.indexOf("async function requireWeightDogAccess");
+    const reqFnBody = indexCode.slice(reqFnIdx, indexCode.indexOf("export function buildHealthWeightCreateRecordDeps", reqFnIdx));
+    assert.ok(!reqFnBody.includes("dogHandlerRa"), "requireWeightDogAccess não deve verificar dogHandlerRa");
+    assert.ok(!reqFnBody.includes("callerHasActiveDog"), "requireWeightDogAccess não deve verificar callerHasActiveDog");
+    assert.ok(reqFnBody.includes("isWeightActiveDog"), "requireWeightDogAccess deve validar isWeightActiveDog");
+    assert.ok(reqFnBody.includes("record_routine"), "requireWeightDogAccess deve validar health.record_routine");
+  });
+
+  await test("18. Arquitetura: preservação de CT3.AUTH-HEALTH-01 (health.read ausente em weight create)", async () => {
+    const SRC_DIR = __dirname.endsWith("lib") ?
+      path.join(__dirname, "..", "src") :
+      __dirname;
+    const indexCode = fs.readFileSync(path.join(SRC_DIR, "index.ts"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+    const reqFnIdx = indexCode.indexOf("async function requireWeightDogAccess");
+    const reqFnBody = indexCode.slice(reqFnIdx, indexCode.indexOf("export const healthWeightCreateRecord", reqFnIdx));
+
+    assert.ok(
+      !reqFnBody.includes("health.read") && !reqFnBody.includes('"read"'),
+      "CT3.AUTH-HEALTH-01 violado: health.read não pode ser introduzido no fluxo de pesagem",
+    );
+  });
+
+  await test("19. Arquitetura: outros writers de Health permanecem protegidos por requireDogRecordAccess", async () => {
+    const SRC_DIR = __dirname.endsWith("lib") ?
+      path.join(__dirname, "..", "src") :
+      __dirname;
+    const indexCode = fs.readFileSync(path.join(SRC_DIR, "index.ts"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+
+    // requireDogRecordAccess permanece para outros writers
+    for (const otherWriter of [
+      "healthNutritionDeps",
+      "healthScheduleDeps",
+      "healthRestrictionLifecycleDeps",
+    ]) {
+      const idx = indexCode.indexOf(otherWriter);
+      assert.ok(idx > 0, `${otherWriter} deve existir em index.ts`);
+      const body = indexCode.slice(idx, indexCode.indexOf("};", idx));
+      assert.ok(
+        body.includes("requireDogRecordAccess"),
+        `${otherWriter} deve continuar usando requireDogRecordAccess`,
+      );
+    }
   });
 }
 

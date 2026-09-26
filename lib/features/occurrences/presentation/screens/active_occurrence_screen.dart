@@ -43,6 +43,7 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
   Timer? _durationTimer;
   Timer? _durationPersistTimer;
   Timer? _savedBadgeTimer;
+  StreamSubscription<Occurrence?>? _occurrenceSub;
   Duration _elapsed = Duration.zero;
   DateTime? _startedAt;
   Occurrence? _loadedOccurrence;
@@ -54,6 +55,14 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     super.initState();
     final vm = context.read<OccurrenceViewModel>();
     vm.watchEvents(widget.occurrenceId);
+    _occurrenceSub = vm.watchById(widget.occurrenceId).listen((occ) {
+      if (!mounted) return;
+      setState(() {
+        _loadedOccurrence = occ;
+        _startedAt ??= occ?.startedAt;
+      });
+      _updateElapsed();
+    });
     _loadOccurrence();
 
     _startedAt = _currentOccurrence(vm)?.startedAt;
@@ -81,9 +90,10 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
   }
 
   Occurrence? _currentOccurrence(OccurrenceViewModel vm) {
+    if (_loadedOccurrence != null) return _loadedOccurrence;
     final open = vm.openOccurrence;
     if (open != null && open.id == widget.occurrenceId) return open;
-    return _loadedOccurrence;
+    return null;
   }
 
   Future<void> _loadOccurrence() async {
@@ -114,6 +124,7 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
     _durationTimer?.cancel();
     _durationPersistTimer?.cancel();
     _savedBadgeTimer?.cancel();
+    _occurrenceSub?.cancel();
     super.dispose();
   }
 
@@ -879,6 +890,7 @@ class _ActiveOccurrenceScreenState extends State<ActiveOccurrenceScreen> {
                   const SizedBox(height: 24),
                   ActiveOccurrenceTimeline(
                     events: vm.events,
+                    canEdit: canEditOccurrence && !isAwaitingSignatures,
                     onEventTap: isAwaitingSignatures
                         ? (_) => _showLockedForSignaturesMessage()
                         : canEditOccurrence

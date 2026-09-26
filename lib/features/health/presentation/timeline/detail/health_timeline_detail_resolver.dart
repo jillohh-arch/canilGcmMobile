@@ -31,6 +31,7 @@ abstract final class HealthTimelineDetailResolver {
   static const sourceFeedings = 'feedings';
   static const sourceVacinas = 'vacinas';
   static const sourceHealthEvents = 'health_events';
+  static const sourceOperationalRestrictions = 'operational_restrictions';
 
   static const _allowlist = <String>{
     sourceWeightRecords,
@@ -39,6 +40,7 @@ abstract final class HealthTimelineDetailResolver {
     sourceVacinas,
     // health_events só navega com type vaccination (ver resolve).
     sourceHealthEvents,
+    sourceOperationalRestrictions,
   };
 
   /// Resolve a partir da referência tipada + dogId (+ type opcional da entry).
@@ -104,6 +106,9 @@ abstract final class HealthTimelineDetailResolver {
       sourceVacinas => HealthTimelineDetailResolved(
         VaccinationHistoryTarget(dogId: dog, sourceId: sourceId),
       ),
+      sourceOperationalRestrictions => HealthTimelineDetailResolved(
+        RestrictionDetailTarget(dogId: dog, sourceId: sourceId),
+      ),
       _ => const HealthTimelineDetailUnsupported(),
     };
   }
@@ -135,6 +140,7 @@ abstract final class HealthTimelineDetailResolver {
       sourceFeedingEvents || sourceFeedings => known == HealthTimelineType.meal,
       sourceVacinas => known == HealthTimelineType.vaccination,
       sourceHealthEvents => known == HealthTimelineType.vaccination,
+      sourceOperationalRestrictions => known == HealthTimelineType.restriction,
       _ => false,
     };
   }

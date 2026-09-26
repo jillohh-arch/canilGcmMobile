@@ -30,6 +30,11 @@ class DetectionOdorMaterials {
 
 class DetectionFormationSession {
   final String? id;
+  final String? programId;
+  final String? programVersionId;
+  final String? methodologyFamilyId;
+  final String? methodologyDisplayName;
+  final int? methodologyVersion;
   final String dogId;
   final String dogName;
   final String lineId;
@@ -66,6 +71,11 @@ class DetectionFormationSession {
 
   DetectionFormationSession({
     this.id,
+    this.programId,
+    this.programVersionId,
+    this.methodologyFamilyId,
+    this.methodologyDisplayName,
+    this.methodologyVersion,
     required this.dogId,
     required this.dogName,
     required this.lineId,
@@ -105,6 +115,7 @@ class DetectionFormationSession {
     Map<String, dynamic> json, {
     String? docId,
   }) {
+    final metadata = _readMap(json['metadata']);
     final repetitionsRaw = json['repetitions'];
     final repetitions = repetitionsRaw is List
         ? repetitionsRaw
@@ -119,6 +130,27 @@ class DetectionFormationSession {
 
     return DetectionFormationSession(
       id: docId ?? json['id'] as String?,
+      programId: _readString(json, const ['program_id', 'programId']) ??
+          _readString(metadata, const ['program_id', 'programId']),
+      programVersionId:
+          _readString(json, const ['program_version_id', 'programVersionId']) ??
+          _readString(metadata, const ['program_version_id', 'programVersionId']),
+      methodologyFamilyId:
+          _readString(json, const ['methodology_family_id', 'methodologyFamilyId']) ??
+          _readString(metadata, const ['methodology_family_id', 'methodologyFamilyId']),
+      methodologyDisplayName:
+          _readString(json, const ['methodology_display_name', 'methodologyDisplayName']) ??
+          _readString(metadata, const ['methodology_display_name', 'methodologyDisplayName']),
+      methodologyVersion: _readInt(
+            json['methodology_version'] ??
+                json['methodologyVersion'] ??
+                json['program_version'],
+          ) ??
+          _readInt(
+            metadata['methodology_version'] ??
+                metadata['methodologyVersion'] ??
+                metadata['program_version'],
+          ),
       dogId: _readString(json, const ['dogId', 'dog_id']) ?? '',
       dogName: _readString(json, const ['dogName', 'dog_name']) ?? '',
       lineId: _readString(json, const ['line_id', 'lineId']) ?? '',
@@ -184,7 +216,32 @@ class DetectionFormationSession {
   }
 
   Map<String, dynamic> toJson() {
+    final resolvedProgramId =
+        (programId != null && programId!.trim().isNotEmpty)
+            ? programId!.trim()
+            : 'ragonha-v1';
+    final resolvedProgramVersionId =
+        (programVersionId != null && programVersionId!.trim().isNotEmpty)
+            ? programVersionId!.trim()
+            : (programId != null && programId!.trim().isNotEmpty)
+                ? programId!.trim()
+                : 'ragonha-v1';
+    final resolvedFamilyId =
+        (methodologyFamilyId != null && methodologyFamilyId!.trim().isNotEmpty)
+            ? methodologyFamilyId!.trim()
+            : 'ragonha';
+    final resolvedDisplayName =
+        (methodologyDisplayName != null && methodologyDisplayName!.trim().isNotEmpty)
+            ? methodologyDisplayName!.trim()
+            : 'Método Ragonha';
+    final resolvedVersion = methodologyVersion ?? 1;
+
     final metadata = {
+      'program_id': resolvedProgramId,
+      'program_version_id': resolvedProgramVersionId,
+      'methodology_family_id': resolvedFamilyId,
+      'methodology_display_name': resolvedDisplayName,
+      'methodology_version': resolvedVersion,
       'line_id': lineId,
       'line': lineName,
       'line_type': lineType,
@@ -209,6 +266,11 @@ class DetectionFormationSession {
 
     return {
       if (id != null) 'id': id,
+      'program_id': resolvedProgramId,
+      'program_version_id': resolvedProgramVersionId,
+      'methodology_family_id': resolvedFamilyId,
+      'methodology_display_name': resolvedDisplayName,
+      'methodology_version': resolvedVersion,
       'type': 'detection_formation',
       'trainingType': 'Detecção',
       'specialty': 'Detecção',
@@ -268,6 +330,11 @@ class DetectionFormationSession {
 
   DetectionFormationSession copyWith({
     String? id,
+    String? programId,
+    String? programVersionId,
+    String? methodologyFamilyId,
+    String? methodologyDisplayName,
+    int? methodologyVersion,
     String? status,
     DateTime? endedAt,
     int? durationSeconds,
@@ -286,6 +353,11 @@ class DetectionFormationSession {
   }) {
     return DetectionFormationSession(
       id: id ?? this.id,
+      programId: programId ?? this.programId,
+      programVersionId: programVersionId ?? this.programVersionId,
+      methodologyFamilyId: methodologyFamilyId ?? this.methodologyFamilyId,
+      methodologyDisplayName: methodologyDisplayName ?? this.methodologyDisplayName,
+      methodologyVersion: methodologyVersion ?? this.methodologyVersion,
       dogId: dogId,
       dogName: dogName,
       lineId: lineId,
@@ -325,6 +397,11 @@ class DetectionFormationSession {
 
   static DetectionFormationSession fromRecorder({
     String? id,
+    String? programId,
+    String? programVersionId,
+    String? methodologyFamilyId,
+    String? methodologyDisplayName,
+    int? methodologyVersion,
     required String dogId,
     required String dogName,
     required String lineId,
@@ -349,6 +426,11 @@ class DetectionFormationSession {
     final now = DateTime.now();
     return DetectionFormationSession(
       id: id,
+      programId: programId,
+      programVersionId: programVersionId,
+      methodologyFamilyId: methodologyFamilyId,
+      methodologyDisplayName: methodologyDisplayName,
+      methodologyVersion: methodologyVersion,
       dogId: dogId,
       dogName: dogName,
       lineId: lineId,
@@ -407,6 +489,12 @@ DateTime? _readDate(dynamic value) {
   if (value is DateTime) return value;
   if (value is String) return DateTime.tryParse(value);
   return null;
+}
+
+Map<String, dynamic> _readMap(dynamic value) {
+  if (value is Map<String, dynamic>) return value;
+  if (value is Map) return Map<String, dynamic>.from(value);
+  return const {};
 }
 
 List<Map<String, dynamic>> _readListMap(dynamic value) {

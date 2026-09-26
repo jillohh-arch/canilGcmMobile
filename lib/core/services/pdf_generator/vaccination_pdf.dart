@@ -19,12 +19,12 @@ class VaccinationPdf {
 
   /// Gera os bytes do PDF da carteira de vacinação.
   static Future<Uint8List> generate(Dog dog, List<HealthLogModel> logs) async {
+    final fonts = await PdfFonts.load();
     final pdf = pw.Document(
       author: 'Canil K9 GCM Limeira',
       title: 'Carteira de Vacinacao - ${dog.name}',
+      theme: fonts.toThemeData(),
     );
-
-    final fonts = await PdfFonts.load();
 
     // Filter vaccine-related logs
     final vaccineLogs =

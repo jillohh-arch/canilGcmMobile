@@ -43,6 +43,7 @@ class _GuardProtectionCurriculumScreenState
   StreamSubscription<TrainingProgram?>? _programSub;
   StreamSubscription<TrainingProgress>? _progressSub;
   StreamSubscription<List<TrainingHubSession>>? _sessionsSub;
+  String? _subscribedProgramId;
 
   TrainingProgram? _program;
   TrainingProgress _progress = TrainingProgress.initial(_modality);
@@ -76,9 +77,12 @@ class _GuardProtectionCurriculumScreenState
     super.dispose();
   }
 
-  void _subscribeProgram() {
+  void _subscribeProgram({String? programId}) {
+    if (_subscribedProgramId == programId && _programSub != null) return;
+    _subscribedProgramId = programId;
+    unawaited(_programSub?.cancel());
     _programSub = _programService
-        .watchProgram(_modality)
+        .watchProgram(_modality, programId: programId)
         .listen(
           (program) {
             if (!mounted) return;
@@ -114,6 +118,10 @@ class _GuardProtectionCurriculumScreenState
                 _modeIndex = 0;
               }
             });
+            if (progress.programId != null &&
+                progress.programId != _subscribedProgramId) {
+              _subscribeProgram(programId: progress.programId);
+            }
             _maybeEnsureProgressInitialized();
           },
           onError: (error) {
@@ -453,6 +461,10 @@ class _GuardProtectionCurriculumScreenState
   Widget _buildTitleCard() {
     final completed = _progress.completedModuleIds.length;
     final total = _modules.length;
+    final methodologyName =
+        _progress.methodologyDisplayName ?? _program?.name ?? 'Guarda & Proteção';
+    final methodologyVer =
+        _progress.methodologyVersion ?? _program?.version ?? 1;
     return _Panel(
       child: Row(
         children: [
@@ -474,7 +486,7 @@ class _GuardProtectionCurriculumScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Guarda & Proteção',
+                  methodologyName,
                   style: GoogleFonts.inter(
                     color: AppTheme.textPrimary,
                     fontSize: 22,
@@ -484,8 +496,8 @@ class _GuardProtectionCurriculumScreenState
                 const SizedBox(height: 4),
                 Text(
                   _progress.isOperational
-                      ? 'Manutenção operacional sem GPS'
-                      : '$completed/$total módulos concluídos · currículo v${_program?.version ?? 1}',
+                      ? 'Manutenção operacional sem GPS · v$methodologyVer'
+                      : '$completed/$total módulos concluídos · v$methodologyVer',
                   style: GoogleFonts.inter(
                     color: AppTheme.textSecondary,
                     fontSize: 13,
@@ -1128,6 +1140,16 @@ class _GuardProtectionSessionFormScreenState
       'mode': widget.phase == 'maintenance' ? 'manutencao' : 'formacao',
       'phase': widget.phase,
       if (widget.program != null) 'program_version': widget.program!.version,
+      if (widget.program != null) 'program_id': widget.program!.id,
+      if (widget.program != null)
+        'program_version_id': widget.program!.id,
+      if (widget.program != null)
+        'methodology_family_id':
+            widget.program!.methodologyFamilyId ?? widget.program!.id,
+      if (widget.program != null)
+        'methodology_display_name': widget.program!.name,
+      if (widget.program != null)
+        'methodology_version': widget.program!.version,
       if (widget.module != null) 'module_id': widget.module!.id,
       if (widget.module != null) 'module_name': widget.module!.name,
       if (widget.milestone != null) 'milestone_id': widget.milestone!.id,

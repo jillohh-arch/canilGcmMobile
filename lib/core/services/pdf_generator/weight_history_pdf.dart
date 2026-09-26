@@ -229,12 +229,12 @@ class WeightHistoryPdf {
     List<HealthLogModel> logs, {
     required WeightPdfAuthority authority,
   }) async {
+    final fonts = await PdfFonts.load();
     final pdf = pw.Document(
       author: 'Canil K9 GCM Limeira',
       title: 'Historico de Peso - ${dog.name}',
+      theme: fonts.toThemeData(),
     );
-
-    final fonts = await PdfFonts.load();
 
     // Filter weight-related logs
     final weightLogs =

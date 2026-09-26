@@ -9,7 +9,6 @@ import 'package:pdf/widgets.dart' as pw;
 
 import 'package:canil_gcm/core/services/integrity_verification_service.dart';
 import 'package:canil_gcm/core/services/occurrence_location_service.dart';
-import 'package:canil_gcm/core/services/osm_static_map_generator.dart';
 import 'package:canil_gcm/core/domain/occurrence_signature.dart';
 import 'package:canil_gcm/core/domain/occurrence_team_member.dart';
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
@@ -69,11 +68,12 @@ class OccurrencePdfGenerator {
     required String handlerRa,
     IntegrityVerdict? integrityVerdict,
   }) async {
+    final fonts = await PdfFonts.load();
     final pdf = pw.Document(
       author: 'Canil K9 GCM Limeira',
       title: 'Registro de Ocorrencia - ${occurrence.typeName}',
+      theme: fonts.toThemeData(),
     );
-    final fonts = await PdfFonts.load();
     final docId = _buildDocId(occurrence);
     final sortedEvents = [...events]
       ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
@@ -84,10 +84,6 @@ class OccurrencePdfGenerator {
     // Download de mídia em paralelo (fotos são leves individualmente)
     final media = await _buildMediaItems(sortedEvents);
     final finalizationMedia = await _buildFinalizationMediaItems(occurrence);
-
-    // Mapas sequenciais para evitar pico de memória (tiles + composição)
-    final staticMapImage = await _buildStaticMapImage(occurrence);
-    final displacementMapImage = await _buildDisplacementMapImage(locations);
 
     // Carregar aditamentos (se houver)
     final amendments = await AmendmentRepository().listByOccurrence(
@@ -104,8 +100,13 @@ class OccurrencePdfGenerator {
       fonts: fonts,
       media: media,
       finalizationMedia: finalizationMedia,
-      staticMapImage: staticMapImage,
-      displacementMapImage: displacementMapImage,
+      // FF-OCC-05: o PDF não solicita basemap externo. O provider passou a
+      // sobrepor "API KEY REQUIRED" em tiles cartográficos válidos, e não há
+      // como distinguir tile limpo de tile carimbado no transporte. As duas
+      // seções usam sempre o mapa esquemático, que é determinístico e
+      // independente de rede.
+      staticMapImage: null,
+      displacementMapImage: null,
       locations: locations,
       amendments: amendments,
       integrityVerdict: integrityVerdict,
@@ -121,7 +122,7 @@ class OccurrencePdfGenerator {
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.only(top: 0, left: 0, right: 0, bottom: 0),
         header: (_) => _header(context, 0),
-        footer: (_) => _footer(false),
+        footer: (_) => _footer(context.fonts, false),
         build: (_) => [
           pw.Padding(
             padding: const pw.EdgeInsets.fromLTRB(
@@ -209,7 +210,7 @@ class OccurrencePdfGenerator {
                 child: bodyBuilder(ctx),
               ),
             ),
-            _footer(pageNumber == 1),
+            _footer(ctx.fonts, pageNumber == 1),
           ],
         ),
       ),
@@ -319,37 +320,9 @@ class OccurrencePdfGenerator {
     );
   }
 
-  /// Gera mapa estático OSM para a página de localização (ponto único).
-  Future<pw.ImageProvider?> _buildStaticMapImage(Occurrence occurrence) async {
-    final lat = occurrence.gpsLat;
-    final lng = occurrence.gpsLng;
-    if (lat == null || lng == null) return null;
-
-    final generator = OsmStaticMapGenerator();
-    try {
-      final bytes = await generator.generateSinglePointMap(lat, lng);
-      if (bytes == null) return null;
-      return pw.MemoryImage(bytes);
-    } finally {
-      generator.dispose();
-    }
-  }
-
-  /// Gera mapa estático OSM com múltiplos pinos numerados para o deslocamento.
-  Future<pw.ImageProvider?> _buildDisplacementMapImage(
-    List<OccurrenceLocation> locations,
-  ) async {
-    if (locations.isEmpty) return null;
-
-    final generator = OsmStaticMapGenerator();
-    try {
-      final bytes = await generator.generateDisplacementMap(locations);
-      if (bytes == null) return null;
-      return pw.MemoryImage(bytes);
-    } finally {
-      generator.dispose();
-    }
-  }
+  // FF-OCC-05: os helpers que baixavam tiles de basemap foram removidos. O PDF
+  // não tem mais nenhum caminho de runtime capaz de contatar um provider
+  // externo de mapas.
 
   String _buildDocId(Occurrence occ) {
     final seq = occ.id.length >= 4
@@ -526,7 +499,7 @@ class OccurrencePdfGenerator {
     );
   }
 
-  pw.Widget _footer(bool cover) {
+  pw.Widget _footer(PdfFonts fonts, bool cover) {
     return pw.Container(
       height: 38,
       padding: const pw.EdgeInsets.symmetric(horizontal: 30),
@@ -539,17 +512,21 @@ class OccurrencePdfGenerator {
           pw.SizedBox(width: 7),
           pw.Text(
             'Documento gerado automaticamente pelo $_systemName',
-            style: pw.TextStyle(fontSize: 7.5, color: _inkFaint),
+            style: pw.TextStyle(
+              font: fonts.regular,
+              fontSize: 7.5,
+              color: _inkFaint,
+            ),
           ),
           pw.Spacer(),
           pw.Text(
             cover
-                ? 'DOCUMENTO DIGITAL - assinatura e integridade na ultima pagina'
-                : 'DOCUMENTO DIGITAL - nao impresso',
+                ? 'DOCUMENTO DIGITAL — assinatura e integridade na última página'
+                : 'DOCUMENTO DIGITAL — não impresso',
             style: pw.TextStyle(
+              font: fonts.bold,
               fontSize: 7.5,
               color: _inkFaint,
-              fontWeight: pw.FontWeight.bold,
             ),
           ),
         ],
@@ -688,7 +665,7 @@ class OccurrencePdfGenerator {
 
   pw.TextStyle _mono(PdfFonts fonts, {double size = 9, PdfColor? color}) {
     return pw.TextStyle(
-      font: fonts.regular,
+      font: fonts.monoRegular,
       fontSize: size,
       color: color ?? _ink,
     );
@@ -1067,7 +1044,12 @@ class OccurrencePdfGenerator {
             pw.SizedBox(width: 9),
             _statCard('EV', '${ctx.events.length}', 'Eventos registrados', f),
             pw.SizedBox(width: 9),
-            _statCard('MID', '${ctx.media.length}', 'Midias anexadas', f),
+            _statCard(
+              'MID',
+              '${ctx.media.length + ctx.finalizationMedia.length}',
+              'Midias anexadas',
+              f,
+            ),
             pw.SizedBox(width: 9),
             _statCard('BO', '${_boCount(ctx.occurrence)}', 'BO registrado', f),
           ],
@@ -2083,27 +2065,16 @@ class OccurrencePdfGenerator {
           ],
         ),
         pw.SizedBox(height: 18),
-        if (visibleMedia.isEmpty)
+        if (visibleMedia.isEmpty && finalizationMedia.isEmpty)
           _emptyBox('Nenhuma midia anexada aos eventos desta ocorrencia.', f)
-        else
-          pw.Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: visibleMedia
-                .map((item) => _mediaCard(item, ctx))
-                .toList(),
-          ),
-        if (finalizationMedia.isNotEmpty) ...[
-          pw.SizedBox(height: 16),
-          _sectionLabel('Fotos da finalizacao', f),
-          pw.SizedBox(height: 10),
-          pw.Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: finalizationMedia
-                .map((item) => _finalizationMediaCard(item, ctx))
-                .toList(),
-          ),
+        else ...[
+          if (visibleMedia.isNotEmpty) ..._buildMediaGrid(visibleMedia, ctx),
+          if (finalizationMedia.isNotEmpty) ...[
+            if (visibleMedia.isNotEmpty) pw.SizedBox(height: 16),
+            _sectionLabel('Fotos da finalizacao', f),
+            pw.SizedBox(height: 10),
+            ..._buildFinalizationMediaGrid(finalizationMedia, ctx),
+          ],
         ],
         pw.SizedBox(height: 16),
         _sectionLabel('Anexos', f),
@@ -2111,6 +2082,58 @@ class OccurrencePdfGenerator {
         _attachmentCard(ctx),
       ],
     );
+  }
+
+  List<pw.Widget> _buildMediaGrid(
+    List<_PdfMediaItem> items,
+    _OccurrencePdfContext ctx,
+  ) {
+    final rows = <pw.Widget>[];
+    for (var i = 0; i < items.length; i += 2) {
+      final first = items[i];
+      final second = i + 1 < items.length ? items[i + 1] : null;
+      rows.add(
+        pw.Padding(
+          padding: const pw.EdgeInsets.only(bottom: 12),
+          child: pw.Row(
+            children: [
+              _mediaCard(first, ctx),
+              if (second != null) ...[
+                pw.SizedBox(width: 12),
+                _mediaCard(second, ctx),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+    return rows;
+  }
+
+  List<pw.Widget> _buildFinalizationMediaGrid(
+    List<_PdfFinalizationMediaItem> items,
+    _OccurrencePdfContext ctx,
+  ) {
+    final rows = <pw.Widget>[];
+    for (var i = 0; i < items.length; i += 2) {
+      final first = items[i];
+      final second = i + 1 < items.length ? items[i + 1] : null;
+      rows.add(
+        pw.Padding(
+          padding: const pw.EdgeInsets.only(bottom: 12),
+          child: pw.Row(
+            children: [
+              _finalizationMediaCard(first, ctx),
+              if (second != null) ...[
+                pw.SizedBox(width: 12),
+                _finalizationMediaCard(second, ctx),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+    return rows;
   }
 
   pw.Widget _mediaCount(_OccurrencePdfContext ctx) {
@@ -2222,7 +2245,7 @@ class OccurrencePdfGenerator {
               children: [
                 if (item.image != null)
                   pw.Positioned.fill(
-                    child: pw.Image(item.image!, fit: pw.BoxFit.cover),
+                    child: pw.Image(item.image!, fit: pw.BoxFit.contain),
                   )
                 else
                   pw.Center(
@@ -2350,7 +2373,7 @@ class OccurrencePdfGenerator {
               children: [
                 if (item.image != null)
                   pw.Positioned.fill(
-                    child: pw.Image(item.image!, fit: pw.BoxFit.cover),
+                    child: pw.Image(item.image!, fit: pw.BoxFit.contain),
                   )
                 else
                   pw.Center(
@@ -2474,98 +2497,141 @@ class OccurrencePdfGenerator {
         .where((r) => r != OccurrenceResult.noOccurrence)
         .toList();
     final report = ctx.occurrence.finalReport?.trim();
+    final resultCards = <pw.Widget>[
+      if (activeResults.isEmpty)
+        _resultCard(OccurrenceResult.noOccurrence, ctx)
+      else
+        ...activeResults.map((result) => _resultCard(result, ctx)),
+      if (ctx.media.isNotEmpty) _resultCard(null, ctx),
+    ];
+
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         _contextBar(ctx, status: true),
-        pw.SizedBox(height: 20),
-        pw.Row(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Expanded(
-              flex: 6,
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  _sectionLabel('Relato institucional', f),
-                  pw.SizedBox(height: 12),
-                  pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: pw.BoxDecoration(
-                      color: PdfInstitutionalColors.panelCyan,
-                      border: pw.Border.all(
-                        color: PdfInstitutionalColors.panelCyanBorder,
-                      ),
-                      borderRadius: const pw.BorderRadius.all(
-                        pw.Radius.circular(7),
-                      ),
-                    ),
-                    child: pw.Text(
-                      'TRANSCRICAO DE AUDIO - REVISADA PELO CONDUTOR',
-                      style: _bodyBold(f, size: 7.8, color: _cyanDeep),
-                    ),
-                  ),
-                  pw.SizedBox(height: 10),
-                  pw.Container(
-                    padding: const pw.EdgeInsets.only(left: 11),
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border(
-                        left: pw.BorderSide(color: _cyan, width: 2.4),
-                      ),
-                    ),
-                    child: pw.Text(
-                      report == null || report.isEmpty
-                          ? 'Relato institucional nao registrado na finalizacao.'
-                          : report,
-                      textAlign: pw.TextAlign.justify,
-                      style: _body(
-                        f,
-                        size: 9.5,
-                        color: PdfInstitutionalColors.timelineDark,
-                      ),
-                    ),
-                  ),
-                  pw.SizedBox(height: 12),
-                  pw.Container(
-                    padding: const pw.EdgeInsets.all(10),
-                    decoration: pw.BoxDecoration(
-                      color: PdfInstitutionalColors.panelSubtle,
-                      border: pw.Border.all(color: _lineSoft),
-                      borderRadius: const pw.BorderRadius.all(
-                        pw.Radius.circular(7),
-                      ),
-                    ),
-                    child: pw.Text(
-                      'Relato transcrito de audio gravado em campo, quando aplicavel, e revisado pelo condutor responsavel antes da finalizacao.',
-                      style: _body(f, size: 7.8, color: _inkSoft),
-                    ),
-                  ),
-                ],
-              ),
+        pw.SizedBox(height: 16),
+        _sectionLabel('Resultados', f),
+        pw.SizedBox(height: 10),
+        ..._buildResultCardsGrid(resultCards),
+        pw.SizedBox(height: 14),
+        _sectionLabel('Relato institucional', f),
+        pw.SizedBox(height: 10),
+        pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: pw.BoxDecoration(
+            color: PdfInstitutionalColors.panelCyan,
+            border: pw.Border.all(
+              color: PdfInstitutionalColors.panelCyanBorder,
             ),
-            pw.SizedBox(width: 18),
-            pw.Expanded(
-              flex: 5,
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  _sectionLabel('Resultados', f),
-                  pw.SizedBox(height: 12),
-                  if (activeResults.isEmpty)
-                    _resultCard(OccurrenceResult.noOccurrence, ctx)
-                  else
-                    ...activeResults.map((result) => _resultCard(result, ctx)),
-                  if (ctx.media.isNotEmpty) _resultCard(null, ctx),
-                ],
-              ),
-            ),
-          ],
+            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(7)),
+          ),
+          child: pw.Text(
+            'TRANSCRICAO DE AUDIO - REVISADA PELO CONDUTOR',
+            style: _bodyBold(f, size: 7.8, color: _cyanDeep),
+          ),
+        ),
+        pw.SizedBox(height: 10),
+        ..._buildReportParagraphs(report, f),
+        pw.SizedBox(height: 6),
+        pw.Container(
+          padding: const pw.EdgeInsets.all(10),
+          decoration: pw.BoxDecoration(
+            color: PdfInstitutionalColors.panelSubtle,
+            border: pw.Border.all(color: _lineSoft),
+            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(7)),
+          ),
+          child: pw.Text(
+            'Relato transcrito de audio gravado em campo, quando aplicavel, e revisado pelo condutor responsavel antes da finalizacao.',
+            style: _body(f, size: 7.8, color: _inkSoft),
+          ),
         ),
       ],
     );
+  }
+
+  List<pw.Widget> _buildResultCardsGrid(List<pw.Widget> cards) {
+    final rows = <pw.Widget>[];
+    for (var i = 0; i < cards.length; i += 2) {
+      final first = cards[i];
+      final second = i + 1 < cards.length ? cards[i + 1] : null;
+      rows.add(
+        pw.Padding(
+          padding: const pw.EdgeInsets.only(bottom: 2),
+          child: pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Expanded(child: first),
+              if (second != null) ...[
+                pw.SizedBox(width: 12),
+                pw.Expanded(child: second),
+              ] else
+                pw.Spacer(),
+            ],
+          ),
+        ),
+      );
+    }
+    return rows;
+  }
+
+  List<pw.Widget> _buildReportParagraphs(String? report, PdfFonts f) {
+    final paragraphs = _splitReportIntoParagraphs(report);
+    return paragraphs.map((paragraph) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 8),
+        child: pw.Container(
+          padding: const pw.EdgeInsets.only(left: 11),
+          decoration: pw.BoxDecoration(
+            border: pw.Border(left: pw.BorderSide(color: _cyan, width: 2.4)),
+          ),
+          child: pw.Text(
+            paragraph,
+            textAlign: pw.TextAlign.justify,
+            style: _body(
+              f,
+              size: 9.5,
+              color: PdfInstitutionalColors.timelineDark,
+            ),
+          ),
+        ),
+      );
+    }).toList();
+  }
+
+  List<String> _splitReportIntoParagraphs(String? report) {
+    if (report == null || report.trim().isEmpty) {
+      return const ['Relato institucional nao registrado na finalizacao.'];
+    }
+    final rawParagraphs = report.split(RegExp(r'\r?\n+'));
+    final chunks = <String>[];
+    for (final raw in rawParagraphs) {
+      final trimmed = raw.trim();
+      if (trimmed.isEmpty) continue;
+      if (trimmed.length <= 800) {
+        chunks.add(trimmed);
+      } else {
+        var remaining = trimmed;
+        while (remaining.length > 800) {
+          var splitIndex = remaining.lastIndexOf('. ', 800);
+          if (splitIndex == -1 || splitIndex < 200) {
+            splitIndex = remaining.lastIndexOf(' ', 800);
+          }
+          if (splitIndex == -1 || splitIndex < 200) {
+            splitIndex = 800;
+          } else {
+            splitIndex += 1;
+          }
+          chunks.add(remaining.substring(0, splitIndex).trim());
+          remaining = remaining.substring(splitIndex).trim();
+        }
+        if (remaining.isNotEmpty) {
+          chunks.add(remaining);
+        }
+      }
+    }
+    return chunks.isEmpty
+        ? const ['Relato institucional nao registrado na finalizacao.']
+        : chunks;
   }
 
   pw.Widget _resultCard(OccurrenceResult? result, _OccurrencePdfContext ctx) {
@@ -2669,11 +2735,14 @@ class OccurrencePdfGenerator {
   /// `weight_grams` é peso em gramas (o campo que o operador preenche em
   /// "Peso em gramas"), então o documento precisa mostrar a unidade. O campo
   /// legado `quantidade` não tem unidade conhecida e é renderizado cru.
-  @visibleForTesting
-  static String formatDrugDescriptionForTest(dynamic raw) =>
-      _formatDrugDescription(raw);
-
-  static String _formatDrugDescription(dynamic raw) {
+  static String formatDrugDescription(dynamic raw) {
+    if (raw is Map &&
+        (raw.containsKey('type') ||
+            raw.containsKey('tipo') ||
+            raw.containsKey('weight_grams') ||
+            raw.containsKey('quantidade'))) {
+      raw = [raw];
+    }
     if (raw is List && raw.isNotEmpty) {
       final entries = raw
           .whereType<Map>()
@@ -2692,7 +2761,11 @@ class OccurrencePdfGenerator {
     return 'Substancia analoga a entorpecente apreendida e registrada na ocorrencia.';
   }
 
-  String _drugDescription(dynamic raw) => _formatDrugDescription(raw);
+  @visibleForTesting
+  static String formatDrugDescriptionForTest(dynamic raw) =>
+      formatDrugDescription(raw);
+
+  String _drugDescription(dynamic raw) => formatDrugDescription(raw);
 
   String _weaponDescription(Map<String, dynamic>? details) {
     final type = details?['type']?.toString();
@@ -3222,6 +3295,32 @@ class OccurrencePdfGenerator {
     );
   }
 
+  /// FF-OCC-09: expõe o texto do estado de integridade para regressão, no mesmo
+  /// padrão que FF-OCC-08 usa em [formatDrugDescriptionForTest]. O objetivo é
+  /// travar permanentemente a redação não acusatória de `unverified`.
+  @visibleForTesting
+  static String integrityStateTextForTest({
+    required bool hasHash,
+    required IntegrityVerdict? verdict,
+  }) => OccurrencePdfGenerator()._integrityStateText(
+    hasHash: hasHash,
+    verdict: verdict,
+  );
+
+  /// F40 R8: Expõe o cálculo do total de mídias para testes de cobertura e regressão.
+  @visibleForTesting
+  static int totalMediaCountForTest({
+    required int eventMediaCount,
+    required int finalizationMediaCount,
+  }) => eventMediaCount + finalizationMediaCount;
+
+  /// F40 R8: Expõe a condição de estado vazio de mídia para testes de regressão.
+  @visibleForTesting
+  static bool isEmptyMediaStateForTest({
+    required bool visibleMediaEmpty,
+    required bool finalizationMediaEmpty,
+  }) => visibleMediaEmpty && finalizationMediaEmpty;
+
   String _integrityStateText({
     required bool hasHash,
     required IntegrityVerdict? verdict,
@@ -3233,14 +3332,24 @@ class OccurrencePdfGenerator {
       return 'SELO ARMAZENADO\nVerificacao local indisponivel neste PDF. Confirme pelo QR Code.';
     }
     return switch (verdict.status) {
+      // FF-OCC-09.H1.C1: quem confirma a integridade documental e o verificador
+      // oficial, nao o recalculo local. A homologacao fisica da ocorrencia
+      // 212bdc56 provou o caso: hash local divergente e documento valido.
+      // Afirmar "conferido localmente" seria falso.
       IntegrityStatus.intact =>
-        'INTEGRO\nHash recalculado localmente e conferido com o selo armazenado.',
+        'INTEGRO\nIntegridade documental confirmada pelo verificador oficial.',
       IntegrityStatus.broken =>
         'SELO QUEBRADO\nHash recalculado nao confere com o selo armazenado.',
       IntegrityStatus.legacy =>
         'SELO LEGADO\nVersao de hash nao recalculavel pelo verificador atual.',
       IntegrityStatus.unsealed =>
         'PENDENTE\nOcorrencia sem selo de integridade armazenado.',
+      // FF-OCC-09: sem veredito do verificador oficial nao se afirma nada
+      // sobre adulteracao. Texto autossuficiente: FF-OCC-11 provou que a
+      // rota do QR responde 404 hoje, logo nao a recomendamos como fallback.
+      IntegrityStatus.unverified =>
+        'VERIFICACAO NAO DISPONIVEL\nNao foi possivel consultar o verificador '
+            'oficial neste momento. Tente novamente com conexao.',
     };
   }
 

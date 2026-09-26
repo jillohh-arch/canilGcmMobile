@@ -8,6 +8,9 @@ class TrainingProgram {
   final bool active;
   final DateTime? updatedAt;
   final List<TrainingModule> modules;
+  final String? methodologyFamilyId;
+  final String? status;
+  final String? description;
 
   const TrainingProgram({
     required this.id,
@@ -17,6 +20,9 @@ class TrainingProgram {
     required this.active,
     required this.modules,
     this.updatedAt,
+    this.methodologyFamilyId,
+    this.status,
+    this.description,
   });
 
   factory TrainingProgram.fromFirestore(
@@ -26,16 +32,26 @@ class TrainingProgram {
     final data = doc.data() ?? const <String, dynamic>{};
     return TrainingProgram(
       id: doc.id,
-      name: _readString(data, 'name') ?? doc.id,
+      name: _readString(data, 'name') ?? _readString(data, 'title') ?? doc.id,
       modality: _readString(data, 'modality') ?? doc.id,
       version: _readInt(data['version']) ?? 1,
       active: data['active'] != false,
       updatedAt: _readDate(data['updated_at'] ?? data['updatedAt']),
       modules: modules,
+      methodologyFamilyId:
+          _readString(data, 'methodology_family_id') ??
+          _readString(data, 'methodologyFamilyId'),
+      status: _readString(data, 'status'),
+      description: _readString(data, 'description'),
     );
   }
 
-  TrainingProgram copyWith({List<TrainingModule>? modules}) {
+  TrainingProgram copyWith({
+    List<TrainingModule>? modules,
+    String? methodologyFamilyId,
+    String? status,
+    String? description,
+  }) {
     return TrainingProgram(
       id: id,
       name: name,
@@ -44,6 +60,9 @@ class TrainingProgram {
       active: active,
       updatedAt: updatedAt,
       modules: modules ?? this.modules,
+      methodologyFamilyId: methodologyFamilyId ?? this.methodologyFamilyId,
+      status: status ?? this.status,
+      description: description ?? this.description,
     );
   }
 
@@ -79,7 +98,7 @@ class TrainingModule {
     return TrainingModule(
       id: doc.id,
       order: _readInt(data['order']) ?? 0,
-      name: _readString(data, 'name') ?? doc.id,
+      name: _readString(data, 'title') ?? _readString(data, 'name') ?? doc.id,
       description: _readString(data, 'description') ?? '',
       active: data['active'] != false,
       milestones: milestones,
@@ -126,7 +145,7 @@ class TrainingMilestone {
     return TrainingMilestone(
       id: doc.id,
       order: _readInt(data['order']) ?? 0,
-      label: _readString(data, 'label') ?? doc.id,
+      label: _readString(data, 'title') ?? _readString(data, 'label') ?? doc.id,
       isRequired: data['required'] != false,
       active: data['active'] != false,
     );
@@ -144,6 +163,16 @@ class TrainingProgress {
   final List<CompletedTrainingModule> completedModules;
   final Map<String, Map<String, TrainingMilestoneAchievement>>
   achievedMilestones;
+  final String? programId;
+  final String? programVersionId;
+  final String? methodologyFamilyId;
+  final String? methodologyDisplayName;
+  final int? methodologyVersion;
+  final DateTime? assignedAt;
+  final String? assignedBy;
+  final String? initialModuleId;
+  final String? initialModuleJustification;
+  final List<Map<String, dynamic>> assignmentHistory;
 
   const TrainingProgress({
     required this.exists,
@@ -155,6 +184,16 @@ class TrainingProgress {
     this.currentModuleId,
     this.programVersion,
     this.operationalSince,
+    this.programId,
+    this.programVersionId,
+    this.methodologyFamilyId,
+    this.methodologyDisplayName,
+    this.methodologyVersion,
+    this.assignedAt,
+    this.assignedBy,
+    this.initialModuleId,
+    this.initialModuleJustification,
+    this.assignmentHistory = const [],
   });
 
   factory TrainingProgress.initial(String modality) {
@@ -165,6 +204,16 @@ class TrainingProgress {
       completedModuleIds: const [],
       completedModules: const [],
       achievedMilestones: const {},
+      programId: null,
+      programVersionId: null,
+      methodologyFamilyId: null,
+      methodologyDisplayName: null,
+      methodologyVersion: null,
+      assignedAt: null,
+      assignedBy: null,
+      initialModuleId: null,
+      initialModuleJustification: null,
+      assignmentHistory: const [],
     );
   }
 
@@ -178,6 +227,12 @@ class TrainingProgress {
     final completedIds = _readStringList(
       data['completed_module_ids'] ?? data['completedModules'],
     );
+    final assignedByRaw = data['assigned_by'] ?? data['assignedBy'];
+    final assignedByStr = assignedByRaw is Map
+        ? (_readString(_stringKeyMap(assignedByRaw), 'name') ??
+            _readString(_stringKeyMap(assignedByRaw), 'ra'))
+        : assignedByRaw?.toString();
+
     return TrainingProgress(
       exists: true,
       modality: _readString(data, 'modality') ?? modality,
@@ -196,6 +251,29 @@ class TrainingProgress {
           : completedModules.map((module) => module.moduleId).toList(),
       completedModules: completedModules,
       achievedMilestones: _readAchievedMilestones(data['achieved_milestones']),
+      programId:
+          _readString(data, 'program_id') ?? _readString(data, 'programId'),
+      programVersionId:
+          _readString(data, 'program_version_id') ??
+          _readString(data, 'programVersionId') ??
+          _readString(data, 'program_id'),
+      methodologyFamilyId:
+          _readString(data, 'methodology_family_id') ??
+          _readString(data, 'methodologyFamilyId'),
+      methodologyDisplayName:
+          _readString(data, 'methodology_display_name') ??
+          _readString(data, 'methodologyDisplayName'),
+      methodologyVersion:
+          _readInt(data['methodology_version']) ??
+          _readInt(data['methodologyVersion']) ??
+          _readInt(data['program_version']),
+      assignedAt: _readDate(data['assigned_at'] ?? data['assignedAt']),
+      assignedBy: assignedByStr,
+      initialModuleId: _readString(data, 'initial_module_id'),
+      initialModuleJustification:
+          _readString(data, 'initial_module_justification'),
+      assignmentHistory:
+          _readListMap(data['assignment_history']) ?? const [],
     );
   }
 
@@ -324,7 +402,7 @@ class BonusTrainingMilestone {
       moduleName: _readString(data, 'module_name') ?? '',
       milestoneId: _readString(data, 'milestone_id') ?? doc.id,
       milestoneOrder: _readInt(data['milestone_order']) ?? 0,
-      label: _readString(data, 'label') ?? doc.id,
+      label: _readString(data, 'title') ?? _readString(data, 'label') ?? doc.id,
       isRequired: data['required'] != false,
       programVersion: _readInt(data['program_version']),
       completedAt: _readDate(data['completed_at']),
@@ -417,4 +495,12 @@ Map<String, Map<String, TrainingMilestoneAchievement>> _readAchievedMilestones(
 
 Map<String, dynamic> _stringKeyMap(Map<dynamic, dynamic> value) {
   return value.map((key, item) => MapEntry(key.toString(), item));
+}
+
+List<Map<String, dynamic>>? _readListMap(dynamic value) {
+  if (value is! List) return null;
+  return value
+      .whereType<Map>()
+      .map((item) => Map<String, dynamic>.from(item))
+      .toList();
 }

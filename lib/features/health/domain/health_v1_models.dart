@@ -116,6 +116,19 @@ final class RecordedBy {
   final String name;
   final String internalRole;
 
+  factory RecordedBy.fromMap(Map<String, dynamic> map) {
+    final uid = map['uid']?.toString() ?? '';
+    final name = map['name']?.toString() ?? '';
+    final role = (map['internal_role'] ?? map['internalRole'])?.toString() ?? '';
+    return RecordedBy(uid: uid, name: name, internalRole: role);
+  }
+
+  Map<String, String> toMap() => {
+    'uid': uid,
+    'name': name,
+    'internal_role': internalRole,
+  };
+
   @override
   bool operator ==(Object other) =>
       other is RecordedBy &&
@@ -426,6 +439,129 @@ final class ClinicalEvent {
         ? this.cancelledBy
         : cancelledBy as RecordedBy?,
   );
+
+  factory ClinicalEvent.fromMap(
+    Map<String, dynamic> map, {
+    String? documentId,
+  }) {
+    final id = documentId ??
+        map['event_id'] as String? ??
+        map['id'] as String? ??
+        '';
+    final caseId = map['case_id'] as String? ??
+        map['caseId'] as String? ??
+        '';
+    final rawType = map['event_type'] ?? map['type'];
+    final parsedType = ClinicalEventTypeWire.parse(rawType);
+    final eventType = parsedType.value;
+    if (!parsedType.isKnown || eventType == null) {
+      throw HealthDomainException(
+        'unknown_event_type',
+        'Tipo de evento clínico desconhecido: $rawType',
+      );
+    }
+    final rawStatus = map['status'];
+    final parsedStatus = ClinicalEventStatusWire.parse(rawStatus);
+    final status = parsedStatus.value ?? ClinicalEventStatus.finalised;
+
+    final occurredAt = _parseDateTime(map['occurred_at'] ?? map['occurredAt']) ??
+        DateTime.now().toUtc();
+    final recordedAt = _parseDateTime(map['recorded_at'] ?? map['recordedAt']) ??
+        DateTime.now().toUtc();
+
+    final recordedBy = _parseRecordedBy(map['recorded_by'] ?? map['recordedBy']) ??
+        RecordedBy(uid: 'system', name: 'Sistema', internalRole: 'sistema');
+
+    final payloadType = map['payload_type'] as String? ??
+        map['payloadType'] as String? ??
+        '${eventType.wireName}_v1';
+    final payloadVersion = (map['payload_version'] as num?)?.toInt() ??
+        (map['payloadVersion'] as num?)?.toInt() ??
+        1;
+    final schemaVersion = (map['schema_version'] as num?)?.toInt() ??
+        (map['schemaVersion'] as num?)?.toInt() ??
+        1;
+
+    final rawContent = map['content'];
+    final content = rawContent is Map
+        ? Map<String, Object?>.from(rawContent)
+        : const <String, Object?>{};
+
+    final rawAttachments = map['attachment_refs'] ?? map['attachmentRefs'];
+    final attachmentRefs = rawAttachments is List
+        ? rawAttachments.map((e) => e.toString()).toList()
+        : const <String>[];
+
+    final cancelReason = map['cancel_reason'] as String? ??
+        map['cancelReason'] as String?;
+    final cancelledAt = _parseDateTime(map['cancelled_at'] ?? map['cancelledAt']);
+    final cancelledBy = _parseRecordedBy(map['cancelled_by'] ?? map['cancelledBy']);
+
+    return ClinicalEvent(
+      id: id,
+      caseId: caseId,
+      type: eventType,
+      status: status,
+      occurredAt: occurredAt,
+      recordedAt: recordedAt,
+      recordedBy: recordedBy,
+      payloadType: payloadType,
+      payloadVersion: payloadVersion,
+      schemaVersion: schemaVersion,
+      content: content,
+      attachmentRefs: attachmentRefs,
+      cancelReason: cancelReason,
+      cancelledAt: cancelledAt,
+      cancelledBy: cancelledBy,
+    );
+  }
+
+  Map<String, Object?> toMap() => {
+    'entity_kind': 'clinical_event',
+    'event_id': id,
+    'case_id': caseId,
+    'event_type': type.wireName,
+    'status': status.wireName,
+    'occurred_at': occurredAt.toIso8601String(),
+    'recorded_at': recordedAt.toIso8601String(),
+    'recorded_by': recordedBy.toMap(),
+    'payload_type': payloadType,
+    'payload_version': payloadVersion,
+    'schema_version': schemaVersion,
+    'content': content,
+    'attachment_refs': attachmentRefs,
+    if (cancelReason != null) 'cancel_reason': cancelReason,
+    if (cancelledAt != null) 'cancelled_at': cancelledAt!.toIso8601String(),
+    if (cancelledBy != null) 'cancelled_by': cancelledBy!.toMap(),
+  };
+}
+
+RecordedBy? _parseRecordedBy(Object? raw) {
+  if (raw is RecordedBy) return raw;
+  if (raw is! Map) return null;
+  final uid = raw['uid']?.toString().trim();
+  final name = raw['name']?.toString().trim();
+  final role = (raw['internal_role'] ?? raw['internalRole'])?.toString().trim();
+  if (uid == null || name == null || role == null) return null;
+  if (uid.isEmpty || name.isEmpty || role.isEmpty) return null;
+  return RecordedBy(uid: uid, name: name, internalRole: role);
+}
+
+DateTime? _parseDateTime(Object? raw) {
+  if (raw == null) return null;
+  if (raw is DateTime) return raw;
+  if (raw is num) {
+    return DateTime.fromMillisecondsSinceEpoch(raw.toInt(), isUtc: true);
+  }
+  try {
+    final dynamic dyn = raw;
+    final d = dyn.toDate();
+    if (d is DateTime) return d;
+  } catch (_) {}
+  if (raw is String && raw.trim().isNotEmpty) {
+    return DateTime.tryParse(raw.trim());
+  }
+  return null;
 }
 
 final class MealLog {

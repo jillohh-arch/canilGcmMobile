@@ -20,20 +20,32 @@ import 'package:canil_gcm/features/occurrences/presentation/widgets/signature_co
 
 class OccurrenceReviewScreen extends StatefulWidget {
   final String occurrenceId;
+  final OccurrenceRepository? occurrenceRepository;
+  final OccurrenceEventRepository? eventRepository;
+  final SignatureRepository? signatureRepository;
+  final OccurrenceTransitionService? transitionService;
+  final String? currentHandlerRa;
+  final OccurrenceFinalizationViewModel? teamViewModel;
 
-  const OccurrenceReviewScreen({super.key, required this.occurrenceId});
+  const OccurrenceReviewScreen({
+    super.key,
+    required this.occurrenceId,
+    this.occurrenceRepository,
+    this.eventRepository,
+    this.signatureRepository,
+    this.transitionService,
+    this.currentHandlerRa,
+    this.teamViewModel,
+  });
 
   @override
   State<OccurrenceReviewScreen> createState() => _OccurrenceReviewScreenState();
 }
 
 class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
-  final _occurrenceRepository = OccurrenceRepository(
-    FirebaseFirestore.instance,
-  );
-  final _eventRepository = OccurrenceEventRepository(
-    FirebaseFirestore.instance,
-  );
+  late final OccurrenceRepository _occurrenceRepository;
+  late final OccurrenceEventRepository _eventRepository;
+  late final OccurrenceTransitionService _transitionService;
   late final OccurrenceFinalizationViewModel _teamViewModel;
 
   bool _isLoading = true;
@@ -46,17 +58,32 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
   @override
   void initState() {
     super.initState();
-    _teamViewModel = OccurrenceFinalizationViewModel(
-      occurrenceRepository: _occurrenceRepository,
-      signatureRepository: SignatureRepository(),
-    );
+    _occurrenceRepository = widget.occurrenceRepository ??
+        OccurrenceRepository(FirebaseFirestore.instance);
+    _eventRepository = widget.eventRepository ??
+        OccurrenceEventRepository(FirebaseFirestore.instance);
+    _transitionService =
+        widget.transitionService ?? OccurrenceTransitionService();
+    _teamViewModel = widget.teamViewModel ??
+        OccurrenceFinalizationViewModel(
+          occurrenceRepository: _occurrenceRepository,
+          signatureRepository:
+              widget.signatureRepository ?? SignatureRepository(),
+        );
     _load();
   }
 
   @override
   void dispose() {
-    _teamViewModel.dispose();
+    if (widget.teamViewModel == null) {
+      _teamViewModel.dispose();
+    }
     super.dispose();
+  }
+
+  String? _currentHandlerRa() {
+    return widget.currentHandlerRa ??
+        HandlerIdentityService.raFromUser(FirebaseAuth.instance.currentUser);
   }
 
   Future<void> _load() async {
@@ -89,9 +116,7 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
 
   bool get _canSign {
     final occurrence = _occurrence;
-    final currentRa = HandlerIdentityService.raFromUser(
-      FirebaseAuth.instance.currentUser,
-    );
+    final currentRa = _currentHandlerRa();
     if (occurrence == null ||
         currentRa == null ||
         occurrence.status != OccurrenceStatus.awaitingSignatures) {
@@ -108,24 +133,28 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
 
   bool get _canRequestCorrection {
     final occurrence = _occurrence;
-    final currentRa = HandlerIdentityService.raFromUser(
-      FirebaseAuth.instance.currentUser,
-    );
+    final currentRa = _currentHandlerRa();
     if (occurrence == null ||
         currentRa == null ||
         occurrence.status != OccurrenceStatus.awaitingSignatures) {
       return false;
     }
-    return occurrence.team.any((member) => member.handlerId == currentRa) ||
-        occurrence.primaryHandlerRa == currentRa ||
-        occurrence.primaryHandlerId == currentRa;
+    final member = occurrence.team.where((item) => item.handlerId == currentRa);
+    if (member.isEmpty || member.first.role == TeamRole.titular) return false;
+    final hasAlreadySigned = _teamViewModel.signatures.any(
+      (signature) =>
+          signature.handlerId == currentRa &&
+          signature.status == SignatureStatus.signed,
+    );
+    if (hasAlreadySigned) {
+      return false;
+    }
+    return true;
   }
 
   bool get _canRespondParticipation {
     final occurrence = _occurrence;
-    final currentRa = HandlerIdentityService.raFromUser(
-      FirebaseAuth.instance.currentUser,
-    );
+    final currentRa = _currentHandlerRa();
     if (occurrence == null || currentRa == null || !occurrence.status.isOpen) {
       return false;
     }
@@ -142,124 +171,88 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => SignatureConfirmationDialog(
+      builder: (dialogContext) => SignatureConfirmationDialog(
         occurrence: occurrence,
         viewModel: _teamViewModel,
+        currentHandlerRa: _currentHandlerRa(),
         onSuccess: () async {
           await _load();
           if (!mounted) return;
           AppFeedback.success(context, 'Assinatura registrada.');
+          if (_occurrence != null && _occurrence!.status.isClosed) {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop('signed_and_sealed');
+            }
+          }
         },
       ),
     );
   }
 
-  void _showCorrectionDialog() {
-    final reasonController = TextEditingController();
-    showDialog(
+  Future<void> _showCorrectionDialog() async {
+    final reason = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Devolver para correção'),
-        content: TextField(
-          controller: reasonController,
-          autofocus: true,
-          minLines: 3,
-          maxLines: 6,
-          decoration: const InputDecoration(
-            labelText: 'Motivo',
-            hintText: 'Explique o que precisa ser corrigido',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: _isRequestingCorrection
-                ? null
-                : () {
-                    final reason = reasonController.text.trim();
-                    if (reason.isEmpty) {
-                      AppFeedback.warning(context, 'Informe o motivo da devolução.');
-                      return;
-                    }
-                    Navigator.pop(dialogContext);
-                    _requestCorrection(reason);
-                  },
-            child: const Text('Devolver'),
-          ),
-        ],
+      builder: (dialogContext) => const _ReasonInputDialog(
+        title: 'Devolver para correção',
+        labelText: 'Motivo',
+        hintText: 'Explique o que precisa ser corrigido',
+        actionLabel: 'Devolver',
+        validationErrorMessage: 'Informe o motivo da devolução.',
       ),
-    ).whenComplete(reasonController.dispose);
+    );
+
+    if (reason != null && mounted) {
+      await _requestCorrection(reason);
+    }
   }
 
-  void _showDeclineParticipationDialog() {
-    final reasonController = TextEditingController();
-    showDialog(
+  Future<void> _showDeclineParticipationDialog() async {
+    final reason = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Recusar participação'),
-        content: TextField(
-          controller: reasonController,
-          autofocus: true,
-          minLines: 3,
-          maxLines: 6,
-          decoration: const InputDecoration(
-            labelText: 'Motivo da recusa',
-            hintText: 'Explique por que não participou desta ocorrência',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: _isRespondingParticipation
-                ? null
-                : () {
-                    final reason = reasonController.text.trim();
-                    if (reason.isEmpty) {
-                      AppFeedback.warning(context, 'Informe o motivo da recusa.');
-                      return;
-                    }
-                    Navigator.pop(dialogContext);
-                    _declineParticipation(reason);
-                  },
-            child: const Text('Recusar'),
-          ),
-        ],
+      builder: (dialogContext) => const _ReasonInputDialog(
+        title: 'Recusar participação',
+        labelText: 'Motivo da recusa',
+        hintText: 'Explique por que não participou desta ocorrência',
+        actionLabel: 'Recusar',
+        validationErrorMessage: 'Informe o motivo da recusa.',
       ),
-    ).whenComplete(reasonController.dispose);
+    );
+
+    if (reason != null && mounted) {
+      await _declineParticipation(reason);
+    }
   }
 
   Future<void> _acceptParticipation() async {
     setState(() => _isRespondingParticipation = true);
+    var didNavigate = false;
     try {
-      await OccurrenceTransitionService().acceptParticipation(
+      await _occurrenceRepository.acceptParticipation(
         occurrenceId: widget.occurrenceId,
       );
       if (!mounted) return;
+      AppFeedback.success(context, 'Participação confirmada.');
+      didNavigate = true;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) =>
               ActiveOccurrenceScreen(occurrenceId: widget.occurrenceId),
         ),
       );
-      AppFeedback.success(context, 'Participação confirmada.');
     } catch (error) {
       if (!mounted) return;
       AppFeedback.error(context, error);
     } finally {
-      if (mounted) setState(() => _isRespondingParticipation = false);
+      if (mounted && !didNavigate) {
+        setState(() => _isRespondingParticipation = false);
+      }
     }
   }
 
   Future<void> _declineParticipation(String reason) async {
     setState(() => _isRespondingParticipation = true);
     try {
-      await OccurrenceTransitionService().declineParticipation(
+      await _transitionService.declineParticipation(
         occurrenceId: widget.occurrenceId,
         reason: reason,
       );
@@ -276,24 +269,27 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
 
   Future<void> _requestCorrection(String reason) async {
     setState(() => _isRequestingCorrection = true);
+    var didPop = false;
     try {
-      await OccurrenceTransitionService().requestCorrection(
+      await _transitionService.requestCorrection(
         occurrenceId: widget.occurrenceId,
         reason: reason,
       );
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) =>
-              ActiveOccurrenceScreen(occurrenceId: widget.occurrenceId),
-        ),
-      );
       AppFeedback.success(context, 'Ocorrência devolvida para correção.');
+      if (Navigator.of(context).canPop()) {
+        didPop = true;
+        Navigator.of(context).pop('returned_for_correction');
+      } else {
+        await _load();
+      }
     } catch (error) {
       if (!mounted) return;
       AppFeedback.error(context, error);
     } finally {
-      if (mounted) setState(() => _isRequestingCorrection = false);
+      if (mounted && !didPop) {
+        setState(() => _isRequestingCorrection = false);
+      }
     }
   }
 
@@ -392,6 +388,18 @@ class _OccurrenceReviewScreenState extends State<OccurrenceReviewScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
+                      if (occurrence.status.isClosed) ...[
+                        _SectionCard(
+                          icon: Icons.lock_outline,
+                          title: 'Ocorrência selada',
+                          children: const [
+                            Text(
+                              'Esta ocorrência foi finalizada e selada pelo encarregado. Não há ações pendentes de resposta ou assinatura.',
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       _SectionCard(
                         icon: Icons.groups_outlined,
                         title: 'Equipe e assinaturas',
@@ -446,6 +454,10 @@ class _ActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!canRespondParticipation && !canSign && !canRequestCorrection) {
+      return const SizedBox.shrink();
+    }
+
     return SafeArea(
       top: false,
       child: Container(
@@ -669,6 +681,84 @@ class _ErrorState extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ReasonInputDialog extends StatefulWidget {
+  final String title;
+  final String labelText;
+  final String hintText;
+  final String actionLabel;
+  final String validationErrorMessage;
+
+  const _ReasonInputDialog({
+    required this.title,
+    required this.labelText,
+    required this.hintText,
+    required this.actionLabel,
+    required this.validationErrorMessage,
+  });
+
+  @override
+  State<_ReasonInputDialog> createState() => _ReasonInputDialogState();
+}
+
+class _ReasonInputDialogState extends State<_ReasonInputDialog> {
+  late final TextEditingController _controller;
+  String? _validationError;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final text = _controller.text.trim();
+    if (text.isEmpty) {
+      setState(() => _validationError = widget.validationErrorMessage);
+      return;
+    }
+    Navigator.of(context).pop(text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        minLines: 3,
+        maxLines: 6,
+        onChanged: (_) {
+          if (_validationError != null) {
+            setState(() => _validationError = null);
+          }
+        },
+        decoration: InputDecoration(
+          labelText: widget.labelText,
+          hintText: widget.hintText,
+          errorText: _validationError,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: Text(widget.actionLabel),
+        ),
+      ],
     );
   }
 }
