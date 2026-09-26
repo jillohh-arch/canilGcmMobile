@@ -60,22 +60,63 @@ android {
         }
     }
 
+    val storeFilePath = keystoreProperties.getProperty("storeFile")?.trim()
+    val storeFileCandidate = if (!storeFilePath.isNullOrEmpty()) {
+        val candidate = File(storeFilePath)
+        if (candidate.isAbsolute) candidate else rootProject.file(storeFilePath)
+    } else null
+
+    val releaseKeyAlias = keystoreProperties.getProperty("keyAlias")?.trim()
+    val releaseStorePassword = keystoreProperties.getProperty("storePassword")
+    val releaseKeyPassword = keystoreProperties.getProperty("keyPassword")
+
+    val hasCompleteReleaseConfig = keystorePropertiesFile.exists() &&
+        storeFileCandidate != null &&
+        storeFileCandidate.exists() &&
+        !releaseKeyAlias.isNullOrEmpty() &&
+        !releaseStorePassword.isNullOrEmpty() &&
+        !releaseKeyPassword.isNullOrEmpty()
+
     signingConfigs {
         create("release") {
-            val keyFilePath = keystoreProperties.getProperty("storeFile")
-            val keyFile = if (keyFilePath != null) {
-                val candidate = File(keyFilePath)
-                if (candidate.isAbsolute) candidate else rootProject.file(keyFilePath)
-            } else null
-
-            if (keyFile != null && keyFile.exists()) {
-                keyAlias = keystoreProperties.getProperty("keyAlias")
-                keyPassword = keystoreProperties.getProperty("keyPassword")
-                storeFile = keyFile
-                storePassword = keystoreProperties.getProperty("storePassword")
-            } else {
-                initWith(getByName("debug"))
+            if (hasCompleteReleaseConfig) {
+                storeFile = storeFileCandidate
+                keyAlias = releaseKeyAlias
+                storePassword = releaseStorePassword
+                keyPassword = releaseKeyPassword
             }
+        }
+    }
+
+    gradle.taskGraph.whenReady {
+        val isProductionReleaseRequested = allTasks.any { task ->
+            val name = task.name
+            name.contains("ProductionRelease", ignoreCase = true)
+        }
+        if (isProductionReleaseRequested && !hasCompleteReleaseConfig) {
+            val missingReasons = mutableListOf<String>()
+            if (!keystorePropertiesFile.exists()) {
+                missingReasons.add("key.properties file is missing at ${keystorePropertiesFile.absolutePath}")
+            }
+            if (storeFilePath.isNullOrEmpty()) {
+                missingReasons.add("property 'storeFile' is missing or blank")
+            } else if (storeFileCandidate == null || !storeFileCandidate.exists()) {
+                missingReasons.add("keystore file does not exist at ${storeFileCandidate?.absolutePath ?: storeFilePath}")
+            }
+            if (releaseKeyAlias.isNullOrEmpty()) {
+                missingReasons.add("property 'keyAlias' is missing or blank")
+            }
+            if (releaseStorePassword.isNullOrEmpty()) {
+                missingReasons.add("property 'storePassword' is missing or blank")
+            }
+            if (releaseKeyPassword.isNullOrEmpty()) {
+                missingReasons.add("property 'keyPassword' is missing or blank")
+            }
+            throw GradleException(
+                "FAIL-CLOSED: Production release signing requires a valid release configuration, but: " +
+                missingReasons.joinToString("; ") +
+                ". Silently falling back to debug signing is strictly forbidden."
+            )
         }
     }
 
