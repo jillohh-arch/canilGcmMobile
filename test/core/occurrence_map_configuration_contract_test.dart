@@ -108,6 +108,105 @@ void main() {
         );
       }
     });
+
+    test(
+      '5. android/app/build.gradle.kts enforces fail-closed validation for MAPS_API_KEY in productionRelease',
+      () {
+        final gradleFile = File('${rootDir.path}/android/app/build.gradle.kts');
+        expect(gradleFile.existsSync(), isTrue);
+        final content = gradleFile.readAsStringSync();
+
+        expect(
+          content,
+          contains('isProductionReleaseRequested'),
+          reason: 'Must detect when ProductionRelease is requested',
+        );
+        expect(
+          content,
+          contains('mapsApiKey.isBlank()'),
+          reason: 'Must check if mapsApiKey is blank',
+        );
+        expect(
+          content,
+          contains('FAIL-CLOSED'),
+          reason: 'Must fail closed on invalid configuration',
+        );
+        expect(
+          content,
+          contains('GradleException'),
+          reason: 'Must throw GradleException to abort build',
+        );
+      },
+    );
+
+    test(
+      '6. android/local.properties contains a valid non-empty MAPS_API_KEY for local production builds',
+      () {
+        final localPropFile = File('${rootDir.path}/android/local.properties');
+        if (!localPropFile.existsSync()) return;
+        final content = localPropFile.readAsStringSync();
+        final match = RegExp(r'^MAPS_API_KEY=(.+)$', multiLine: true).firstMatch(content);
+        expect(
+          match,
+          isNotNull,
+          reason: 'local.properties must define MAPS_API_KEY',
+        );
+        final key = match!.group(1)!.trim();
+        expect(
+          key.isNotEmpty,
+          isTrue,
+          reason: 'MAPS_API_KEY must not be empty or blank',
+        );
+      },
+    );
+
+    test(
+      '7. MAPS_API_KEY resolution rejects empty/blank strings and prioritizes projectProperty > env > localProperties',
+      () {
+        String resolveMapsApiKey({
+          String? projectProp,
+          String? envVar,
+          String? localProp,
+        }) {
+          final raw = projectProp ?? envVar ?? localProp ?? '';
+          return raw.trim();
+        }
+
+        expect(
+          resolveMapsApiKey(
+            projectProp: 'KEY_PROJECT',
+            envVar: 'KEY_ENV',
+            localProp: 'KEY_LOCAL',
+          ),
+          equals('KEY_PROJECT'),
+        );
+
+        expect(
+          resolveMapsApiKey(
+            projectProp: null,
+            envVar: 'KEY_ENV',
+            localProp: 'KEY_LOCAL',
+          ),
+          equals('KEY_ENV'),
+        );
+
+        expect(
+          resolveMapsApiKey(
+            projectProp: null,
+            envVar: null,
+            localProp: 'KEY_LOCAL',
+          ),
+          equals('KEY_LOCAL'),
+        );
+
+        final emptyResolved = resolveMapsApiKey(
+          projectProp: null,
+          envVar: null,
+          localProp: '   ',
+        );
+        expect(emptyResolved.isEmpty, isTrue);
+      },
+    );
   });
 
   group(

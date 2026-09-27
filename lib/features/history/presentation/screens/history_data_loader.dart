@@ -69,15 +69,26 @@ extension _HistoryDataLoader on _HistoryScreenState {
             _replaceWeightRecords(const []);
             debugPrint('[History] ERRO ao carregar pesagens canônicas: $e');
           });
-      // Observar ocorrências (stream real-time)
-      Provider.of<OccurrenceViewModel>(context, listen: false).watchByDog(dogId);
-      debugPrint('[History] watchByDog iniciado para dogId=$dogId');
+      // Observar ocorrências (stream real-time) para cão e condutor
+      Provider.of<OccurrenceViewModel>(
+        context,
+        listen: false,
+      ).watchByContext(
+        dogId: dogId,
+        handlerRa: currentRa,
+      );
+      debugPrint(
+        '[History] watchByContext iniciado para dogId=$dogId, handlerRa=$currentRa',
+      );
     } else if (currentRa != null && currentRa.isNotEmpty) {
       debugPrint(
         '[History] _loadAllData chamado para handlerRa=$currentRa (force=$forceReload)',
       );
-      Provider.of<OccurrenceViewModel>(context, listen: false).watchByHandler(currentRa);
-      debugPrint('[History] watchByHandler iniciado para handlerRa=$currentRa');
+      Provider.of<OccurrenceViewModel>(
+        context,
+        listen: false,
+      ).watchByContext(handlerRa: currentRa);
+      debugPrint('[History] watchByContext iniciado para handlerRa=$currentRa');
     }
   }
 

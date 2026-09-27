@@ -52,6 +52,10 @@ class OccurrenceViewModel extends ChangeNotifier {
   StreamSubscription<List<Occurrence>>? _occurrencesSub;
   StreamSubscription<Occurrence?>? _openSub;
   StreamSubscription<List<OccurrenceEvent>>? _eventsSub;
+  String? _watchedDogId;
+  String? _watchedHandlerRa;
+  String? _watchedByDogId;
+  String? _watchedByHandlerRa;
 
   // ─── Getters ────────────────────────────────────────────────────────
 
@@ -66,10 +70,33 @@ class OccurrenceViewModel extends ChangeNotifier {
 
   // ─── Carregamento ───────────────────────────────────────────────────
 
-  void watchByDog(String dogId) {
+  void watchByContext({String? dogId, String? handlerRa}) {
+    final cleanDogId = dogId?.trim();
+    final cleanRa = handlerRa?.trim();
+    final effectiveDog =
+        (cleanDogId != null && cleanDogId.isNotEmpty) ? cleanDogId : null;
+    final effectiveRa =
+        (cleanRa != null && cleanRa.isNotEmpty) ? cleanRa : null;
+
+    if (effectiveDog == _watchedByDogId &&
+        effectiveRa == _watchedByHandlerRa &&
+        _occurrencesSub != null) {
+      return;
+    }
+
+    _watchedByDogId = effectiveDog;
+    _watchedByHandlerRa = effectiveRa;
     _occurrencesSub?.cancel();
+
+    if (effectiveDog == null && effectiveRa == null) {
+      _occurrencesSub = null;
+      _occurrences = const [];
+      notifyListeners();
+      return;
+    }
+
     _occurrencesSub = _repository
-        .watchByDog(dogId)
+        .watchByContext(dogId: effectiveDog, handlerRa: effectiveRa)
         .listen(
           (list) {
             _occurrences = list;
@@ -82,50 +109,58 @@ class OccurrenceViewModel extends ChangeNotifier {
         );
   }
 
+  void watchByDog(String dogId) {
+    watchByContext(dogId: dogId, handlerRa: _watchedByHandlerRa);
+  }
+
   void watchByHandler(String handlerRa) {
-    _occurrencesSub?.cancel();
-    _occurrencesSub = _repository
-        .watchByHandler(handlerRa)
+    watchByContext(dogId: _watchedByDogId, handlerRa: handlerRa);
+  }
+
+  void watchOpenForContext({String? dogId, String? handlerRa}) {
+    final cleanDogId = dogId?.trim();
+    final cleanRa = handlerRa?.trim();
+    final effectiveDog =
+        (cleanDogId != null && cleanDogId.isNotEmpty) ? cleanDogId : null;
+    final effectiveRa =
+        (cleanRa != null && cleanRa.isNotEmpty) ? cleanRa : null;
+
+    if (effectiveDog == _watchedDogId &&
+        effectiveRa == _watchedHandlerRa &&
+        _openSub != null) {
+      return;
+    }
+
+    _watchedDogId = effectiveDog;
+    _watchedHandlerRa = effectiveRa;
+    _openSub?.cancel();
+
+    if (effectiveDog == null && effectiveRa == null) {
+      _openSub = null;
+      _openOccurrence = null;
+      notifyListeners();
+      return;
+    }
+
+    _openSub = _repository
+        .watchOpenForContext(dogId: effectiveDog, handlerRa: effectiveRa)
         .listen(
-          (list) {
-            _occurrences = list;
+          (occ) {
+            _openOccurrence = occ;
             notifyListeners();
           },
           onError: (e) {
-            _error = 'Erro ao carregar ocorrências: $e';
-            notifyListeners();
+            debugPrint('[OccurrenceViewModel] watchOpenForContext error: $e');
           },
         );
   }
 
   void watchOpen(String dogId) {
-    _openSub?.cancel();
-    _openSub = _repository
-        .watchOpen(dogId)
-        .listen(
-          (occ) {
-            _openOccurrence = occ;
-            notifyListeners();
-          },
-          onError: (e) {
-            debugPrint('[OccurrenceViewModel] watchOpen error: $e');
-          },
-        );
+    watchOpenForContext(dogId: dogId, handlerRa: _watchedHandlerRa);
   }
 
   void watchOpenForHandler(String handlerRa) {
-    _openSub?.cancel();
-    _openSub = _repository
-        .watchOpenForHandler(handlerRa)
-        .listen(
-          (occ) {
-            _openOccurrence = occ;
-            notifyListeners();
-          },
-          onError: (e) {
-            debugPrint('[OccurrenceViewModel] watchOpenForHandler error: $e');
-          },
-        );
+    watchOpenForContext(dogId: _watchedDogId, handlerRa: handlerRa);
   }
 
   /// Retorna o stream reativo de uma ocorrência por ID.
@@ -400,6 +435,8 @@ class OccurrenceViewModel extends ChangeNotifier {
       _openSub?.cancel();
       _openSub = null;
       _openOccurrence = null;
+      _watchedDogId = null;
+      _watchedHandlerRa = null;
       notifyListeners();
     } catch (e) {
       _error = 'Erro ao finalizar ocorrência: $e';
@@ -447,6 +484,8 @@ class OccurrenceViewModel extends ChangeNotifier {
       _openSub?.cancel();
       _openSub = null;
       _openOccurrence = null;
+      _watchedDogId = null;
+      _watchedHandlerRa = null;
       notifyListeners();
 
       return result;
@@ -463,7 +502,11 @@ class OccurrenceViewModel extends ChangeNotifier {
   Future<void> cancelOccurrence(String id, String userId, String reason) async {
     try {
       await _repository.softDelete(id, userId, reason);
+      _openSub?.cancel();
+      _openSub = null;
       _openOccurrence = null;
+      _watchedDogId = null;
+      _watchedHandlerRa = null;
       notifyListeners();
     } catch (e) {
       _error = 'Erro ao cancelar ocorrência: $e';
@@ -623,6 +666,10 @@ class OccurrenceViewModel extends ChangeNotifier {
     _occurrencesSub?.cancel();
     _openSub?.cancel();
     _eventsSub?.cancel();
+    _watchedDogId = null;
+    _watchedHandlerRa = null;
+    _watchedByDogId = null;
+    _watchedByHandlerRa = null;
     super.dispose();
   }
 }

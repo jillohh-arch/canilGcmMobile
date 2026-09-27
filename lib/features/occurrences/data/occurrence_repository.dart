@@ -930,74 +930,178 @@ class OccurrenceRepository {
     });
   }
 
-  Stream<List<Occurrence>> watchByDog(String dogId) {
-    return _collection.where('dog_id', isEqualTo: dogId).snapshots().map((
-      snap,
-    ) {
-      final occurrences =
-          snap.docs
-              .map((doc) => Occurrence.fromMap(doc.data(), doc.id))
-              .where((occ) => !occ.isDeleted)
-              .toList()
-            ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
-      return occurrences;
-    });
+  Stream<List<Occurrence>> _combineOccurrenceStreams(
+    List<Stream<QuerySnapshot<Map<String, dynamic>>>> streams, {
+    required bool openOnly,
+  }) {
+    if (streams.isEmpty) return Stream.value(const []);
+    if (streams.length == 1) {
+      return streams.first.map(
+        (snap) => _mapDocsToOccurrences(snap.docs, openOnly: openOnly),
+      );
+    }
+
+    late final StreamController<List<Occurrence>> controller;
+    final latestDocs =
+        List<List<QueryDocumentSnapshot<Map<String, dynamic>>>>.generate(
+          streams.length,
+          (_) => const [],
+        );
+    final subscriptions = <StreamSubscription>[];
+
+    void emit() {
+      if (controller.isClosed) return;
+      final allDocs = <String, QueryDocumentSnapshot<Map<String, dynamic>>>{};
+      for (final list in latestDocs) {
+        for (final doc in list) {
+          allDocs[doc.id] = doc;
+        }
+      }
+      final occurrences = _mapDocsToOccurrences(
+        allDocs.values.toList(),
+        openOnly: openOnly,
+      );
+      controller.add(occurrences);
+    }
+
+    controller = StreamController<List<Occurrence>>.broadcast(
+      onListen: () {
+        for (var i = 0; i < streams.length; i++) {
+          final index = i;
+          subscriptions.add(
+            streams[index].listen(
+              (snap) {
+                latestDocs[index] = snap.docs;
+                emit();
+              },
+              onError: (err) {
+                debugPrint('[OccurrenceRepo] Stream error: $err');
+              },
+            ),
+          );
+        }
+      },
+      onCancel: () async {
+        for (final sub in subscriptions) {
+          await sub.cancel();
+        }
+        subscriptions.clear();
+      },
+    );
+
+    return controller.stream;
+  }
+
+  List<Occurrence> _mapDocsToOccurrences(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs, {
+    required bool openOnly,
+  }) {
+    final occurrences = docs
+        .map((doc) => Occurrence.fromMap(doc.data(), doc.id))
+        .where((occ) => !occ.isDeleted && (!openOnly || occ.status.isOpen))
+        .toList();
+
+    if (openOnly) {
+      occurrences.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    } else {
+      occurrences.sort((a, b) => b.startedAt.compareTo(a.startedAt));
+    }
+    return occurrences;
+  }
+
+  Stream<Occurrence?> watchOpenForContext({
+    String? dogId,
+    String? handlerRa,
+  }) {
+    final cleanDogId = dogId?.trim();
+    final cleanRa = handlerRa?.trim();
+
+    final streams = <Stream<QuerySnapshot<Map<String, dynamic>>>>[];
+
+    if (cleanDogId != null && cleanDogId.isNotEmpty) {
+      streams.add(
+        _collection.where('dog_id', isEqualTo: cleanDogId).snapshots(),
+      );
+    }
+
+    if (cleanRa != null && cleanRa.isNotEmpty) {
+      streams.add(
+        _collection
+            .where('team_handler_ids', arrayContains: cleanRa)
+            .snapshots(),
+      );
+      streams.add(
+        _collection
+            .where('primary_handler_ra', isEqualTo: cleanRa)
+            .snapshots(),
+      );
+    }
+
+    if (streams.isEmpty) {
+      return Stream.value(null);
+    }
+
+    return _combineOccurrenceStreams(streams, openOnly: true).map(
+      (list) => list.isEmpty ? null : list.first,
+    );
   }
 
   Stream<Occurrence?> watchOpen(String dogId) {
-    return _collection.where('dog_id', isEqualTo: dogId).snapshots().map((
-      snap,
-    ) {
-      final open =
-          snap.docs
-              .map((doc) => Occurrence.fromMap(doc.data(), doc.id))
-              .where((occ) => !occ.isDeleted && occ.status.isOpen)
-              .toList()
-            ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-      if (open.isEmpty) return null;
-      return open.first;
-    });
+    return watchOpenForContext(dogId: dogId);
   }
 
   Stream<Occurrence?> watchOpenForHandler(String handlerRa) {
-    final cleanRa = handlerRa.trim();
-    if (cleanRa.isEmpty) return Stream.value(null);
+    return watchOpenForContext(handlerRa: handlerRa);
+  }
 
-    return _collection
-        .where('team_handler_ids', arrayContains: cleanRa)
-        .snapshots()
-        .map((snap) {
-          final open =
-              snap.docs
-                  .map((doc) => Occurrence.fromMap(doc.data(), doc.id))
-                  .where((occ) => !occ.isDeleted && occ.status.isOpen)
-                  .toList()
-                ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-          if (open.isEmpty) return null;
-          return open.first;
-        });
+  Stream<List<Occurrence>> watchByContext({
+    String? dogId,
+    String? handlerRa,
+  }) {
+    final cleanDogId = dogId?.trim();
+    final cleanRa = handlerRa?.trim();
+
+    final streams = <Stream<QuerySnapshot<Map<String, dynamic>>>>[];
+
+    if (cleanDogId != null && cleanDogId.isNotEmpty) {
+      streams.add(
+        _collection.where('dog_id', isEqualTo: cleanDogId).snapshots(),
+      );
+    }
+
+    if (cleanRa != null && cleanRa.isNotEmpty) {
+      streams.add(
+        _collection
+            .where('team_handler_ids', arrayContains: cleanRa)
+            .snapshots(),
+      );
+      streams.add(
+        _collection
+            .where('primary_handler_ra', isEqualTo: cleanRa)
+            .snapshots(),
+      );
+    }
+
+    if (streams.isEmpty) {
+      return Stream.value(const []);
+    }
+
+    return _combineOccurrenceStreams(streams, openOnly: false);
+  }
+
+  Stream<List<Occurrence>> watchByDog(String dogId) {
+    return watchByContext(dogId: dogId);
   }
 
   Stream<List<Occurrence>> watchByHandler(String handlerRa) {
-    final cleanRa = handlerRa.trim();
-    if (cleanRa.isEmpty) return Stream.value(const []);
-
-    return _collection
-        .where('team_handler_ids', arrayContains: cleanRa)
-        .snapshots()
-        .map((snap) {
-          final occurrences =
-              snap.docs
-                  .map((doc) => Occurrence.fromMap(doc.data(), doc.id))
-                  .where((occ) => !occ.isDeleted)
-                  .toList()
-                ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
-          return occurrences;
-        });
+    return watchByContext(handlerRa: handlerRa);
   }
 
   Future<Occurrence?> findOpen(String dogId) async {
-    final snap = await _collection.where('dog_id', isEqualTo: dogId).get();
+    final cleanDogId = dogId.trim();
+    if (cleanDogId.isEmpty) return null;
+
+    final snap = await _collection.where('dog_id', isEqualTo: cleanDogId).get();
     final open =
         snap.docs
             .map((doc) => Occurrence.fromMap(doc.data(), doc.id))
@@ -1046,14 +1150,25 @@ class OccurrenceRepository {
     final cleanDogId = dogId?.trim();
     final cleanRa = handlerRa?.trim();
 
-    Occurrence? open;
+    final candidates = <Occurrence>[];
     if (cleanDogId != null && cleanDogId.isNotEmpty) {
-      open = await findOpen(cleanDogId);
+      final dogOpen = await findOpen(cleanDogId);
+      if (dogOpen != null && !dogOpen.isDeleted && dogOpen.status.isOpen) {
+        candidates.add(dogOpen);
+      }
     }
-    if (open == null && cleanRa != null && cleanRa.isNotEmpty) {
-      open = await findOpenForHandler(cleanRa);
+    if (cleanRa != null && cleanRa.isNotEmpty) {
+      final handlerOpen = await findOpenForHandler(cleanRa);
+      if (handlerOpen != null &&
+          !handlerOpen.isDeleted &&
+          handlerOpen.status.isOpen &&
+          !candidates.any((o) => o.id == handlerOpen.id)) {
+        candidates.add(handlerOpen);
+      }
     }
-    return open;
+    if (candidates.isEmpty) return null;
+    candidates.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return candidates.first;
   }
 
   Future<List<Occurrence>> getExpiredOccurrences(DateTime now) async {

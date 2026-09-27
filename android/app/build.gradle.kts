@@ -28,6 +28,18 @@ android {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
+    val localProperties = Properties()
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.withReader("UTF-8") { reader ->
+            localProperties.load(reader)
+        }
+    }
+    val mapsApiKey = ((project.findProperty("MAPS_API_KEY") as? String)
+        ?: System.getenv("MAPS_API_KEY")
+        ?: localProperties.getProperty("MAPS_API_KEY")
+        ?: "").trim()
+
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.ragonha.k9ops"
@@ -38,17 +50,6 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         multiDexEnabled = true
-        val localProperties = Properties()
-        val localPropertiesFile = rootProject.file("local.properties")
-        if (localPropertiesFile.exists()) {
-            localPropertiesFile.withReader("UTF-8") { reader ->
-                localProperties.load(reader)
-            }
-        }
-        val mapsApiKey = (project.findProperty("MAPS_API_KEY") as? String)
-            ?: System.getenv("MAPS_API_KEY")
-            ?: localProperties.getProperty("MAPS_API_KEY")
-            ?: ""
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
@@ -93,8 +94,11 @@ android {
             val name = task.name
             name.contains("ProductionRelease", ignoreCase = true)
         }
-        if (isProductionReleaseRequested && !hasCompleteReleaseConfig) {
+        if (isProductionReleaseRequested) {
             val missingReasons = mutableListOf<String>()
+            if (mapsApiKey.isBlank()) {
+                missingReasons.add("property 'MAPS_API_KEY' is missing or blank in local.properties, gradle property, or environment. A non-empty Maps API key is mandatory for productionRelease builds to prevent blank Google Maps rendering.")
+            }
             if (!keystorePropertiesFile.exists()) {
                 missingReasons.add("key.properties file is missing at ${keystorePropertiesFile.absolutePath}")
             }
@@ -112,11 +116,13 @@ android {
             if (releaseKeyPassword.isNullOrEmpty()) {
                 missingReasons.add("property 'keyPassword' is missing or blank")
             }
-            throw GradleException(
-                "FAIL-CLOSED: Production release signing requires a valid release configuration, but: " +
-                missingReasons.joinToString("; ") +
-                ". Silently falling back to debug signing is strictly forbidden."
-            )
+            if (missingReasons.isNotEmpty()) {
+                throw GradleException(
+                    "FAIL-CLOSED: Production release build requires a valid configuration, but: " +
+                    missingReasons.joinToString("; ") +
+                    ". Silently proceeding with an invalid configuration or empty Maps key is strictly forbidden."
+                )
+            }
         }
     }
 

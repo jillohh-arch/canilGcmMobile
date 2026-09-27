@@ -354,10 +354,16 @@ class _StartOccurrenceScreenState extends State<StartOccurrenceScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final occVM = context.read<OccurrenceViewModel>();
-      final dogId = context.read<ShiftViewModel>().activeDogId;
+      final shiftVM = context.read<ShiftViewModel>();
+      final authVM = context.read<AuthViewModel>();
+      final dogId = shiftVM.activeDogId ?? shiftVM.serviceDogId;
+      final currentRa = HandlerIdentityService.raFromUser(authVM.user);
       final openOccurrence =
           occVM.openOccurrence ??
-          (dogId == null ? null : await occVM.findOpen(dogId));
+          await occVM.findOpenForContext(
+            dogId: dogId,
+            handlerRa: currentRa,
+          );
       if (!mounted || openOccurrence == null) return;
       _showOpenOccurrenceDialog(openOccurrence.id);
     });

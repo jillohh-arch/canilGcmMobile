@@ -185,14 +185,6 @@ extension _MainRootActions on _MainRootScreenState {
   ) async {
     HapticFeedback.mediumImpact();
     final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
-    if (!shiftVM.hasActiveShift) {
-      AppFeedback.warning(
-        context,
-        'Inicie um turno para registrar ocorrência.',
-      );
-      return;
-    }
-
     final effectiveDogId = dogId ?? shiftVM.serviceDogId;
     final rootNavigator = Navigator.of(context, rootNavigator: true);
     final occurrenceVM = Provider.of<OccurrenceViewModel>(

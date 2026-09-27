@@ -154,18 +154,43 @@ class _QuickActionsSection extends StatelessWidget {
     ).push(MaterialPageRoute(builder: (_) => const TrainingHubScreen()));
   }
 
-  void _openOccurrence(BuildContext context) {
+  Future<void> _openOccurrence(BuildContext context) async {
     HapticFeedback.mediumImpact();
-    // FF-OCC-03: mesma decisão compartilhada de E1 — nenhum predicado
-    // duplicado. Somente `ready` navega; a validação final segue autoritativa.
+    // FF-OCC-03 / CT3.F40: se já existe ocorrência aberta para o cão ou condutor,
+    // recupera diretamente a ocorrência ativa sem exigir novo início.
     final shiftVM = Provider.of<ShiftViewModel>(context, listen: false);
+    final occurrenceVM = Provider.of<OccurrenceViewModel>(
+      context,
+      listen: false,
+    );
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    final currentRa = HandlerIdentityService.raFromUser(authVM.user);
+    final effectiveDogId = dog.id;
+
+    final openOccurrence =
+        occurrenceVM.openOccurrence ??
+        await occurrenceVM.findOpenForContext(
+          dogId: effectiveDogId,
+          handlerRa: currentRa,
+        );
+    if (!context.mounted) return;
+
     routeQuickActionOccurrenceEntrypoint(
+      hasOpenOccurrence: openOccurrence != null,
       eligibility: evaluateOccurrenceStartEligibility(
         isLoading: shiftVM.isLoading,
         shiftError: shiftVM.error,
         hasActiveShift: shiftVM.hasActiveShift,
         vehicleCrewId: shiftVM.vehicleCrewId,
       ),
+      onRecoverOpenOccurrence: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) =>
+                ActiveOccurrenceScreen(occurrenceId: openOccurrence!.id),
+          ),
+        );
+      },
       onStartNewOccurrence: () {
         Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const StartOccurrenceScreen()),
@@ -320,20 +345,23 @@ class _CommandCard extends StatelessWidget {
 /// FF-OCC-03 — orquestração do entrypoint de ocorrência da central de ações.
 ///
 /// Mesmo motivo do hook equivalente em `main_root_actions.dart`: permitir que a
-/// decisão real "bloquear / abrir" seja exercitada em teste sem montar
+/// decisão real "recuperar / bloquear / abrir" seja exercitada em teste sem montar
 /// `ActiveShiftDashboardScreen`, que exige oito providers e serviços sem seam.
 /// A produção (`_openOccurrence`) delega a esta função.
-///
-/// Este entrypoint não tem recuperação de ocorrência aberta — essa
-/// responsabilidade é do entrypoint raiz. Aqui só existe abrir ou bloquear.
 ///
 /// Sem Provider, sem Firebase, sem mutação de estado de turno.
 @visibleForTesting
 void routeQuickActionOccurrenceEntrypoint({
+  bool hasOpenOccurrence = false,
   required OccurrenceStartEligibility eligibility,
+  VoidCallback? onRecoverOpenOccurrence,
   required VoidCallback onStartNewOccurrence,
   required void Function(String message) onBlocked,
 }) {
+  if (hasOpenOccurrence) {
+    onRecoverOpenOccurrence?.call();
+    return;
+  }
   if (!eligibility.canStart) {
     onBlocked(occurrenceStartBlockMessage(eligibility)!);
     return;

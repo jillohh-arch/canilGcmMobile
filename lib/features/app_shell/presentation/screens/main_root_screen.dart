@@ -142,28 +142,38 @@ class _MainRootScreenState extends State<MainRootScreen> {
     final currentRa = HandlerIdentityService.raFromUser(authVM.user);
     final openOccurrence = occurrenceVM.openOccurrence;
 
+    final bool isPrimary =
+        currentRa != null &&
+        (openOccurrence?.primaryHandlerRa == currentRa ||
+            openOccurrence?.primaryHandlerId == currentRa);
     final bool isAcceptedParticipant =
         currentRa != null &&
         (openOccurrence?.acceptedHandlerIds.contains(currentRa) ?? false);
     final bool isPersonalDogOccurrence =
-        activeDogId != null && openOccurrence?.dogId == activeDogId;
+        (activeDogId != null && openOccurrence?.dogId == activeDogId) ||
+        (effectiveDogId != null &&
+            (openOccurrence?.dogId == effectiveDogId ||
+                openOccurrence?.serviceDogId == effectiveDogId));
     final bool isTeamMember =
         currentRa != null &&
-        (openOccurrence?.team.any((m) => m.handlerId.trim() == currentRa) ?? false);
+        (openOccurrence?.team.any((m) => m.handlerId.trim() == currentRa) ??
+            false);
 
     final activeOccurrence =
         (openOccurrence != null &&
-            (isPersonalDogOccurrence || isAcceptedParticipant || isTeamMember))
+            (isPersonalDogOccurrence ||
+                isAcceptedParticipant ||
+                isTeamMember ||
+                isPrimary))
         ? openOccurrence
         : null;
 
-    final watchTarget = (effectiveDogId != null && effectiveDogId.isNotEmpty)
-        ? 'dog:$effectiveDogId'
-        : (currentRa != null && currentRa.isNotEmpty)
-            ? 'handler:$currentRa'
-            : null;
+    final watchTarget =
+        'dog:${effectiveDogId ?? ""}|handler:${currentRa ?? ""}';
+    final hasTarget = (effectiveDogId != null && effectiveDogId.isNotEmpty) ||
+        (currentRa != null && currentRa.isNotEmpty);
 
-    if (watchTarget != null &&
+    if (hasTarget &&
         (watchTarget != _lastOccurrenceWatchTarget ||
             !occurrenceVM.isWatchingOpen)) {
       _lastOccurrenceWatchTarget = watchTarget;
@@ -173,11 +183,10 @@ class _MainRootScreenState extends State<MainRootScreen> {
           context,
           listen: false,
         );
-        if (watchTarget.startsWith('dog:')) {
-          vm.watchOpen(watchTarget.substring(4));
-        } else {
-          vm.watchOpenForHandler(watchTarget.substring(8));
-        }
+        vm.watchOpenForContext(
+          dogId: effectiveDogId,
+          handlerRa: currentRa,
+        );
       });
     }
 
