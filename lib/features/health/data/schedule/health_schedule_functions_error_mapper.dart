@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 
@@ -13,6 +15,11 @@ abstract final class HealthScheduleFunctionsErrorMapper {
   static HealthScheduleMutationFailure map(Object error) {
     if (error is HealthScheduleMutationFailure) {
       return error;
+    }
+    if (error is TimeoutException) {
+      return const HealthScheduleMutationOffline(
+        'Tempo limite esgotado para salvar o item da agenda. Verifique sua conexão e tente novamente.',
+      );
     }
     if (error is FirebaseFunctionsException) {
       return _fromFirebase(error);

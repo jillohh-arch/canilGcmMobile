@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_gateway.dart';
@@ -647,4 +648,94 @@ void main() {
     expect(controller.todayOrNull!.meals, hasLength(1));
     controller.dispose();
   });
+
+  test(
+    'recupera de synchronizing quando a sincronização temporal dá timeout ou falha',
+    () {
+      fakeAsync((async) {
+        final clock = _FakeMonotonicClock();
+        final completer = Completer<AuthoritativeTimeRemoteResponse>();
+        final gateway = _TemporalGateway(() => completer.future);
+        final provider = AuthoritativeTimeProvider(
+          gateway: gateway,
+          monotonicClock: clock,
+        );
+        final source = CoexistenceNutritionReadSource(
+          canonicalPlanReader: _SequencePlanReader([
+            NutritionSourceBatch.available([_plan('pa', 'dog-a')]),
+          ]),
+        );
+        final controller = HealthNutritionReadController(
+          source: source,
+          authoritativeTimeProvider: provider,
+        );
+
+        controller.selectDog('dog-a');
+        expect(controller.isLoading, isTrue);
+        expect(
+          controller.temporalState,
+          HealthNutritionTemporalState.synchronizing,
+        );
+
+        // Avança o tempo além do timeout de 10s
+        async.elapse(const Duration(seconds: 11));
+
+        expect(controller.isLoading, isFalse);
+        expect(
+          controller.temporalState,
+          HealthNutritionTemporalState.unavailable,
+        );
+        expect(controller.temporalActionsAllowed, isFalse);
+        expect(controller.snapshotResult.valueOrNull, isNotNull);
+        expect(
+          controller.todayResult?.code,
+          'authoritative_time_unavailable',
+        );
+
+        controller.dispose();
+      });
+    },
+  );
+
+  test(
+    'troca rápida de K9 / remount não deixa controller preso em synchronizing',
+    () async {
+      final clock = _FakeMonotonicClock();
+      final gateway = _TemporalGateway(() async => _timeResponse());
+      final provider = AuthoritativeTimeProvider(
+        gateway: gateway,
+        monotonicClock: clock,
+      );
+      final source = CoexistenceNutritionReadSource(
+        canonicalPlanReader: _ScriptedPlanReader({
+          'dog-a': [_plan('pa', 'dog-a')],
+          'dog-b': [_plan('pb', 'dog-b')],
+        }),
+      );
+      final controller = HealthNutritionReadController(
+        source: source,
+        authoritativeTimeProvider: provider,
+      );
+
+      final f1 = controller.selectDog('dog-a');
+      final f2 = controller.selectDog('dog-b');
+
+      await Future.wait([f1, f2]);
+
+      expect(controller.isLoading, isFalse);
+      expect(
+        controller.temporalState,
+        isNot(HealthNutritionTemporalState.synchronizing),
+      );
+      expect(controller.activeDogId, 'dog-b');
+      expect(
+        (controller.snapshotOrNull!.activePlan as NutritionActiveCanonicalPlan)
+            .plan
+            .id,
+        'pb',
+      );
+
+      controller.dispose();
+    },
+  );
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_functions/cloud_functions.dart';
 
 import 'authoritative_time_gateway.dart';
@@ -11,14 +13,18 @@ final class FirebaseFunctionsAuthoritativeTimeGateway
   FirebaseFunctionsAuthoritativeTimeGateway({
     FirebaseFunctions? functions,
     AuthoritativeTimeCallableInvoker? invoker,
+    Duration requestTimeout = defaultTimeout,
   }) : _functionsOverride = functions,
-       _invokerOverride = invoker;
+       _invokerOverride = invoker,
+       _requestTimeout = requestTimeout;
 
   static const String callableName = 'systemAuthoritativeTimeNow';
   static const String region = 'southamerica-east1';
+  static const Duration defaultTimeout = Duration(seconds: 10);
 
   final FirebaseFunctions? _functionsOverride;
   final AuthoritativeTimeCallableInvoker? _invokerOverride;
+  final Duration _requestTimeout;
   FirebaseFunctions? _cachedFunctions;
 
   FirebaseFunctions get _functions {
@@ -31,8 +37,15 @@ final class FirebaseFunctionsAuthoritativeTimeGateway
     Map<String, dynamic> data,
   ) async {
     final override = _invokerOverride;
-    if (override != null) return override(functionName, data);
-    return (await _functions.httpsCallable(functionName).call(data)).data;
+    if (override != null) {
+      return await override(functionName, data).timeout(_requestTimeout);
+    }
+    final callable = _functions.httpsCallable(
+      functionName,
+      options: HttpsCallableOptions(timeout: _requestTimeout),
+    );
+    final result = await callable.call(data).timeout(_requestTimeout);
+    return result.data;
   }
 
   @override
@@ -47,6 +60,11 @@ final class FirebaseFunctionsAuthoritativeTimeGateway
       }
       return AuthoritativeTimeRemoteResponse.fromMap(
         Map<String, dynamic>.from(raw),
+      );
+    } on TimeoutException {
+      throw const AuthoritativeTimeFailure(
+        AuthoritativeTimeFailureCode.unavailable,
+        'Horário autoritativo temporariamente indisponível.',
       );
     } on AuthoritativeTimeFailure {
       rethrow;

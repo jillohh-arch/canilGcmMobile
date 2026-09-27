@@ -97,8 +97,10 @@ abstract final class HealthScheduleMutationUserCopy {
       HealthScheduleMutationIntegrity() =>
         'Não foi possível validar os dados deste item. '
             'Atualize a agenda e tente novamente.',
-      HealthScheduleMutationOffline() =>
-        'Sem conexão. Verifique sua internet e tente novamente.',
+      HealthScheduleMutationOffline(:final message) =>
+        message.trim().isNotEmpty && message.trim() != 'Sem conexão.'
+            ? message
+            : 'Sem conexão. Verifique sua internet e tente novamente.',
       HealthScheduleMutationWritesNotEnabled() =>
         'As alterações da agenda ainda não estão disponíveis.',
       HealthScheduleMutationUnexpected() =>
