@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
@@ -39,6 +41,8 @@ class HealthNutritionMutationController extends ChangeNotifier {
 
   bool _submitting = false;
   bool _disposed = false;
+
+  static const Duration gatewayTimeout = Duration(seconds: 20);
 
   HealthNutritionMutationResult? _lastResult;
   HealthNutritionMutationFailure? _lastError;
@@ -283,7 +287,15 @@ class HealthNutritionMutationController extends ChangeNotifier {
     _safeNotify();
 
     try {
-      final result = await _gateway.createSupplementLog(command);
+      final result = await _gateway.createSupplementLog(command).timeout(
+        gatewayTimeout,
+        onTimeout: () => const HealthNutritionMutationErrorResult(
+          HealthNutritionMutationUnavailable(
+            'Tempo limite esgotado ao registrar nutrição. Verifique sua conexão e tente novamente.',
+            'timeout',
+          ),
+        ),
+      );
       _lastResult = result;
       return await _handleResult(result);
     } on HealthNutritionMutationFailure catch (e) {
@@ -319,10 +331,26 @@ class HealthNutritionMutationController extends ChangeNotifier {
       if (planned) {
         result = await _gateway.createPlannedMealLog(
           command as CreatePlannedMealLogCommand,
+        ).timeout(
+          gatewayTimeout,
+          onTimeout: () => const HealthNutritionMutationErrorResult(
+            HealthNutritionMutationUnavailable(
+              'Tempo limite esgotado ao registrar refeição. Verifique sua conexão e tente novamente.',
+              'timeout',
+            ),
+          ),
         );
       } else {
         result = await _gateway.createAdhocMealLog(
           command as CreateAdhocMealLogCommand,
+        ).timeout(
+          gatewayTimeout,
+          onTimeout: () => const HealthNutritionMutationErrorResult(
+            HealthNutritionMutationUnavailable(
+              'Tempo limite esgotado ao registrar refeição. Verifique sua conexão e tente novamente.',
+              'timeout',
+            ),
+          ),
         );
       }
       _lastResult = result;
@@ -388,7 +416,7 @@ class HealthNutritionMutationController extends ChangeNotifier {
       return false;
     }
     try {
-      await cb();
+      await cb().timeout(const Duration(seconds: 10));
       return false;
     } catch (e, st) {
       assert(() {

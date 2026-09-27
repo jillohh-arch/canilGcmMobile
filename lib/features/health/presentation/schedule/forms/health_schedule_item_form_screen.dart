@@ -198,78 +198,84 @@ class _HealthScheduleItemFormScreenState
   }
 
   Future<void> _submit() async {
-    final ok = await _formController.submit(
-      validate: _validate,
-      action: () async {
-        final outcome = _isCreate
-            ? await widget.mutationController.createManual(
-                dogId: widget.dogId,
-                scheduleType: _scheduleType,
-                title: _titleController.text,
-                scheduledFor: _scheduledFor!.toUtc(),
-                timezone: _timezone,
-                dueUntil: _dueUntil?.toUtc(),
-                notes: _notesController.text.trim().isEmpty
-                    ? null
-                    : _notesController.text,
-              )
-            : await widget.mutationController.updateOpen(
-                dogId: widget.dogId,
-                scheduleId: _scheduleId!,
-                expectedRevision: _expectedRevision!,
-                title: _titleController.text,
-                scheduledFor: _scheduledFor!.toUtc(),
-                dueUntil: _dueUntil?.toUtc(),
-                clearDueUntil:
-                    _dueUntil == null && widget.item?.dueUntil != null,
-                timezone: _timezone,
-                notes: _notesController.text.trim().isEmpty
-                    ? null
-                    : _notesController.text,
-                clearNotes:
-                    _notesController.text.trim().isEmpty &&
-                    (widget.item?.notes?.trim().isNotEmpty ?? false),
-              );
+    try {
+      final ok = await _formController.submit(
+        validate: _validate,
+        action: () async {
+          final outcome = _isCreate
+              ? await widget.mutationController.createManual(
+                  dogId: widget.dogId,
+                  scheduleType: _scheduleType,
+                  title: _titleController.text,
+                  scheduledFor: _scheduledFor!.toUtc(),
+                  timezone: _timezone,
+                  dueUntil: _dueUntil?.toUtc(),
+                  notes: _notesController.text.trim().isEmpty
+                      ? null
+                      : _notesController.text,
+                )
+              : await widget.mutationController.updateOpen(
+                  dogId: widget.dogId,
+                  scheduleId: _scheduleId!,
+                  expectedRevision: _expectedRevision!,
+                  title: _titleController.text,
+                  scheduledFor: _scheduledFor!.toUtc(),
+                  dueUntil: _dueUntil?.toUtc(),
+                  clearDueUntil:
+                      _dueUntil == null && widget.item?.dueUntil != null,
+                  timezone: _timezone,
+                  notes: _notesController.text.trim().isEmpty
+                      ? null
+                      : _notesController.text,
+                  clearNotes:
+                      _notesController.text.trim().isEmpty &&
+                      (widget.item?.notes?.trim().isNotEmpty ?? false),
+                );
 
-        switch (outcome) {
-          case HealthScheduleMutationUiBlocked():
-            throw const HealthFormException(
-              'Operação já em andamento. Aguarde.',
-            );
-          case HealthScheduleMutationUiFailure(
-            :final userMessage,
-            :final shouldRefresh,
-          ):
-            if (shouldRefresh) {
-              // ignore: discarded_futures
-              widget.mutationController.refreshSchedule();
-            }
-            throw HealthFormException(userMessage);
-          case HealthScheduleMutationUiSuccess(
-            :final successMessage,
-            :final refreshFailed,
-            :final refreshWarning,
-          ):
-            if (!mounted) return;
-            if (refreshFailed) {
-              AppFeedback.warning(
-                context,
-                refreshWarning ??
-                    HealthScheduleMutationUserCopy.refreshFailedAfterSuccess,
+          switch (outcome) {
+            case HealthScheduleMutationUiBlocked():
+              throw const HealthFormException(
+                'Operação já em andamento. Aguarde.',
               );
-              Navigator.of(
-                context,
-              ).pop(HealthScheduleItemFormResult.savedRefreshPending);
-            } else {
-              AppFeedback.success(context, successMessage);
-              Navigator.of(context).pop(HealthScheduleItemFormResult.saved);
-            }
-        }
-      },
-    );
+            case HealthScheduleMutationUiFailure(
+              :final userMessage,
+              :final shouldRefresh,
+            ):
+              if (shouldRefresh) {
+                // ignore: discarded_futures
+                widget.mutationController.refreshSchedule();
+              }
+              throw HealthFormException(userMessage);
+            case HealthScheduleMutationUiSuccess(
+              :final successMessage,
+              :final refreshFailed,
+              :final refreshWarning,
+            ):
+              if (!mounted) return;
+              if (refreshFailed) {
+                AppFeedback.warning(
+                  context,
+                  refreshWarning ??
+                      HealthScheduleMutationUserCopy.refreshFailedAfterSuccess,
+                );
+                Navigator.of(
+                  context,
+                ).pop(HealthScheduleItemFormResult.savedRefreshPending);
+              } else {
+                AppFeedback.success(context, successMessage);
+                Navigator.of(context).pop(HealthScheduleItemFormResult.saved);
+              }
+          }
+        },
+      );
 
-    if (!ok && mounted) {
-      // no-op — erro já no HealthFormActions
+      if (!ok && mounted) {
+        // no-op — erro já no HealthFormActions
+      }
+    } catch (_) {
+      if (mounted && _formController.isSubmitting) {
+        _formController.markDirty();
+      }
     }
   }
 

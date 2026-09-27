@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'authoritative_time_gateway.dart';
 import 'authoritative_time_models.dart';
 import 'monotonic_elapsed_clock.dart';
@@ -93,7 +95,13 @@ final class AuthoritativeTimeProvider {
   ) async {
     final t0 = _clock.elapsed;
     try {
-      final response = await _gateway.fetchAuthoritativeTime();
+      final response = await _gateway.fetchAuthoritativeTime().timeout(
+        maximumRoundTrip,
+        onTimeout: () => throw const AuthoritativeTimeFailure(
+          AuthoritativeTimeFailureCode.unavailable,
+          'Tempo limite esgotado ao sincronizar o horário autoritativo.',
+        ),
+      );
       final t3 = _clock.elapsed;
       final roundTrip = _checkedDifference(t3, t0);
       final serverProcessing = response.serverSentAtUtc.difference(

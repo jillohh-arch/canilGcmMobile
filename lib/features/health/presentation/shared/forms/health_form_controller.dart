@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'package:canil_gcm/features/health/presentation/shared/forms/health_form_status.dart';
@@ -84,6 +86,7 @@ class HealthFormController extends ChangeNotifier {
   Future<bool> submit({
     required Future<void> Function() action,
     HealthFormValidator? validate,
+    Duration timeout = const Duration(seconds: 25),
   }) async {
     if (_disposed || isSubmitting) return false;
 
@@ -100,7 +103,12 @@ class HealthFormController extends ChangeNotifier {
     _safeNotify();
 
     try {
-      await action();
+      await action().timeout(
+        timeout,
+        onTimeout: () => throw const HealthFormException(
+          'Tempo limite esgotado ao salvar. Verifique sua conexão e tente novamente.',
+        ),
+      );
       if (_disposed) return false;
       _dirty = false;
       _status = HealthFormStatus.success;

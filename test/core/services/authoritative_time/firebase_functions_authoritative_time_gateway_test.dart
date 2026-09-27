@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_models.dart';
@@ -95,4 +98,34 @@ void main() {
       );
     },
   );
+
+  test('times out when invoker hangs and maps to unavailable', () {
+    fakeAsync((async) {
+      final completer = Completer<Map<String, dynamic>>();
+      final gateway = FirebaseFunctionsAuthoritativeTimeGateway(
+        invoker: (_, _) => completer.future,
+        requestTimeout: const Duration(seconds: 5),
+      );
+
+      Object? caught;
+      gateway.fetchAuthoritativeTime().catchError((e) {
+        caught = e;
+        return AuthoritativeTimeRemoteResponse(
+          protocolVersion: 1,
+          requestId: 'fake',
+          requestReceivedAtUtc: DateTime.utc(2026),
+          serverSentAtUtc: DateTime.utc(2026),
+          maxAge: Duration.zero,
+        );
+      });
+
+      async.elapse(const Duration(seconds: 6));
+
+      expect(caught, isA<AuthoritativeTimeFailure>());
+      expect(
+        (caught as AuthoritativeTimeFailure).code,
+        AuthoritativeTimeFailureCode.unavailable,
+      );
+    });
+  });
 }

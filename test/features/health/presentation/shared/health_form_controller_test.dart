@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:canil_gcm/features/health/presentation/shared/forms/health_form_controller.dart';
@@ -303,5 +304,48 @@ void main() {
       release.complete();
       await future;
     });
+
+    test(
+      'submit com timeout não deixa status preso em submitting e preserva dirty',
+      () {
+        fakeAsync((async) {
+          controller.markDirty();
+          final completer = Completer<void>();
+
+          var completed = false;
+          controller
+              .submit(
+                timeout: const Duration(seconds: 5),
+                action: () => completer.future,
+              )
+              .then((ok) {
+                completed = true;
+                expect(ok, isFalse);
+              });
+
+          expect(controller.isSubmitting, isTrue);
+
+          async.elapse(const Duration(seconds: 6));
+
+          expect(completed, isTrue);
+          expect(controller.isSubmitting, isFalse);
+          expect(controller.status, HealthFormStatus.error);
+          expect(controller.hasError, isTrue);
+          expect(controller.isDirty, isTrue);
+          expect(
+            controller.errorMessage,
+            'Tempo limite esgotado ao salvar. Verifique sua conexão e tente novamente.',
+          );
+          expect(controller.canSubmit, isTrue);
+
+          // Permite retry com sucesso
+          var retryOk = false;
+          controller.submit(action: () async {}).then((ok) => retryOk = ok);
+          async.flushMicrotasks();
+          expect(retryOk, isTrue);
+          expect(controller.status, HealthFormStatus.success);
+        });
+      },
+    );
   });
 }

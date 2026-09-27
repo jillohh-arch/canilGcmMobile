@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 
@@ -13,6 +15,12 @@ abstract final class HealthNutritionFunctionsErrorMapper {
   static HealthNutritionMutationFailure map(Object error) {
     if (error is HealthNutritionMutationFailure) {
       return error;
+    }
+    if (error is TimeoutException) {
+      return const HealthNutritionMutationUnavailable(
+        'Tempo limite esgotado ao registrar nutrição. Verifique sua conexão e tente novamente.',
+        'timeout',
+      );
     }
     if (error is FirebaseFunctionsException) {
       return _fromFirebase(error);

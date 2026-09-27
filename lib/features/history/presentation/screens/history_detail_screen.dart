@@ -26,6 +26,7 @@ import 'package:canil_gcm/features/occurrences/presentation/screens/create_amend
 import 'package:canil_gcm/core/services/pdf_generator/occurrence_pdf_generator.dart';
 import 'package:canil_gcm/features/occurrences/presentation/view_models/occurrence_view_model.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
+import 'package:canil_gcm/features/conditioning/domain/conditioning_session.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
 import 'package:canil_gcm/features/nutrition/domain/feeding.dart';
 import 'package:canil_gcm/features/history/presentation/widgets/gps_track_detail_widget.dart';
@@ -84,7 +85,9 @@ class _RegistroDetalhePageState extends State<RegistroDetalhePage> {
     if (detail.type == HistoryEntryType.occurrence) {
       specificBody = HistoryOccurrenceBody(detail: detail);
     } else if (detail.type == HistoryEntryType.training) {
-      if (lowerTitle.contains('detec') || lowerTitle.contains('faro')) {
+      if (isConditioningTraining(detail)) {
+        specificBody = HistoryCondicionamentoBody(detail: detail);
+      } else if (lowerTitle.contains('detec') || lowerTitle.contains('faro')) {
         specificBody = HistoryDetectionBody(detail: detail);
       } else if (lowerTitle.contains('guarda') ||
           lowerTitle.contains('protec')) {
@@ -102,7 +105,11 @@ class _RegistroDetalhePageState extends State<RegistroDetalhePage> {
     } else if (detail.type == HistoryEntryType.nutrition) {
       specificBody = HistoryNutricaoBody(detail: detail);
     } else {
-      specificBody = HistoryObedienciaBody(detail: detail); // Fallback
+      if (isConditioningTraining(detail)) {
+        specificBody = HistoryCondicionamentoBody(detail: detail);
+      } else {
+        specificBody = HistoryObedienciaBody(detail: detail); // Fallback
+      }
     }
 
     return HistoryDetailScaffold(
@@ -2726,6 +2733,596 @@ class _TrailLinePainter extends CustomPainter {
 }
 
 // =============================================================================
+// ROUTING HELPER: CONDICIONAMENTO FÍSICO
+// =============================================================================
+
+bool isConditioningTraining(RecordDetail detail) {
+  final lowerTitle = detail.title.toLowerCase();
+  final lowerCategory = detail.category.toLowerCase();
+  final lowerSubtitle = detail.subtitle.toLowerCase();
+  final tag = detail.source.tag.toUpperCase();
+
+  if (lowerTitle.contains('condicion') ||
+      lowerCategory.contains('condicion') ||
+      lowerSubtitle.contains('condicion') ||
+      tag.contains('CONDICION')) {
+    return true;
+  }
+
+  final original = detail.source.originalModel;
+  if (original is ConditioningSession) return true;
+  if (original is TrainingSessionModel) {
+    if (original.trainingType.toLowerCase().contains('condicion')) return true;
+    final specialty =
+        original.metadata?['specialty']?.toString().toLowerCase();
+    if (specialty != null && specialty.contains('condicion')) return true;
+  }
+
+  final tipo = detail.source.details['Tipo']?.toString().toLowerCase() ?? '';
+  final specialty =
+      detail.source.details['specialty']?.toString().toLowerCase() ?? '';
+  if (tipo.contains('condicion') || specialty.contains('condicion')) {
+    return true;
+  }
+
+  final exercise =
+      detail.source.details['exercise']?.toString().toLowerCase() ?? '';
+  if (exercise.isNotEmpty &&
+      const [
+        'passeio',
+        'esteira',
+        'paraquedas',
+        'natação',
+        'natacao',
+        'tração c/ peso',
+        'tracao c/ peso',
+        'tração elástica',
+        'tracao elastica',
+        'escalada',
+        'bolinha em campo',
+        'a-frame',
+        'salto altura',
+        'salto distância',
+        'salto distancia',
+        'cavaletes',
+      ].any((e) => exercise.contains(e))) {
+    return true;
+  }
+
+  return false;
+}
+
+// =============================================================================
+// BODY 4.5: CONDICIONAMENTO FÍSICO
+// =============================================================================
+
+class HistoryCondicionamentoBody extends StatelessWidget {
+  final RecordDetail detail;
+
+  const HistoryCondicionamentoBody({super.key, required this.detail});
+
+  @override
+  Widget build(BuildContext context) {
+    final original = detail.source.originalModel;
+    final session = original is TrainingSessionModel ? original : null;
+    final condSession = original is ConditioningSession ? original : null;
+
+    final Map<String, dynamic> metadata = {
+      ...detail.source.details,
+      if (session?.metadata != null) ...session!.metadata!,
+      if (condSession != null) ...{
+        'exercise':
+            condSession.exerciseNameCustom ?? condSession.exerciseType,
+        'intensity': condSession.intensity,
+        'condition': condSession.postCondition,
+        'notes': condSession.observations,
+        if (condSession.gpsTrackId != null) 'gpsTrackId': condSession.gpsTrackId,
+        ...condSession.metrics,
+      },
+    };
+
+    // Exercise name
+    final exerciseName = _firstNonEmptyString([
+      metadata['exercise'],
+      metadata['exercise_name'],
+      metadata['exercise_type'],
+      metadata['exercicio'],
+      if (detail.title.contains('•')) detail.title.split('•').last.trim(),
+      'Condicionamento Físico',
+    ]);
+
+    // Exercise Category
+    final category = _resolveExerciseCategory(
+      exerciseName,
+      metadata['category']?.toString(),
+    );
+
+    // Intensity
+    final rawIntensity = _firstNonEmptyString([
+      metadata['intensity'],
+      metadata['intensidade'],
+      'Moderada',
+    ]);
+    final intensity = _capitalize(rawIntensity);
+
+    // Post-condition
+    final rawCondition = _firstNonEmptyString([
+      metadata['condition'],
+      metadata['post_condition'],
+      metadata['condicao'],
+      'Normal',
+    ]);
+    final condition = _capitalize(rawCondition);
+
+    // GPS Track Map
+    final gpsTrackRaw = metadata['gps_track'];
+    final Map<String, dynamic>? gpsTrack = gpsTrackRaw is Map
+        ? Map<String, dynamic>.from(gpsTrackRaw)
+        : null;
+
+    // Metrics collection
+    final metrics = _collectMetrics(metadata, detail);
+
+    // Notes
+    final metadataNotes = _firstNonEmptyString([
+      session?.handlerNotes,
+      condSession?.observations,
+      metadata['handlerNotes'],
+      metadata['notes'],
+      metadata['observations'],
+      metadata['obs'],
+      metadata['Notas'],
+      metadata['Observações'],
+    ]);
+    final notes = metadataNotes.isNotEmpty
+        ? metadataNotes
+        : (detail.notes.isNotEmpty &&
+                detail.notes != detail.subtitle &&
+                detail.notes != detail.location
+            ? detail.notes
+            : '');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // GPS Track (se presente)
+        if (gpsTrack != null) ...[
+          GpsTrackDetailWidget(gpsTrack: gpsTrack),
+          const SizedBox(height: 16),
+        ],
+
+        const _SectionLabel('RESUMO DO EXERCÍCIO'),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: _textPrimary.withAlpha(6),
+            border: Border.all(color: _textPrimary.withAlpha(14)),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    _resolveExerciseEmoji(exerciseName),
+                    style: const TextStyle(fontSize: 26),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          exerciseName,
+                          style: GoogleFonts.inter(
+                            color: _textPrimary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          category,
+                          style: GoogleFonts.inter(
+                            color: _cyan,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _textPrimary.withAlpha(5),
+                        border: Border.all(color: _textPrimary.withAlpha(10)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'INTENSIDADE',
+                            style: GoogleFonts.inter(
+                              color: _textMuted,
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            intensity.toUpperCase(),
+                            style: GoogleFonts.inter(
+                              color: _getIntensityColor(intensity),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _textPrimary.withAlpha(5),
+                        border: Border.all(color: _textPrimary.withAlpha(10)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'ESTADO PÓS-TREINO',
+                            style: GoogleFonts.inter(
+                              color: _textMuted,
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            condition.toUpperCase(),
+                            style: GoogleFonts.inter(
+                              color: _getConditionColor(condition),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        if (metrics.isNotEmpty) ...[
+          const _SectionLabel('MÉTRICAS DO CONDICIONAMENTO'),
+          const SizedBox(height: 8),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: metrics.length == 1
+                  ? 1
+                  : (metrics.length == 2 || metrics.length == 4 ? 2 : 3),
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: metrics.length == 1 ? 3.0 : 1.8,
+            ),
+            itemCount: metrics.length,
+            itemBuilder: (context, index) {
+              final m = metrics[index];
+              return Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: _textPrimary.withAlpha(5),
+                  border: Border.all(color: _textPrimary.withAlpha(12)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      m['value']!,
+                      style: GoogleFonts.inter(
+                        color: _textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      m['label']!,
+                      style: GoogleFonts.inter(
+                        color: _textMuted,
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.3,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        const _SectionLabel('CONFIGURAÇÃO DO CONDICIONAMENTO'),
+        const SizedBox(height: 8),
+        _buildConfigGrid({
+          'Exercício': exerciseName,
+          'Intensidade': intensity,
+          'Pós-Treino': condition,
+        }),
+        const SizedBox(height: 16),
+
+        // Observações
+        if (notes.isNotEmpty) ...[
+          const _SectionLabel('OBSERVAÇÕES'),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: _textPrimary.withAlpha(8),
+              border: Border.all(color: _textPrimary.withAlpha(15)),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              notes,
+              style: GoogleFonts.inter(
+                color: _textSecondary,
+                fontSize: 12,
+                height: 1.6,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  static String _firstNonEmptyString(List<dynamic> candidates) {
+    for (final c in candidates) {
+      if (c == null) continue;
+      final str = c.toString().trim();
+      if (str.isNotEmpty) return str;
+    }
+    return '';
+  }
+
+  static String _capitalize(String s) {
+    if (s.isEmpty) return s;
+    return s[0].toUpperCase() + s.substring(1).toLowerCase();
+  }
+
+  static String _resolveExerciseEmoji(String name) {
+    final l = name.toLowerCase();
+    if (l.contains('passeio') || l.contains('caminh')) return '🚶';
+    if (l.contains('esteira')) return '🏃';
+    if (l.contains('paraquedas')) return '🪂';
+    if (l.contains('natação') || l.contains('natacao')) return '🏊';
+    if (l.contains('tração c/ peso') ||
+        l.contains('tracao c/ peso') ||
+        l.contains('peso')) {
+      return '🏋';
+    }
+    if (l.contains('tração elástica') ||
+        l.contains('tracao elastica') ||
+        l.contains('elástica') ||
+        l.contains('elastica')) {
+      return '🪢';
+    }
+    if (l.contains('escalada')) return '🧗';
+    if (l.contains('bolinha')) return '⚽';
+    if (l.contains('a-frame') || l.contains('aframe')) return '📐';
+    if (l.contains('salto altura')) return '⬆';
+    if (l.contains('salto dist') || l.contains('salto distância')) return '↔';
+    if (l.contains('cavalete')) return '🔢';
+    return '💪';
+  }
+
+  static String _resolveExerciseCategory(
+    String name,
+    String? explicitCategory,
+  ) {
+    if (explicitCategory != null && explicitCategory.trim().isNotEmpty) {
+      return explicitCategory.trim().toUpperCase();
+    }
+    final l = name.toLowerCase();
+    if (l.contains('passeio') ||
+        l.contains('esteira') ||
+        l.contains('paraquedas') ||
+        l.contains('natação') ||
+        l.contains('natacao')) {
+      return 'CARDIOVASCULAR';
+    }
+    if (l.contains('tração') ||
+        l.contains('tracao') ||
+        l.contains('escalada') ||
+        l.contains('força') ||
+        l.contains('forca')) {
+      return 'FORÇA';
+    }
+    if (l.contains('bolinha') ||
+        l.contains('a-frame') ||
+        l.contains('salto') ||
+        l.contains('cavalete') ||
+        l.contains('agilidade') ||
+        l.contains('pliometria')) {
+      return 'AGILIDADE E PLIOMETRIA';
+    }
+    return 'CONDICIONAMENTO FÍSICO';
+  }
+
+  static Color _getIntensityColor(String intensity) {
+    final l = intensity.toLowerCase();
+    if (l.contains('intensa') || l.contains('alta')) return _amber;
+    if (l.contains('moderada') || l.contains('média') || l.contains('media')) {
+      return _cyan;
+    }
+    if (l.contains('leve') || l.contains('baixa')) return _green;
+    return _cyan;
+  }
+
+  static Color _getConditionColor(String condition) {
+    final l = condition.toLowerCase();
+    if (l.contains('exausto')) return _red;
+    if (l.contains('ofegante')) return _amber;
+    if (l.contains('normal')) return _green;
+    return _textSecondary;
+  }
+
+  static List<Map<String, String>> _collectMetrics(
+    Map<String, dynamic> metadata,
+    RecordDetail detail,
+  ) {
+    final List<Map<String, String>> metrics = [];
+
+    // Duration
+    final rawDuration = metadata['duration']?.toString() ??
+        metadata['duration_minutes']?.toString() ??
+        metadata['duracao']?.toString() ??
+        (detail.duration.isNotEmpty && detail.duration != 'Não informado'
+            ? detail.duration
+            : null);
+    if (rawDuration != null && rawDuration.trim().isNotEmpty) {
+      final str = rawDuration.trim();
+      final formatted = str.contains('min') || str.contains('h')
+          ? str
+          : '$str min';
+      metrics.add({'value': formatted, 'label': 'DURAÇÃO'});
+    }
+
+    // Distance
+    final rawDistance = metadata['distance']?.toString() ??
+        metadata['distance_meters']?.toString() ??
+        metadata['max_distance_meters']?.toString() ??
+        metadata['distancia']?.toString();
+    if (rawDistance != null && rawDistance.trim().isNotEmpty) {
+      final str = rawDistance.trim();
+      String formatted = str;
+      if (!str.contains('km') && !str.contains('m')) {
+        final numVal = double.tryParse(str);
+        if (numVal != null) {
+          final isExplicitMeters = metadata.containsKey('distance_meters') ||
+              metadata.containsKey('max_distance_meters');
+          if (isExplicitMeters) {
+            formatted = numVal >= 1000
+                ? '${(numVal / 1000).toStringAsFixed(1)} km'
+                : '${numVal.round()} m';
+          } else if (numVal < 50) {
+            formatted = '$str km';
+          } else {
+            formatted = '${numVal.round()} m';
+          }
+        } else {
+          formatted = '$str m';
+        }
+      }
+      metrics.add({'value': formatted, 'label': 'DISTÂNCIA'});
+    }
+
+    // Repetitions
+    final rawReps = metadata['reps']?.toString() ??
+        metadata['repetitions']?.toString() ??
+        metadata['repeticoes']?.toString();
+    if (rawReps != null && rawReps.trim().isNotEmpty) {
+      final str = rawReps.trim();
+      final formatted = str.contains('x') || str.contains('vez')
+          ? str
+          : '$str x';
+      metrics.add({'value': formatted, 'label': 'REPETIÇÕES'});
+    }
+
+    // Sets
+    final rawSets = metadata['sets']?.toString() ??
+        metadata['series']?.toString();
+    if (rawSets != null && rawSets.trim().isNotEmpty) {
+      final str = rawSets.trim();
+      final formatted = str.contains('x') || str.contains('série')
+          ? str
+          : '$str x';
+      metrics.add({'value': formatted, 'label': 'SÉRIES'});
+    }
+
+    // Speed
+    final rawSpeed = metadata['speed']?.toString() ??
+        metadata['velocity_kmh']?.toString() ??
+        metadata['velocidade']?.toString();
+    if (rawSpeed != null && rawSpeed.trim().isNotEmpty) {
+      final str = rawSpeed.trim();
+      final formatted = str.contains('km/h') ? str : '$str km/h';
+      metrics.add({'value': formatted, 'label': 'VELOCIDADE'});
+    }
+
+    // Load
+    final rawLoad = metadata['load']?.toString() ??
+        metadata['load_kg']?.toString() ??
+        metadata['carga']?.toString();
+    if (rawLoad != null && rawLoad.trim().isNotEmpty) {
+      final str = rawLoad.trim();
+      final formatted = str.contains('kg') ? str : '$str kg';
+      metrics.add({'value': formatted, 'label': 'CARGA'});
+    }
+
+    // Height
+    final rawHeight = metadata['height']?.toString() ??
+        metadata['max_height_cm']?.toString() ??
+        metadata['altura']?.toString();
+    if (rawHeight != null && rawHeight.trim().isNotEmpty) {
+      final str = rawHeight.trim();
+      final formatted = str.contains('cm') || str.contains('m')
+          ? str
+          : '$str cm';
+      metrics.add({'value': formatted, 'label': 'ALTURA'});
+    }
+
+    // Diagonal
+    final rawDiag = metadata['diagonal']?.toString() ??
+        metadata['diagonal_meters']?.toString();
+    if (rawDiag != null && rawDiag.trim().isNotEmpty) {
+      final str = rawDiag.trim();
+      final formatted = str.contains('m') ? str : '$str m';
+      metrics.add({'value': formatted, 'label': 'DIAGONAL'});
+    }
+
+    return metrics;
+  }
+}
+
+// =============================================================================
 // BODY 5: OBEDIÊNCIA
 // =============================================================================
 
@@ -2737,29 +3334,40 @@ class HistoryObedienciaBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final session = detail.source.originalModel as TrainingSessionModel?;
-    final metadata = session?.metadata ?? const {};
+    final metadata = session?.metadata ?? (detail.source.details);
 
-    final list =
-        metadata['commands'] as List? ??
-        [
-          'Junto',
-          'Senta',
-          'Fica',
-          'Deita',
-          'Vem (chamada)',
-          'Latir sob comando',
-        ];
-    final commands = list.map((e) => e.toString()).toList();
+    final rawCommands = metadata['commands'];
+    final list = rawCommands is List ? rawCommands : const [];
+    final commands = list
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
 
     final operacionais = commands.where((name) {
       final l = name.toLowerCase();
-      return l.contains('junto') || l.contains('senta') || l.contains('fica');
+      return l.contains('junto') ||
+          l.contains('senta') ||
+          l.contains('fica') ||
+          l.contains('solta');
     }).toList();
 
     final posicionais = commands.where((name) {
+      if (operacionais.contains(name)) return false;
       final l = name.toLowerCase();
-      return l.contains('deita') || l.contains('vem') || l.contains('latir');
+      return l.contains('deita') ||
+          l.contains('vem') ||
+          l.contains('latir') ||
+          l.contains('levanta') ||
+          l.contains('cumprimenta') ||
+          l.contains('abraço');
     }).toList();
+
+    final demais = commands
+        .where(
+          (name) =>
+              !operacionais.contains(name) && !posicionais.contains(name),
+        )
+        .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2781,25 +3389,49 @@ class HistoryObedienciaBody extends StatelessWidget {
 
         const _SectionLabel('COMANDOS · ESTÁGIO'),
         const SizedBox(height: 4),
-        Wrap(
-          spacing: 10,
-          runSpacing: 4,
-          children: [
-            _legendItem('● 1 Iniciante', _textMuted),
-            _legendItem('● 3 Praticando', _amber),
-            _legendItem('● 4 Consolidando', _cyan),
-            _legendItem('● 5 Operacional', _green),
-          ],
-        ),
-        const SizedBox(height: 12),
+        if (commands.isEmpty) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
+            decoration: BoxDecoration(
+              color: _textPrimary.withAlpha(5),
+              border: Border.all(color: _textPrimary.withAlpha(12)),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Text(
+              'Nenhum comando registrado para esta sessão.',
+              style: GoogleFonts.inter(
+                color: _textMuted,
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+        ] else ...[
+          Wrap(
+            spacing: 10,
+            runSpacing: 4,
+            children: [
+              _legendItem('● 1 Iniciante', _textMuted),
+              _legendItem('● 3 Praticando', _amber),
+              _legendItem('● 4 Consolidando', _cyan),
+              _legendItem('● 5 Operacional', _green),
+            ],
+          ),
+          const SizedBox(height: 12),
 
-        if (operacionais.isNotEmpty) ...[
-          _categoryLabel('OPERACIONAIS'),
-          for (final cmd in operacionais) _buildCmdRow(cmd),
-        ],
-        if (posicionais.isNotEmpty) ...[
-          _categoryLabel('POSICIONAIS'),
-          for (final cmd in posicionais) _buildCmdRow(cmd),
+          if (operacionais.isNotEmpty) ...[
+            _categoryLabel('OPERACIONAIS'),
+            for (final cmd in operacionais) _buildCmdRow(cmd),
+          ],
+          if (posicionais.isNotEmpty) ...[
+            _categoryLabel('POSICIONAIS'),
+            for (final cmd in posicionais) _buildCmdRow(cmd),
+          ],
+          if (demais.isNotEmpty) ...[
+            _categoryLabel('OUTROS COMANDOS'),
+            for (final cmd in demais) _buildCmdRow(cmd),
+          ],
         ],
         const SizedBox(height: 16),
 

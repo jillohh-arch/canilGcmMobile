@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:canil_gcm/core/services/authoritative_time/authoritative_time_gateway.dart';
@@ -885,6 +886,43 @@ void main() {
       expect(provider.status, AuthoritativeTimeStatus.neverSynchronized);
       expect(provider.currentSnapshot, isNull);
       expect(provider.nowReadOnlyUtc(), isNull);
+    },
+  );
+
+  test(
+    'gateway call that hangs times out, resets in-flight state and fails closed',
+    () {
+      fakeAsync((async) {
+        final clock = _FakeMonotonicClock();
+        final completer = Completer<AuthoritativeTimeRemoteResponse>();
+        final gateway = _CallbackGateway(() => completer.future);
+        final provider = AuthoritativeTimeProvider(
+          gateway: gateway,
+          monotonicClock: clock,
+        );
+
+        AuthoritativeTimeSyncResult? syncResult;
+        provider.synchronize().then((r) => syncResult = r);
+        expect(provider.status, AuthoritativeTimeStatus.synchronizing);
+
+        // Avança o tempo além de maximumRoundTrip (10s)
+        async.elapse(const Duration(seconds: 11));
+
+        expect(syncResult, isA<AuthoritativeTimeSyncFailure>());
+        final failure = (syncResult as AuthoritativeTimeSyncFailure).failure;
+        expect(failure.code, AuthoritativeTimeFailureCode.unavailable);
+        expect(provider.status, AuthoritativeTimeStatus.failed);
+        expect(provider.nowFreshUtc(), isNull);
+
+        // Nova tentativa após recuperação do gateway
+        gateway.callback = () async => response();
+        AuthoritativeTimeSyncResult? recoveredResult;
+        provider.synchronize().then((r) => recoveredResult = r);
+        async.elapse(const Duration(milliseconds: 100));
+
+        expect(recoveredResult, isA<AuthoritativeTimeSyncSuccess>());
+        expect(provider.status, AuthoritativeTimeStatus.fresh);
+      });
     },
   );
 }

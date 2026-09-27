@@ -16,10 +16,16 @@ typedef HealthScheduleCallableInvoker =
 /// Resolve [FirebaseFunctions] de forma **lazy** no primeiro call — permite
 /// composition root em testes de widget sem Firebase.initializeApp.
 final class FirebaseFunctionsHealthScheduleCallableInvoker {
-  FirebaseFunctionsHealthScheduleCallableInvoker({FirebaseFunctions? functions})
-    : _functionsOverride = functions;
+  FirebaseFunctionsHealthScheduleCallableInvoker({
+    FirebaseFunctions? functions,
+    Duration requestTimeout = defaultTimeout,
+  }) : _functionsOverride = functions,
+       _requestTimeout = requestTimeout;
+
+  static const Duration defaultTimeout = Duration(seconds: 15);
 
   final FirebaseFunctions? _functionsOverride;
+  final Duration _requestTimeout;
   FirebaseFunctions? _cached;
 
   FirebaseFunctions get _functions {
@@ -34,8 +40,11 @@ final class FirebaseFunctionsHealthScheduleCallableInvoker {
     String functionName,
     Map<String, dynamic> data,
   ) async {
-    final callable = _functions.httpsCallable(functionName);
-    final result = await callable.call(data);
+    final callable = _functions.httpsCallable(
+      functionName,
+      options: HttpsCallableOptions(timeout: _requestTimeout),
+    );
+    final result = await callable.call(data).timeout(_requestTimeout);
     final payload = result.data;
     if (payload is Map) {
       return Map<String, dynamic>.from(payload);

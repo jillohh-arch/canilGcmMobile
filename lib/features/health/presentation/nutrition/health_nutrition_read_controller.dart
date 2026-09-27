@@ -166,98 +166,128 @@ class HealthNutritionReadController extends ChangeNotifier {
     }
     _safeNotify();
 
-    DateTime? referenceNow;
-    final provider = _authoritativeTimeProvider;
-    final testClock = _testClock;
-    if (provider != null) {
-      final syncResult = await provider.synchronize(force: forceTimeSync);
-      if (!_isCurrent(generation, dogId)) return;
-      if (syncResult is AuthoritativeTimeSyncFailure) {
-        _temporalFailure = syncResult.failure;
-      }
-      switch (provider.status) {
-        case AuthoritativeTimeStatus.fresh:
-          _temporalState = HealthNutritionTemporalState.fresh;
-          referenceNow = provider.nowFreshUtc();
-        case AuthoritativeTimeStatus.stale:
-          _temporalState = HealthNutritionTemporalState.stale;
-          referenceNow = provider.nowReadOnlyUtc();
-        case AuthoritativeTimeStatus.neverSynchronized:
-        case AuthoritativeTimeStatus.synchronizing:
-        case AuthoritativeTimeStatus.expired:
-        case AuthoritativeTimeStatus.failed:
-          _temporalState = HealthNutritionTemporalState.unavailable;
-      }
-    } else if (testClock != null) {
-      _temporalState = HealthNutritionTemporalState.fresh;
-      referenceNow = testClock().toUtc();
-    } else {
-      _temporalState = HealthNutritionTemporalState.unavailable;
-    }
-
-    NutritionReadResult<NutritionCoexistenceSnapshot> snapshot;
     try {
-      snapshot = await _source.loadSnapshot(
-        dogId,
-        mealsFrom: mealsFrom,
-        mealsTo: mealsTo,
-      );
-    } catch (e, st) {
-      assert(() {
-        debugPrint(
-          '[HealthNutritionReadController] snapshot falhou dog=$dogId: $e\n$st',
-        );
-        return true;
-      }());
-      snapshot = NutritionReadResult.error(
-        message: e.toString(),
-        code: 'nutrition_snapshot_controller_exception',
-      );
-    }
-    if (!_isCurrent(generation, dogId)) return;
-
-    NutritionReadResult<NutritionTodayReadModel> today;
-    try {
-      if (referenceNow == null) {
-        today = const NutritionReadResult.error(
-          message: 'Horário confiável indisponível.',
-          code: 'authoritative_time_unavailable',
-        );
-      } else {
-        today = _source.projectTodayFromSnapshot(
-          dogId: dogId,
-          snapshotResult: snapshot,
-          serverNow: referenceNow,
-        );
-        if (_temporalState == HealthNutritionTemporalState.stale &&
-            today.valueOrNull != null) {
-          today = NutritionReadResult.degraded(
-            today.valueOrNull!,
-            message:
-                'Horário aguardando atualização. Os dados permanecem disponíveis para consulta.',
-            code: 'authoritative_time_stale',
+      DateTime? referenceNow;
+      final provider = _authoritativeTimeProvider;
+      final testClock = _testClock;
+      if (provider != null) {
+        AuthoritativeTimeSyncResult syncResult;
+        try {
+          syncResult = await provider.synchronize(force: forceTimeSync);
+        } on AuthoritativeTimeFailure catch (failure) {
+          syncResult = AuthoritativeTimeSyncFailure(failure);
+        } catch (e) {
+          syncResult = AuthoritativeTimeSyncFailure(
+            AuthoritativeTimeFailure(
+              AuthoritativeTimeFailureCode.unexpected,
+              e.toString(),
+            ),
           );
         }
-      }
-    } catch (e, st) {
-      assert(() {
-        debugPrint(
-          '[HealthNutritionReadController] today falhou dog=$dogId: $e\n$st',
-        );
-        return true;
-      }());
-      today = NutritionReadResult.error(
-        message: e.toString(),
-        code: 'nutrition_today_controller_exception',
-      );
-    }
-    if (!_isCurrent(generation, dogId)) return;
 
-    // Publica os dois resultados juntos: ambos derivam do mesmo snapshot.
-    _snapshotResult = snapshot;
-    _todayResult = today;
-    _loading = false;
-    _safeNotify();
+        if (syncResult is AuthoritativeTimeSyncFailure) {
+          _temporalFailure = syncResult.failure;
+        }
+        switch (provider.status) {
+          case AuthoritativeTimeStatus.fresh:
+            _temporalState = HealthNutritionTemporalState.fresh;
+            referenceNow = provider.nowFreshUtc();
+          case AuthoritativeTimeStatus.stale:
+            _temporalState = HealthNutritionTemporalState.stale;
+            referenceNow = provider.nowReadOnlyUtc();
+          case AuthoritativeTimeStatus.neverSynchronized:
+          case AuthoritativeTimeStatus.synchronizing:
+          case AuthoritativeTimeStatus.expired:
+          case AuthoritativeTimeStatus.failed:
+            _temporalState = HealthNutritionTemporalState.unavailable;
+        }
+      } else if (testClock != null) {
+        _temporalState = HealthNutritionTemporalState.fresh;
+        referenceNow = testClock().toUtc();
+      } else {
+        _temporalState = HealthNutritionTemporalState.unavailable;
+      }
+
+      // Se por qualquer razão ainda estiver em synchronizing após a tentativa,
+      // força estado terminal acionável (fail-closed, nunca trava em spinner).
+      if (_temporalState == HealthNutritionTemporalState.synchronizing) {
+        _temporalState = HealthNutritionTemporalState.unavailable;
+      }
+
+      if (!_isCurrent(generation, dogId)) return;
+
+      NutritionReadResult<NutritionCoexistenceSnapshot> snapshot;
+      try {
+        snapshot = await _source.loadSnapshot(
+          dogId,
+          mealsFrom: mealsFrom,
+          mealsTo: mealsTo,
+        );
+      } catch (e, st) {
+        assert(() {
+          debugPrint(
+            '[HealthNutritionReadController] snapshot falhou dog=$dogId: $e\n$st',
+          );
+          return true;
+        }());
+        snapshot = NutritionReadResult.error(
+          message: e.toString(),
+          code: 'nutrition_snapshot_controller_exception',
+        );
+      }
+      if (!_isCurrent(generation, dogId)) return;
+
+      NutritionReadResult<NutritionTodayReadModel> today;
+      try {
+        if (referenceNow == null) {
+          today = const NutritionReadResult.error(
+            message: 'Horário confiável indisponível.',
+            code: 'authoritative_time_unavailable',
+          );
+        } else {
+          today = _source.projectTodayFromSnapshot(
+            dogId: dogId,
+            snapshotResult: snapshot,
+            serverNow: referenceNow,
+          );
+          if (_temporalState == HealthNutritionTemporalState.stale &&
+              today.valueOrNull != null) {
+            today = NutritionReadResult.degraded(
+              today.valueOrNull!,
+              message:
+                  'Horário aguardando atualização. Os dados permanecem disponíveis para consulta.',
+              code: 'authoritative_time_stale',
+            );
+          }
+        }
+      } catch (e, st) {
+        assert(() {
+          debugPrint(
+            '[HealthNutritionReadController] today falhou dog=$dogId: $e\n$st',
+          );
+          return true;
+        }());
+        today = NutritionReadResult.error(
+          message: e.toString(),
+          code: 'nutrition_today_controller_exception',
+        );
+      }
+      if (!_isCurrent(generation, dogId)) return;
+
+      // Publica os dois resultados juntos: ambos derivam do mesmo snapshot.
+      _snapshotResult = snapshot;
+      _todayResult = today;
+    } finally {
+      if (!_disposed) {
+        if (_activeDogId == dogId && generation == _generation) {
+          _loading = false;
+          if (_temporalState == HealthNutritionTemporalState.synchronizing) {
+            _temporalState = HealthNutritionTemporalState.unavailable;
+          }
+          _safeNotify();
+        }
+      }
+    }
   }
 
   bool _isCurrent(int generation, String dogId) {

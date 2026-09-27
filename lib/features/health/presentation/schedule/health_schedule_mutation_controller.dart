@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
@@ -37,6 +39,8 @@ class HealthScheduleMutationController extends ChangeNotifier {
   final Set<String> _busyScheduleIds = <String>{};
   bool _createSubmitting = false;
   bool _disposed = false;
+
+  static const Duration gatewayTimeout = Duration(seconds: 20);
 
   /// Idempotency key da intenção de create atual (preservada em retry).
   String? _createIdempotencyKey;
@@ -142,7 +146,14 @@ class HealthScheduleMutationController extends ChangeNotifier {
         notes: notes,
       );
 
-      final result = await _gateway.createManual(command);
+      final result = await _gateway.createManual(command).timeout(
+        gatewayTimeout,
+        onTimeout: () => const HealthScheduleMutationErrorResult(
+          HealthScheduleMutationOffline(
+            'Tempo limite esgotado para salvar o item da agenda. Verifique sua conexão e tente novamente.',
+          ),
+        ),
+      );
       return await _handleResult(
         result: result,
         successMessage: HealthScheduleMutationUserCopy.successCreated,
@@ -205,7 +216,14 @@ class HealthScheduleMutationController extends ChangeNotifier {
         clearNotes: clearNotes,
       );
 
-      final result = await _gateway.updateOpen(command);
+      final result = await _gateway.updateOpen(command).timeout(
+        gatewayTimeout,
+        onTimeout: () => const HealthScheduleMutationErrorResult(
+          HealthScheduleMutationOffline(
+            'Tempo limite esgotado para atualizar o item da agenda. Verifique sua conexão e tente novamente.',
+          ),
+        ),
+      );
       return await _handleResult(
         result: result,
         successMessage: HealthScheduleMutationUserCopy.successUpdated,
@@ -244,7 +262,14 @@ class HealthScheduleMutationController extends ChangeNotifier {
         operationId: operationId,
       );
 
-      final result = await _gateway.complete(command);
+      final result = await _gateway.complete(command).timeout(
+        gatewayTimeout,
+        onTimeout: () => const HealthScheduleMutationErrorResult(
+          HealthScheduleMutationOffline(
+            'Tempo limite esgotado para concluir o item da agenda. Verifique sua conexão e tente novamente.',
+          ),
+        ),
+      );
       return await _handleResult(
         result: result,
         successMessage: HealthScheduleMutationUserCopy.successCompleted,
@@ -303,7 +328,14 @@ class HealthScheduleMutationController extends ChangeNotifier {
         operationId: operationId,
       );
 
-      final result = await _gateway.cancel(command);
+      final result = await _gateway.cancel(command).timeout(
+        gatewayTimeout,
+        onTimeout: () => const HealthScheduleMutationErrorResult(
+          HealthScheduleMutationOffline(
+            'Tempo limite esgotado para cancelar o item da agenda. Verifique sua conexão e tente novamente.',
+          ),
+        ),
+      );
       return await _handleResult(
         result: result,
         successMessage: HealthScheduleMutationUserCopy.successCancelled,
@@ -329,7 +361,9 @@ class HealthScheduleMutationController extends ChangeNotifier {
     final dogId = _scheduleController.activeDogId;
     if (dogId == null || dogId.isEmpty) return;
     try {
-      await _scheduleController.refresh();
+      await _scheduleController.refresh().timeout(
+        const Duration(seconds: 10),
+      );
     } catch (e, st) {
       assert(() {
         debugPrint(
@@ -369,7 +403,9 @@ class HealthScheduleMutationController extends ChangeNotifier {
 
   Future<bool> _refreshAfterSuccess() async {
     try {
-      await _scheduleController.refresh();
+      await _scheduleController.refresh().timeout(
+        const Duration(seconds: 10),
+      );
       return _scheduleShowsRefreshFailure();
     } catch (e, st) {
       assert(() {
