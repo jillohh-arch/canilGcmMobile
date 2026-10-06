@@ -306,12 +306,14 @@ class NutritionPdf {
       final amountStr = '${f.amountGrams}g';
       final prescribedStr = f.prescriptionAtTime > 0 ? '${f.prescriptionAtTime}g' : '—';
 
-      final isDivergent = f.divergencePercent.abs() > 10.0;
+      // Autoridade de domínio F20: Feeding.isConform (divergencePercent.abs() <= 10.0)
+      final isConform = f.isConform;
+      final isDivergent = !isConform;
       final diffPrefix = f.divergencePercent > 0 ? '+' : '';
       final diffStr = '$diffPrefix${f.divergencePercent.toStringAsFixed(0)}%';
 
-      final statusStr = isDivergent ? 'Divergente' : 'Conforme';
-      final statusTone = isDivergent ? ReportTone.attention : ReportTone.positive;
+      final statusStr = isConform ? 'Conforme' : 'Divergente';
+      final statusTone = isConform ? ReportTone.positive : ReportTone.attention;
 
       return RichDataTableRow(
         cells: [

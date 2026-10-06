@@ -32,6 +32,12 @@ class VaccinationPdf {
       'REGISTRADA' => ReportTone.positive,
       _ => ReportTone.neutral,
     };
+    final nextDoseStatusLabel = switch (overallStatus) {
+      'EM DIA' => 'PRÓXIMA DOSE EM DIA',
+      'VENCIDA' => 'PRÓXIMA DOSE VENCIDA',
+      'REGISTRADA' => 'HISTÓRICO REGISTRADO',
+      _ => 'SEM REGISTROS',
+    };
 
     final now = DateTime.now();
 
@@ -47,7 +53,7 @@ class VaccinationPdf {
       category: 'PRONTUÁRIO MÉDICO VETERINÁRIO',
       motto: 'DISCIPLINA · PROTEÇÃO · RESULTADO',
       metadata: metadata,
-      statusLabel: overallStatus,
+      statusLabel: nextDoseStatusLabel,
       statusTone: overallTone,
       useDarkFooter: true,
       archetypeConfig: ReportArchetypeConfig(
@@ -130,7 +136,7 @@ class VaccinationPdf {
           pw.Expanded(
             child: ReportPrimitives.metricCard(
               MetricCardData(
-                label: 'Status Geral',
+                label: 'Situação da Próxima Dose',
                 value: overallStatus,
                 tone: overallTone,
               ),
@@ -233,7 +239,7 @@ class VaccinationPdf {
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
                   pw.Text(
-                    'RESPONSÁVEL TÉCNICO',
+                    'PROFISSIONAL DA ÚLTIMA APLICAÇÃO',
                     style: pw.TextStyle(
                       font: fonts.bold,
                       fontSize: 7,
@@ -439,9 +445,9 @@ class VaccinationPdf {
       ),
       DataTableColumn(header: 'Veterinário / CRMV', flex: 2.4),
       DataTableColumn(
-        header: 'Status',
+        header: 'Situação da Dose',
         alignment: DataTableCellAlignment.center,
-        flex: 1.0,
+        flex: 1.1,
       ),
     ];
 
