@@ -415,5 +415,138 @@ void main() {
       final pdfBytes = await builder.buildPdf(customFonts: fonts);
       expect(pdfBytes.take(4), orderedEquals('%PDF'.codeUnits));
     });
+
+    test('Gera documento PDF com Header Tático Dark Navy, Gráfico Vetorial e Tabela Rica', () async {
+      final fonts = await PdfFonts.load();
+      final now = DateTime(2026, 10, 6, 15, 0);
+
+      final builder = ReportTemplateBuilder(
+        title: 'Histórico Bioestatístico e Ponderal K9',
+        subtitle: 'Acompanhamento Físico Operacional',
+        category: 'Saúde & Prontidão',
+        organization: 'GCM Limeira',
+        motto: 'DISCIPLINA · PROTEÇÃO · RESULTADO',
+        statusLabel: 'DENTRO DA FAIXA IDEAL',
+        statusTone: ReportTone.positive,
+        useDarkFooter: true,
+        metadata: ReportMetadata(
+          generatedAt: now,
+          documentId: 'BIO-K9-2026-0099',
+          dogIdentity: 'Thor (Malinois)',
+        ),
+        archetypeConfig: ReportArchetypeConfig.clinicalTactical(),
+      );
+
+      // 1. Identity com tags operacionais
+      builder.addWidget(
+        ReportPrimitives.entityIdentityBlock(
+          EntityIdentityData(
+            title: 'Thor',
+            subtitle: 'Pastor Belga Malinois',
+            tags: const ['CÃO DE TRABALHO', 'INTERVENÇÃO'],
+            statusLabel: 'ATIVO',
+            statusTone: ReportTone.positive,
+            fields: const [
+              EntityIdentityField(label: 'Microchip', value: '981098102938499', isMonospace: true),
+              EntityIdentityField(label: 'Faixa Ideal', value: '28.0 kg a 32.0 kg'),
+            ],
+          ),
+          fonts,
+        ),
+      );
+
+      // 2. Título de Seção Estilizado
+      builder.addWidget(
+        ReportPrimitives.styledSectionTitle(
+          'Evolução Ponderal (Gráfico)',
+          fonts,
+          iconText: 'EVO',
+        ),
+      );
+
+      // 3. Gráfico de Evolução de Peso Vetorial
+      builder.addWidget(
+        ReportPrimitives.weightTrendChart(
+          points: [
+            WeightChartPoint(date: DateTime(2026, 7, 1), weight: 29.5),
+            WeightChartPoint(date: DateTime(2026, 8, 1), weight: 30.0),
+            WeightChartPoint(date: DateTime(2026, 9, 1), weight: 30.4),
+            WeightChartPoint(date: DateTime(2026, 10, 1), weight: 30.2),
+          ],
+          idealMin: 28.0,
+          idealMax: 32.0,
+          fonts: fonts,
+        ),
+      );
+
+      // 4. Tabela Rica com Badges e Zebra
+      builder.addWidget(
+        ReportPrimitives.styledSectionTitle(
+          'Registros de Pesagem',
+          fonts,
+          iconText: 'LOG',
+        ),
+      );
+
+      builder.addWidget(
+        ReportPrimitives.richDataTable(
+          RichDataTableData(
+            columns: const [
+              DataTableColumn(header: 'Data', alignment: DataTableCellAlignment.center, isMonospace: true, flex: 1.2),
+              DataTableColumn(header: 'Peso', alignment: DataTableCellAlignment.right, isMonospace: true, flex: 1.0),
+              DataTableColumn(header: 'Variação', alignment: DataTableCellAlignment.right, isMonospace: true, flex: 1.0),
+              DataTableColumn(header: 'Status', alignment: DataTableCellAlignment.center, flex: 1.0),
+            ],
+            rows: [
+              RichDataTableRow(
+                cells: [
+                  const RichTableCell.text('01/10/2026', isMonospace: true),
+                  const RichTableCell.text('30.2 kg', isBold: true, isMonospace: true),
+                  const RichTableCell.text('-0.2 kg', isBold: true, isMonospace: true),
+                  const RichTableCell.badge(badgeText: 'CONFORME', badgeTone: ReportTone.positive),
+                ],
+              ),
+              RichDataTableRow(
+                cells: [
+                  const RichTableCell.text('01/09/2026', isMonospace: true),
+                  const RichTableCell.text('30.4 kg', isBold: true, isMonospace: true),
+                  const RichTableCell.text('+0.4 kg', isBold: true, isMonospace: true),
+                  const RichTableCell.badge(badgeText: 'ATENÇÃO', badgeTone: ReportTone.attention),
+                ],
+              ),
+            ],
+          ),
+          fonts,
+        ),
+      );
+
+      // 5. Auditoria com trackingCode
+      builder.addWidget(
+        ReportPrimitives.auditBlock(
+          const AuditData(
+            verificationUrl: 'https://k9ops.com/v/BIO-K9-2026-0099',
+            hash: 'abcd1234ef567890abcd1234ef567890abcd1234ef567890abcd1234ef567890',
+            documentId: 'BIO-K9-2026-0099',
+            trackingCode: 'AUDIT-THOR-99182',
+            description: 'Documento assinado digitalmente e registrado em cadeia de custódia imutável.',
+          ),
+          fonts,
+        ),
+      );
+
+      final pdfBytes = await builder.buildPdf(customFonts: fonts);
+      expect(pdfBytes, isNotEmpty);
+      expect(pdfBytes.take(4), orderedEquals('%PDF'.codeUnits));
+    });
+  });
+
+  group('F70 Design System V1 — Tokens Táticos K9 Ops V2', () {
+    test('Tokens Dark Navy e Ciano estão em conformidade canônica', () {
+      expect(ReportColors.darkNavy, PdfColor.fromHex('0A1A24'));
+      expect(ReportColors.darkNavySurface, PdfColor.fromHex('0E1F2C'));
+      expect(ReportColors.darkNavyBorder, PdfColor.fromHex('1A3345'));
+      expect(ReportColors.cyanAccent, PdfColor.fromHex('2BB6C4'));
+      expect(ReportColors.goldAccent, PdfColor.fromHex('E5A93C'));
+    });
   });
 }

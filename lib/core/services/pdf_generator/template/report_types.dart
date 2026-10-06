@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:pdf/pdf.dart';
 
 import 'report_tokens.dart';
 
@@ -93,6 +94,7 @@ enum HeaderVariant {
   institutional,
   standard,
   compact,
+  darkTactical,
 }
 
 /// Orientação da página.
@@ -170,6 +172,21 @@ class ReportArchetypeConfig {
     );
   }
 
+  /// Arquétipo Prontuário Clínico Tático K9 Ops V2 (Header Dark Tactical)
+  factory ReportArchetypeConfig.clinicalTactical() {
+    return const ReportArchetypeConfig(
+      archetype: ReportArchetype.clinical,
+      name: 'Prontuário Clínico Tático',
+      orientation: PageOrientation.portrait,
+      headerVariant: HeaderVariant.darkTactical,
+      requiresAuditBlock: true,
+      requiresSignatures: false,
+      supportsTimeline: true,
+      supportsIdentityBlock: true,
+      supportsDataTable: true,
+    );
+  }
+
   /// Arquétipo Analítico / Gestão / Produtividade
   factory ReportArchetypeConfig.analytical({PageOrientation orientation = PageOrientation.portrait}) {
     return ReportArchetypeConfig(
@@ -239,6 +256,8 @@ class EntityIdentityData {
   final String? statusLabel;
   final ReportTone? statusTone;
   final ReportImageSlot? avatar;
+  final List<String> tags;
+  final String? avatarPlaceholder;
 
   const EntityIdentityData({
     required this.title,
@@ -247,6 +266,8 @@ class EntityIdentityData {
     this.statusLabel,
     this.statusTone,
     this.avatar,
+    this.tags = const [],
+    this.avatarPlaceholder,
   });
 }
 
@@ -401,11 +422,103 @@ class AuditData {
   final String hash;
   final String algorithm;
   final String? documentId;
+  final String? trackingCode;
+  final String? description;
 
   const AuditData({
     required this.verificationUrl,
     required this.hash,
     this.algorithm = 'SHA-256',
     this.documentId,
+    this.trackingCode,
+    this.description,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Extensões Visuais K9 Ops V2 (Gráfico e Tabelas Ricas)
+// ---------------------------------------------------------------------------
+
+class WeightChartPoint {
+  final DateTime date;
+  final double weight;
+  final String? label;
+
+  const WeightChartPoint({
+    required this.date,
+    required this.weight,
+    this.label,
+  });
+}
+
+class RichTableCell {
+  final String text;
+  final String? secondaryText;
+  final ReportTone? badgeTone;
+  final String? badgeText;
+  final PdfColor? textColor;
+  final bool isBold;
+  final bool isMonospace;
+  final DataTableCellAlignment? alignment;
+
+  const RichTableCell({
+    required this.text,
+    this.secondaryText,
+    this.badgeTone,
+    this.badgeText,
+    this.textColor,
+    this.isBold = false,
+    this.isMonospace = false,
+    this.alignment,
+  });
+
+  const RichTableCell.text(
+    this.text, {
+    this.isBold = false,
+    this.isMonospace = false,
+    this.textColor,
+    this.alignment,
+  })  : secondaryText = null,
+        badgeTone = null,
+        badgeText = null;
+
+  const RichTableCell.badge({
+    required this.badgeText,
+    required this.badgeTone,
+    this.alignment,
+  })  : text = badgeText ?? '',
+        secondaryText = null,
+        textColor = null,
+        isBold = true,
+        isMonospace = false;
+
+  const RichTableCell.twoLine({
+    required this.text,
+    required this.secondaryText,
+    this.isMonospace = false,
+    this.alignment,
+  })  : badgeTone = null,
+        badgeText = null,
+        textColor = null,
+        isBold = true;
+}
+
+class RichDataTableRow {
+  final List<RichTableCell> cells;
+  final PdfColor? backgroundColor;
+
+  const RichDataTableRow({
+    required this.cells,
+    this.backgroundColor,
+  });
+}
+
+class RichDataTableData {
+  final List<DataTableColumn> columns;
+  final List<RichDataTableRow> rows;
+
+  const RichDataTableData({
+    required this.columns,
+    required this.rows,
   });
 }

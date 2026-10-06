@@ -1,262 +1,210 @@
+import 'dart:convert';
 import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
 import 'package:intl/intl.dart';
-import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
-import 'pdf_colors.dart';
 import 'pdf_common_widgets.dart';
+import 'template/template.dart';
 
-/// Gerador do PDF da Carteira de Vacinação do Cão.
+/// Gerador do PDF da Carteira de Vacinação do Cão baseado na Foundation F70 Oficial.
 class VaccinationPdf {
-  static final _cyan = PdfInstitutionalColors.cyan;
-  static final _textPrimary = PdfInstitutionalColors.textPrimary;
-  static final _textSecondary = PdfInstitutionalColors.textSecondary;
-  static final _textTertiary = PdfInstitutionalColors.textTertiary;
-  static final _lightGray = PdfInstitutionalColors.lightGray;
-  static final _cardBorder = PdfInstitutionalColors.cardBorder;
-
   /// Gera os bytes do PDF da carteira de vacinação.
   static Future<Uint8List> generate(Dog dog, List<HealthLogModel> logs) async {
     final fonts = await PdfFonts.load();
-    final pdf = pw.Document(
-      author: 'Canil K9 GCM Limeira',
-      title: 'Carteira de Vacinacao - ${dog.name}',
-      theme: fonts.toThemeData(),
-    );
 
-    // Filter vaccine-related logs
-    final vaccineLogs =
-        logs
-            .where(
-              (log) =>
-                  log.dogId == dog.id &&
-                  (log.type == 'vaccination' ||
-                      log.logType == 'Vacina' ||
-                      log.vaccines.isNotEmpty),
-            )
-            .toList()
-          ..sort((a, b) => b.date.compareTo(a.date));
+    // Filtra logs de vacinação do cão (preservando ordenação decrescente de data)
+    final vaccineLogs = logs
+        .where(
+          (log) =>
+              log.dogId == dog.id &&
+              (log.type == 'vaccination' ||
+                  log.logType == 'Vacina' ||
+                  log.vaccines.isNotEmpty),
+        )
+        .toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
 
     final docId = _buildDocId(dog);
     final overallStatus = _getOverallStatus(vaccineLogs);
-    final isVaccineOk = overallStatus == 'EM DIA';
+    final overallTone = switch (overallStatus) {
+      'EM DIA' => ReportTone.positive,
+      'VENCIDA' => ReportTone.critical,
+      _ => ReportTone.neutral,
+    };
 
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.symmetric(horizontal: 40, vertical: 40),
-        header: (context) => PdfCommonWidgets.pageHeader(
-          docType: 'CARTEIRA DE VACINAÇÃO K9',
-          docId: docId,
-          fonts: fonts,
-          color: _cyan,
-        ),
-        footer: (context) => PdfCommonWidgets.pageFooter(
-          context: context,
-          docType: 'Carteira de Vacinação',
-          fonts: fonts,
-        ),
-        build: (context) {
-          return [
-            // --- CAPA / CABEÇALHO DO RELATÓRIO ---
-            pw.Container(
-              padding: const pw.EdgeInsets.only(bottom: 20),
-              child: pw.Row(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Expanded(
-                    child: pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.Text(
-                          'PRONTUÁRIO MÉDICO VETERINÁRIO',
-                          style: pw.TextStyle(
-                            font: fonts.bold,
-                            fontSize: 10,
-                            color: _cyan,
-                            letterSpacing: 1.0,
-                          ),
-                        ),
-                        pw.SizedBox(height: 4),
-                        pw.Text(
-                          dog.name.toUpperCase(),
-                          style: pw.TextStyle(
-                            font: fonts.black,
-                            fontSize: 26,
-                            color: _textPrimary,
-                          ),
-                        ),
-                        pw.SizedBox(height: 6),
-                        pw.Text(
-                          'Raça: ${dog.breed}   |   Microchip: ${dog.microchip ?? "Não Informado"}',
-                          style: pw.TextStyle(
-                            font: fonts.regular,
-                            fontSize: 10,
-                            color: _textSecondary,
-                          ),
-                        ),
-                        pw.Text(
-                          'Matrícula: ${dog.registrationNumber ?? "Não Informado"}',
-                          style: pw.TextStyle(
-                            font: fonts.regular,
-                            fontSize: 9,
-                            color: _textTertiary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  pw.SizedBox(width: 20),
-                  // Status box
-                  pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    decoration: pw.BoxDecoration(
-                      color: isVaccineOk
-                          ? PdfInstitutionalColors.greenInstitutional.withAlpha(
-                              25 / 255,
-                            )
-                          : PdfInstitutionalColors.redAlert.withAlpha(25 / 255),
-                      border: pw.Border.all(
-                        color: isVaccineOk
-                            ? PdfInstitutionalColors.greenInstitutional
-                            : PdfInstitutionalColors.redAlert,
-                        width: 1.5,
-                      ),
-                      borderRadius: const pw.BorderRadius.all(
-                        pw.Radius.circular(8),
-                      ),
-                    ),
-                    child: pw.Column(
-                      children: [
-                        pw.Text(
-                          'STATUS GERAL',
-                          style: pw.TextStyle(
-                            font: fonts.bold,
-                            fontSize: 8,
-                            color: isVaccineOk
-                                ? PdfInstitutionalColors.greenInstitutional
-                                : PdfInstitutionalColors.redAlert,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        pw.SizedBox(height: 4),
-                        pw.Text(
-                          overallStatus,
-                          style: pw.TextStyle(
-                            font: fonts.black,
-                            fontSize: 12,
-                            color: isVaccineOk
-                                ? PdfInstitutionalColors.greenInstitutional
-                                : PdfInstitutionalColors.redAlert,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+    final auditRef = _buildAuditReference(dog);
+    final now = DateTime.now();
+    final docHash = sha256
+        .convert(utf8.encode('$docId|${dog.id}|${dog.name}|${now.toIso8601String()}'))
+        .toString();
 
-            PdfCommonWidgets.divider(),
+    final metadata = ReportMetadata(
+      generatedAt: now,
+      documentId: docId,
+      dogIdentity: '${dog.name} (${dog.breed})',
+      operatorName: dog.conductorRa != null ? 'Condutor RA: ${dog.conductorRa}' : null,
+      callsign: 'K9-CANIL',
+    );
 
-            // --- AVISO DE PRÓXIMAS DOSES / ALERTAS ---
-            _buildUpcomingAlert(vaccineLogs, fonts),
-
-            pw.SizedBox(height: 16),
-
-            // --- TABELA DE IMUNIZAÇÃO ---
-            PdfCommonWidgets.sectionTitle(
-              title: 'HISTÓRICO DE VACINAS E IMUNIZAÇÕES',
-              fonts: fonts,
-              color: _cyan,
-            ),
-            pw.SizedBox(height: 8),
-            _buildImmunizationTable(vaccineLogs, fonts),
-
-            pw.SizedBox(height: 24),
-
-            // --- BLOCO DE CONFORMIDADE E AUDITORIA (SEM HASH INJUSTIFICADO) ---
-            pw.Container(
-              padding: const pw.EdgeInsets.all(12),
-              decoration: pw.BoxDecoration(
-                color: _lightGray,
-                border: pw.Border.all(color: _cardBorder),
-                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-              ),
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Row(
-                    children: [
-                      pw.Container(
-                        width: 8,
-                        height: 8,
-                        decoration: pw.BoxDecoration(
-                          color: PdfInstitutionalColors.greenInstitutional,
-                          shape: pw.BoxShape.circle,
-                        ),
-                      ),
-                      pw.SizedBox(width: 8),
-                      pw.Text(
-                        'REGISTRO VERIFICADO & SINCRONIZADO',
-                        style: pw.TextStyle(
-                          font: fonts.bold,
-                          fontSize: 9,
-                          color: PdfInstitutionalColors.greenInstitutional,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                  pw.SizedBox(height: 6),
-                  pw.Text(
-                    'Este documento reflete em tempo real o prontuário de saúde do cão ${dog.name}, registrado e mantido pela equipe de condutores e veterinários do Canil K9 da GCM de Limeira. Todas as modificações no prontuário geram trilhas de auditoria imutáveis.',
-                    style: pw.TextStyle(
-                      font: fonts.regular,
-                      fontSize: 8.5,
-                      color: _textSecondary,
-                      lineSpacing: 1.3,
-                    ),
-                  ),
-                  pw.SizedBox(height: 8),
-                  pw.Row(
-                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                    children: [
-                      pw.Text(
-                        'Código de Rastreamento de Auditoria:',
-                        style: pw.TextStyle(
-                          font: fonts.regular,
-                          fontSize: 8,
-                          color: _textTertiary,
-                        ),
-                      ),
-                      pw.Text(
-                        _buildAuditReference(dog),
-                        style: pw.TextStyle(
-                          font: fonts.bold,
-                          fontSize: 8.5,
-                          color: _textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ];
-        },
+    final builder = ReportTemplateBuilder(
+      title: 'CARTEIRA DE VACINAÇÃO K9',
+      subtitle: 'REGISTRO SANITÁRIO E CONTROLE DE IMUNOBIOLÓGICOS',
+      category: 'PRONTUÁRIO MÉDICO VETERINÁRIO',
+      organization: 'CANIL DA GUARDA CIVIL MUNICIPAL DE LIMEIRA',
+      motto: 'DISCIPLINA · PROTEÇÃO · RESULTADO',
+      metadata: metadata,
+      statusLabel: overallStatus,
+      statusTone: overallTone,
+      useDarkFooter: true,
+      archetypeConfig: ReportArchetypeConfig(
+        archetype: ReportArchetype.clinical,
+        name: 'Carteira de Vacinação',
+        headerVariant: HeaderVariant.darkTactical,
       ),
     );
 
-    return pdf.save();
+    // 1. Card de Identidade Canina (com foto/avatar e tags de Cão de Trabalho)
+    builder.addWidget(
+      ReportPrimitives.entityIdentityBlock(
+        EntityIdentityData(
+          title: dog.name.toUpperCase(),
+          subtitle: 'Raça: ${dog.breed}',
+          tags: [
+            'CÃO DE TRABALHO',
+            if (dog.specialties != null) ...dog.specialties!,
+          ],
+          statusLabel: dog.status.toUpperCase(),
+          statusTone: dog.status.toLowerCase() == 'ativo'
+              ? ReportTone.positive
+              : ReportTone.neutral,
+          avatarPlaceholder: dog.name.isNotEmpty
+              ? dog.name.substring(0, dog.name.length >= 2 ? 2 : 1).toUpperCase()
+              : 'K9',
+          fields: [
+            EntityIdentityField(
+              label: 'Microchip',
+              value: dog.microchip ?? 'Não informado',
+              isMonospace: true,
+            ),
+            EntityIdentityField(
+              label: 'Matrícula',
+              value: dog.registrationNumber ?? 'Não informada',
+              isMonospace: true,
+            ),
+            EntityIdentityField(
+              label: 'Sexo',
+              value: dog.sex == 'M' ? 'Macho' : 'Fêmea',
+            ),
+            EntityIdentityField(
+              label: 'Nascimento',
+              value: DateFormat('dd/MM/yyyy').format(dog.dateOfBirth),
+              isMonospace: true,
+            ),
+            EntityIdentityField(
+              label: 'Condutor / Unidade',
+              value: dog.conductorRa != null ? 'RA ${dog.conductorRa}' : 'GCM Limeira',
+            ),
+            EntityIdentityField(
+              label: 'Peso Registrado',
+              value: dog.weight != null
+                  ? '${dog.weight!.toStringAsFixed(1)} kg'
+                  : 'Não informado',
+            ),
+          ],
+        ),
+        fonts,
+      ),
+    );
+
+    // 2. Cards de Métricas / KPI (Total de Doses, Status Geral, Próxima Dose)
+    final nextUpcoming = _findNextUpcomingDate(vaccineLogs);
+    builder.addWidget(
+      pw.Row(
+        children: [
+          pw.Expanded(
+            child: ReportPrimitives.metricCard(
+              MetricCardData(
+                label: 'Total de Vacinas',
+                value: '${vaccineLogs.length}',
+                unit: 'aplicações',
+                tone: ReportTone.neutral,
+              ),
+              fonts,
+            ),
+          ),
+          pw.SizedBox(width: 8),
+          pw.Expanded(
+            child: ReportPrimitives.metricCard(
+              MetricCardData(
+                label: 'Status Geral',
+                value: overallStatus,
+                tone: overallTone,
+              ),
+              fonts,
+            ),
+          ),
+          pw.SizedBox(width: 8),
+          pw.Expanded(
+            child: ReportPrimitives.metricCard(
+              MetricCardData(
+                label: 'Próxima Revacinação',
+                value: nextUpcoming != null
+                    ? DateFormat('dd/MM/yy').format(nextUpcoming)
+                    : (vaccineLogs.isNotEmpty ? 'Em dia' : '—'),
+                tone: ReportTone.info,
+              ),
+              fonts,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    builder.addWidget(pw.SizedBox(height: ReportSpacing.sm));
+
+    // 3. Banner de Alertas / Próximas Doses
+    builder.addWidget(_buildUpcomingAlertWidget(vaccineLogs, fonts));
+
+    builder.addWidget(pw.SizedBox(height: ReportSpacing.sm));
+
+    // 4. Seção Estilizada: Histórico de Imunizações
+    builder.addWidget(
+      ReportPrimitives.styledSectionTitle(
+        'HISTÓRICO DE VACINAS E IMUNIZAÇÕES',
+        fonts,
+        iconText: 'VAC',
+        subtitle: 'Registro cronológico de vacinas aplicadas com rastreabilidade de lote e CRMV',
+      ),
+    );
+
+    // 5. Tabela Rica de Vacinações com zebra e status
+    builder.addWidget(_buildImmunizationTable(vaccineLogs, fonts));
+
+    builder.addWidget(pw.SizedBox(height: ReportSpacing.md));
+
+    // 6. Bloco de Auditoria e Verificação Técnica
+    builder.addWidget(
+      ReportPrimitives.auditBlock(
+        AuditData(
+          verificationUrl: 'https://k9ops.com/v/$docId',
+          hash: docHash,
+          algorithm: 'SHA-256',
+          documentId: docId,
+          trackingCode: auditRef,
+          description:
+              'Este documento reflete em tempo real o prontuário de saúde do cão ${dog.name}, registrado e mantido pela equipe de condutores e veterinários do Canil K9 da GCM de Limeira. Todas as modificações no prontuário geram trilhas de auditoria imutáveis.',
+        ),
+        fonts,
+      ),
+    );
+
+    return builder.buildPdf(customFonts: fonts);
   }
 
-  /// Gera um ID de documento único estruturado.
+  /// Gera um ID de documento estruturado único.
   static String _buildDocId(Dog dog) {
     final year = DateTime.now().year;
     final month = DateTime.now().month.toString().padLeft(2, '0');
@@ -266,7 +214,7 @@ class VaccinationPdf {
     return 'VAC: $year/$month/$seq-K9';
   }
 
-  /// Gera uma referência de auditoria baseada no ID do cão e no timestamp atual.
+  /// Gera uma referência de rastreamento de auditoria baseada no ID do cão.
   static String _buildAuditReference(Dog dog) {
     final dogPart = dog.id.length >= 6
         ? dog.id.substring(0, 6).toUpperCase()
@@ -294,8 +242,23 @@ class VaccinationPdf {
     return hasExpired ? 'VENCIDA' : 'EM DIA';
   }
 
-  /// Constrói o alerta de próximas doses.
-  static pw.Widget _buildUpcomingAlert(
+  /// Localiza a data da próxima dose futura mais próxima.
+  static DateTime? _findNextUpcomingDate(List<HealthLogModel> logs) {
+    DateTime? next;
+    final now = DateTime.now();
+    for (final log in logs) {
+      final due = log.nextDueDate ?? log.date.add(const Duration(days: 365));
+      if (due.isAfter(now)) {
+        if (next == null || due.isBefore(next)) {
+          next = due;
+        }
+      }
+    }
+    return next;
+  }
+
+  /// Constrói o widget de resumo e alerta de próximas doses.
+  static pw.Widget _buildUpcomingAlertWidget(
     List<HealthLogModel> logs,
     PdfFonts fonts,
   ) {
@@ -312,6 +275,7 @@ class VaccinationPdf {
       }
     }
 
+    bool hasOverdue = false;
     for (final entry in latestByType.entries) {
       final log = entry.value;
       final nextDue =
@@ -319,6 +283,7 @@ class VaccinationPdf {
       final diffDays = nextDue.difference(now).inDays;
 
       if (diffDays <= 30) {
+        if (diffDays < 0) hasOverdue = true;
         upcoming.add({
           'name': entry.key,
           'dueDate': nextDue,
@@ -328,257 +293,115 @@ class VaccinationPdf {
     }
 
     if (upcoming.isEmpty) {
-      return pw.Container(
-        width: double.infinity,
-        padding: const pw.EdgeInsets.all(10),
-        decoration: pw.BoxDecoration(
-          color: PdfInstitutionalColors.greenInstitutional.withAlpha(15 / 255),
-          border: pw.Border.all(
-            color: PdfInstitutionalColors.greenInstitutional.withAlpha(
-              50 / 255,
-            ),
-          ),
-          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-        ),
-        child: pw.Row(
-          children: [
-            pw.Container(
-              width: 6,
-              height: 6,
-              decoration: pw.BoxDecoration(
-                color: PdfInstitutionalColors.greenInstitutional,
-                shape: pw.BoxShape.circle,
-              ),
-            ),
-            pw.SizedBox(width: 8),
-            pw.Text(
+      return ReportPrimitives.summaryCard(
+        const SummaryCardData(
+          title: 'CONFORMIDADE SANITÁRIA OPERACIONAL',
+          description:
               'Todas as vacinações do cão estão em dia e com conformidade operacional.',
-              style: pw.TextStyle(
-                font: fonts.bold,
-                fontSize: 9,
-                color: PdfInstitutionalColors.greenInstitutional,
-              ),
-            ),
-          ],
+          tone: ReportTone.positive,
         ),
+        fonts,
       );
     }
 
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: upcoming.map((alert) {
-        final overdue = alert['diffDays'] < 0;
-        final days = (alert['diffDays'] as int).abs();
-        final text = overdue
-            ? 'A vacina ${alert['name']} está VENCIDA há $days dia(s) (${DateFormat('dd/MM/yyyy').format(alert['dueDate'])}).'
-            : 'A vacina ${alert['name']} vencerá em $days dia(s) (${DateFormat('dd/MM/yyyy').format(alert['dueDate'])}).';
+    final alertBullets = upcoming.map((alert) {
+      final overdue = alert['diffDays'] < 0;
+      final days = (alert['diffDays'] as int).abs();
+      final dateStr = DateFormat('dd/MM/yyyy').format(alert['dueDate']);
+      return overdue
+          ? 'Vacina ${alert['name']}: VENCIDA há $days dia(s) (venceu em $dateStr).'
+          : 'Vacina ${alert['name']}: Vencerá em $days dia(s) (data limite: $dateStr).';
+    }).toList();
 
-        final color = overdue
-            ? PdfInstitutionalColors.redAlert
-            : PdfInstitutionalColors.amberWarning;
-
-        return pw.Container(
-          width: double.infinity,
-          margin: const pw.EdgeInsets.only(bottom: 6),
-          padding: const pw.EdgeInsets.all(10),
-          decoration: pw.BoxDecoration(
-            color: color.withAlpha(15 / 255),
-            border: pw.Border.all(color: color.withAlpha(50 / 255)),
-            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-          ),
-          child: pw.Row(
-            children: [
-              pw.Container(
-                width: 6,
-                height: 6,
-                decoration: pw.BoxDecoration(
-                  color: color,
-                  shape: pw.BoxShape.circle,
-                ),
-              ),
-              pw.SizedBox(width: 8),
-              pw.Expanded(
-                child: pw.Text(
-                  text,
-                  style: pw.TextStyle(
-                    font: fonts.bold,
-                    fontSize: 9,
-                    color: color,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
+    return ReportPrimitives.summaryCard(
+      SummaryCardData(
+        title: hasOverdue
+            ? 'ALERTA SANITÁRIO — DOSES VENCIDAS'
+            : 'AVISO PREVENTIVO — REVACINAÇÕES PRÓXIMAS',
+        description:
+            'Acompanhamento preventivo de imunobiológicos exigidos para atividades do cão:',
+        bulletItems: alertBullets,
+        tone: hasOverdue ? ReportTone.critical : ReportTone.attention,
+      ),
+      fonts,
     );
   }
 
-  /// Constrói a tabela de histórico de imunizações.
+  /// Constrói a tabela rica de histórico de imunizações.
   static pw.Widget _buildImmunizationTable(
     List<HealthLogModel> logs,
     PdfFonts fonts,
   ) {
     if (logs.isEmpty) {
-      return pw.Container(
-        height: 80,
-        alignment: pw.Alignment.center,
-        decoration: pw.BoxDecoration(
-          border: pw.Border.all(color: _cardBorder),
-          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+      return ReportPrimitives.observationBlock(
+        const ObservationBlockData(
+          title: 'Histórico de Vacinação',
+          text: 'Nenhuma vacina cadastrada no histórico médico deste cão.',
         ),
-        child: pw.Text(
-          'Nenhuma vacina cadastrada no histórico médico deste cão.',
-          style: pw.TextStyle(
-            font: fonts.regular,
-            fontSize: 10,
-            color: _textTertiary,
-          ),
-        ),
+        fonts,
       );
     }
 
-    final headers = [
-      'Vacina',
-      'Aplicação',
-      'Validade / Próx. Dose',
-      'Veterinário / CRMV',
-      'Status',
+    final columns = const [
+      DataTableColumn(header: 'Vacina', flex: 2.0),
+      DataTableColumn(header: 'Lote / Fabricante', flex: 1.6),
+      DataTableColumn(
+        header: 'Aplicação',
+        alignment: DataTableCellAlignment.center,
+        isMonospace: true,
+        flex: 1.1,
+      ),
+      DataTableColumn(
+        header: 'Validade / Próx. Dose',
+        alignment: DataTableCellAlignment.center,
+        isMonospace: true,
+        flex: 1.3,
+      ),
+      DataTableColumn(header: 'Veterinário / CRMV', flex: 2.2),
+      DataTableColumn(
+        header: 'Status',
+        alignment: DataTableCellAlignment.center,
+        flex: 1.0,
+      ),
     ];
+
     final now = DateTime.now();
 
-    return pw.Table(
-      border: pw.TableBorder.all(color: _cardBorder, width: 0.5),
-      columnWidths: const {
-        0: pw.FlexColumnWidth(2.0),
-        1: pw.FlexColumnWidth(1.2),
-        2: pw.FlexColumnWidth(1.5),
-        3: pw.FlexColumnWidth(2.5),
-        4: pw.FlexColumnWidth(1.0),
-      },
-      children: [
-        // Table Header
-        pw.TableRow(
-          decoration: pw.BoxDecoration(color: _cyan),
-          children: headers.map((header) {
-            return pw.Container(
-              padding: const pw.EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 8,
-              ),
-              alignment: pw.Alignment.centerLeft,
-              child: pw.Text(
-                header,
-                style: pw.TextStyle(
-                  font: fonts.bold,
-                  fontSize: 9,
-                  color: PdfInstitutionalColors.white,
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-        // Table Rows
-        ...List.generate(logs.length, (index) {
-          final log = logs[index];
-          final vaccineName = log.subtype ?? 'Vacina Geral';
-          final appDate = DateFormat('dd/MM/yyyy').format(log.date);
-          final nextDue =
-              log.nextDueDate ?? log.date.add(const Duration(days: 365));
-          final nextDueDateStr = DateFormat('dd/MM/yyyy').format(nextDue);
+    final rows = logs.map((log) {
+      final vaccineName = log.subtype ?? 'Vacina Geral';
+      final appDate = DateFormat('dd/MM/yyyy').format(log.date);
+      final nextDue =
+          log.nextDueDate ?? log.date.add(const Duration(days: 365));
+      final nextDueDateStr = DateFormat('dd/MM/yyyy').format(nextDue);
 
-          final isOverdue = now.isAfter(nextDue);
-          final statusStr = isOverdue ? 'Vencido' : 'OK';
-          final statusColor = isOverdue
-              ? PdfInstitutionalColors.redAlert
-              : PdfInstitutionalColors.greenInstitutional;
+      final isOverdue = now.isAfter(nextDue);
+      final statusStr = isOverdue ? 'Vencido' : 'OK';
+      final statusTone = isOverdue ? ReportTone.critical : ReportTone.positive;
 
-          final vetName = log.vetName ?? 'Não Informado';
-          final crmv = log.professionalCrmv != null
-              ? ' (CRMV: ${log.professionalCrmv})'
-              : '';
-          final vetInfo = '$vetName$crmv';
+      final vetName = log.vetName ?? 'Não Informado';
+      final crmv = log.professionalCrmv != null && log.professionalCrmv!.isNotEmpty
+          ? 'CRMV: ${log.professionalCrmv}'
+          : (log.professionalClinic ?? 'GCM Limeira');
 
-          final isRowOdd = index.isOdd;
-          final rowBg = isRowOdd ? _lightGray : PdfInstitutionalColors.white;
+      final loteStr = log.healthObservations.trim().isNotEmpty
+          ? log.healthObservations.trim()
+          : (log.professionalClinic ?? 'Conforme protocolo');
 
-          return pw.TableRow(
-            decoration: pw.BoxDecoration(color: rowBg),
-            children: [
-              pw.Container(
-                padding: const pw.EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 8,
-                ),
-                child: pw.Text(
-                  vaccineName,
-                  style: pw.TextStyle(
-                    font: fonts.bold,
-                    fontSize: 8.5,
-                    color: _textPrimary,
-                  ),
-                ),
-              ),
-              pw.Container(
-                padding: const pw.EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 8,
-                ),
-                child: pw.Text(
-                  appDate,
-                  style: pw.TextStyle(
-                    font: fonts.regular,
-                    fontSize: 8.5,
-                    color: _textSecondary,
-                  ),
-                ),
-              ),
-              pw.Container(
-                padding: const pw.EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 8,
-                ),
-                child: pw.Text(
-                  nextDueDateStr,
-                  style: pw.TextStyle(
-                    font: fonts.regular,
-                    fontSize: 8.5,
-                    color: _textSecondary,
-                  ),
-                ),
-              ),
-              pw.Container(
-                padding: const pw.EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 8,
-                ),
-                child: pw.Text(
-                  vetInfo,
-                  style: pw.TextStyle(
-                    font: fonts.regular,
-                    fontSize: 8,
-                    color: _textSecondary,
-                  ),
-                ),
-              ),
-              pw.Container(
-                padding: const pw.EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 8,
-                ),
-                child: pw.Text(
-                  statusStr,
-                  style: pw.TextStyle(
-                    font: fonts.bold,
-                    fontSize: 8.5,
-                    color: statusColor,
-                  ),
-                ),
-              ),
-            ],
-          );
-        }),
-      ],
+      return RichDataTableRow(
+        cells: [
+          RichTableCell.text(vaccineName, isBold: true),
+          RichTableCell.text(loteStr),
+          RichTableCell.text(appDate, isMonospace: true),
+          RichTableCell.text(nextDueDateStr, isMonospace: true),
+          RichTableCell.twoLine(text: vetName, secondaryText: crmv),
+          RichTableCell.badge(badgeText: statusStr, badgeTone: statusTone),
+        ],
+      );
+    }).toList();
+
+    return ReportPrimitives.richDataTable(
+      RichDataTableData(columns: columns, rows: rows),
+      fonts,
     );
   }
 }

@@ -19,6 +19,10 @@ class ReportTemplateBuilder {
   final ReportMetadata metadata;
   final ReportBranding branding;
   final ReportArchetypeConfig archetypeConfig;
+  final String? motto;
+  final bool useDarkFooter;
+  final String? statusLabel;
+  final ReportTone? statusTone;
 
   final List<pw.Widget> _contentWidgets = [];
 
@@ -31,6 +35,10 @@ class ReportTemplateBuilder {
     required this.metadata,
     this.branding = const ReportBranding(),
     ReportArchetypeConfig? archetypeConfig,
+    this.motto,
+    this.useDarkFooter = false,
+    this.statusLabel,
+    this.statusTone,
   }) : archetypeConfig = archetypeConfig ?? ReportArchetypeConfig.operational();
 
   /// Construtor de conveniência por arquétipo.
@@ -105,7 +113,14 @@ class ReportTemplateBuilder {
           if (context.pageNumber == 1) {
             return pw.SizedBox.shrink();
           }
-          // Nas páginas 2..N, cabeçalho compacto de continuação
+          // Nas páginas 2..N, cabeçalho de continuação apropriado
+          if (archetypeConfig.headerVariant == HeaderVariant.darkTactical) {
+            return ReportPrimitives.darkCompactContinuationHeader(
+              title: title,
+              documentId: metadata.documentId,
+              fonts: fonts,
+            );
+          }
           return ReportPrimitives.compactContinuationHeader(
             title: title,
             documentId: metadata.documentId,
@@ -113,6 +128,15 @@ class ReportTemplateBuilder {
           );
         },
         footer: (context) {
+          if (useDarkFooter) {
+            return ReportPrimitives.darkReportFooter(
+              context,
+              title: title,
+              documentId: metadata.documentId,
+              disclaimer: disclaimer,
+              fonts: fonts,
+            );
+          }
           return ReportPrimitives.reportFooter(
             context,
             title: title,
@@ -156,6 +180,22 @@ class ReportTemplateBuilder {
                   title: title,
                   documentId: metadata.documentId,
                   fonts: fonts,
+                ),
+              );
+              break;
+            case HeaderVariant.darkTactical:
+              pageContent.add(
+                ReportPrimitives.darkTacticalHeader(
+                  title: title,
+                  subtitle: subtitle,
+                  organization: organization,
+                  category: category,
+                  motto: motto,
+                  metadata: metadata,
+                  branding: branding,
+                  fonts: fonts,
+                  statusLabel: statusLabel,
+                  statusTone: statusTone,
                 ),
               );
               break;

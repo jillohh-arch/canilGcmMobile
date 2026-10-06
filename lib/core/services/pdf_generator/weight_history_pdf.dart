@@ -1,12 +1,14 @@
+import 'dart:convert';
 import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import 'package:canil_gcm/features/dogs/domain/dog.dart';
 import 'package:canil_gcm/features/health/domain/health_log_model.dart';
-import 'pdf_colors.dart';
 import 'pdf_common_widgets.dart';
+import 'template/template.dart';
 
 /// Estado canônico da autoridade de peso, transportado para o documento.
 ///
@@ -205,15 +207,8 @@ final class WeightPdfSummary {
   final bool isConclusive;
 }
 
-/// Gerador do PDF do Histórico de Peso do Cão.
+/// Gerador do PDF do Histórico de Peso do Cão baseado na Foundation F70 Oficial.
 class WeightHistoryPdf {
-  static final _blue = PdfInstitutionalColors.blue;
-  static final _textPrimary = PdfInstitutionalColors.textPrimary;
-  static final _textSecondary = PdfInstitutionalColors.textSecondary;
-  static final _textTertiary = PdfInstitutionalColors.textTertiary;
-  static final _lightGray = PdfInstitutionalColors.lightGray;
-  static final _cardBorder = PdfInstitutionalColors.cardBorder;
-
   /// Gera os bytes do PDF de histórico de peso.
   ///
   /// [authority] transporta a decisão da `WeightCollectionPolicy` — os quatro
@@ -230,28 +225,16 @@ class WeightHistoryPdf {
     required WeightPdfAuthority authority,
   }) async {
     final fonts = await PdfFonts.load();
-    final pdf = pw.Document(
-      author: 'Canil K9 GCM Limeira',
-      title: 'Historico de Peso - ${dog.name}',
-      theme: fonts.toThemeData(),
-    );
 
-    // Filter weight-related logs
-    final weightLogs =
-        logs.where((log) => log.dogId == dog.id && log.weight != null).toList()
-          ..sort((a, b) => b.date.compareTo(a.date)); // Newest first
+    // Filtra logs de pesagem do cão (mais recentes primeiro)
+    final weightLogs = logs
+        .where((log) => log.dogId == dog.id && log.weight != null)
+        .toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
 
     final docId = _buildDocId(dog);
 
     // Estatísticas derivadas SOMENTE de pesagens factuais (WEIGHT-01E-C2B).
-    //
-    // Antes, sem registros, `current` caía em `dog.weight ?? 0.0` e propagava
-    // para mínimo/médio/máximo — produzindo estatística clínica inexistente
-    // (inclusive 0,0 kg) em documento exportado. `dogs.weight` é projeção
-    // legada, não evidência de pesagem.
-    //
-    // Estas são estatísticas DESCRITIVAS do conjunto exibido: `reduce` sobre
-    // min/max/avg não elege peso atual nem endpoint de tendência.
     final weights = weightLogs.map((l) => l.weight!).toList();
     final summary = WeightPdfSummary.from(
       authority: authority,
@@ -273,239 +256,229 @@ class WeightHistoryPdf {
 
     final trendText = summary.trendText;
     final rangeStatus = summary.rangeStatus;
-    final PdfColor rangeColor = switch (rangeStatus) {
-      'DENTRO DA FAIXA IDEAL' => PdfInstitutionalColors.greenInstitutional,
-      'ABAIXO DO PESO IDEAL' => PdfInstitutionalColors.amberWarning,
-      'ACIMA DO PESO IDEAL' => PdfInstitutionalColors.redAlert,
-      _ => _textTertiary,
+    final ReportTone rangeTone = switch (rangeStatus) {
+      'DENTRO DA FAIXA IDEAL' => ReportTone.positive,
+      'ABAIXO DO PESO IDEAL' => ReportTone.attention,
+      'ACIMA DO PESO IDEAL' => ReportTone.critical,
+      _ => ReportTone.neutral,
     };
 
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.symmetric(horizontal: 40, vertical: 40),
-        header: (context) => PdfCommonWidgets.pageHeader(
-          docType: 'HISTÓRICO DE PESO K9',
-          docId: docId,
-          fonts: fonts,
-          color: _blue,
+    final auditRef = _buildAuditReference(dog);
+    final now = DateTime.now();
+    final docHash = sha256
+        .convert(utf8.encode('$docId|${dog.id}|${dog.name}|${now.toIso8601String()}'))
+        .toString();
+
+    final metadata = ReportMetadata(
+      generatedAt: now,
+      documentId: docId,
+      dogIdentity: '${dog.name} (${dog.breed})',
+      operatorName: dog.conductorRa != null ? 'Condutor RA: ${dog.conductorRa}' : null,
+      callsign: 'K9-CANIL',
+    );
+
+    final builder = ReportTemplateBuilder(
+      title: 'HISTÓRICO DE PESO K9',
+      subtitle: 'ACOMPANHAMENTO BIOESTATÍSTICO E CONDICIONAMENTO FÍSICO',
+      category: 'AVALIAÇÃO PONDERAL K9',
+      organization: 'CANIL DA GUARDA CIVIL MUNICIPAL DE LIMEIRA',
+      motto: 'DISCIPLINA · PROTEÇÃO · RESULTADO',
+      metadata: metadata,
+      statusLabel: rangeStatus,
+      statusTone: rangeTone,
+      useDarkFooter: true,
+      archetypeConfig: ReportArchetypeConfig.clinicalTactical(),
+    );
+
+    // 1. Card de Identidade Canina (com foto/avatar e tags de Cão de Trabalho)
+    builder.addWidget(
+      ReportPrimitives.entityIdentityBlock(
+        EntityIdentityData(
+          title: dog.name.toUpperCase(),
+          subtitle: 'Raça: ${dog.breed}',
+          tags: [
+            'CÃO DE TRABALHO',
+            if (dog.specialties != null) ...dog.specialties!,
+          ],
+          statusLabel: dog.status.toUpperCase(),
+          statusTone: dog.status.toLowerCase() == 'ativo'
+              ? ReportTone.positive
+              : ReportTone.neutral,
+          avatarPlaceholder: dog.name.isNotEmpty
+              ? dog.name.substring(0, dog.name.length >= 2 ? 2 : 1).toUpperCase()
+              : 'K9',
+          fields: [
+            EntityIdentityField(
+              label: 'Microchip',
+              value: dog.microchip ?? 'Não informado',
+              isMonospace: true,
+            ),
+            EntityIdentityField(
+              label: 'Matrícula',
+              value: dog.registrationNumber ?? 'Não informada',
+              isMonospace: true,
+            ),
+            EntityIdentityField(
+              label: 'Sexo',
+              value: dog.sex == 'M' ? 'Macho' : 'Fêmea',
+            ),
+            EntityIdentityField(
+              label: 'Total de Pesagens',
+              value: '$count registradas',
+            ),
+            EntityIdentityField(
+              label: 'Faixa Ideal Configurada',
+              value: dog.idealWeightMin != null && dog.idealWeightMax != null
+                  ? '${dog.idealWeightMin!.toStringAsFixed(1)} kg a ${dog.idealWeightMax!.toStringAsFixed(1)} kg'
+                  : 'Não configurada',
+            ),
+            EntityIdentityField(
+              label: 'Condutor / Unidade',
+              value: dog.conductorRa != null ? 'RA ${dog.conductorRa}' : 'GCM Limeira',
+            ),
+          ],
         ),
-        footer: (context) => PdfCommonWidgets.pageFooter(
-          context: context,
-          docType: 'Histórico de Peso',
-          fonts: fonts,
-        ),
-        build: (context) {
-          return [
-            // --- CAPA / CABEÇALHO DO RELATÓRIO ---
-            pw.Container(
-              padding: const pw.EdgeInsets.only(bottom: 20),
-              child: pw.Row(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Expanded(
-                    child: pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.Text(
-                          'ACOMPANHAMENTO BIOESTATÍSTICO K9',
-                          style: pw.TextStyle(
-                            font: fonts.bold,
-                            fontSize: 10,
-                            color: _blue,
-                            letterSpacing: 1.0,
-                          ),
-                        ),
-                        pw.SizedBox(height: 4),
-                        pw.Text(
-                          dog.name.toUpperCase(),
-                          style: pw.TextStyle(
-                            font: fonts.black,
-                            fontSize: 26,
-                            color: _textPrimary,
-                          ),
-                        ),
-                        pw.SizedBox(height: 6),
-                        pw.Text(
-                          'Raça: ${dog.breed}   |   Total de Pesagens: $count',
-                          style: pw.TextStyle(
-                            font: fonts.regular,
-                            fontSize: 10,
-                            color: _textSecondary,
-                          ),
-                        ),
-                        if (dog.idealWeightMin != null &&
-                            dog.idealWeightMax != null)
-                          pw.Text(
-                            'Peso Ideal Configurado: ${dog.idealWeightMin!.toStringAsFixed(1)} kg a ${dog.idealWeightMax!.toStringAsFixed(1)} kg',
-                            style: pw.TextStyle(
-                              font: fonts.regular,
-                              fontSize: 9,
-                              color: _textTertiary,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  pw.SizedBox(width: 20),
-                  // Current Status Box
-                  pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    decoration: pw.BoxDecoration(
-                      color: rangeColor.withAlpha(25),
-                      border: pw.Border.all(color: rangeColor, width: 1.5),
-                      borderRadius: const pw.BorderRadius.all(
-                        pw.Radius.circular(8),
-                      ),
-                    ),
-                    child: pw.Column(
-                      children: [
-                        pw.Text(
-                          'CONDIÇÃO FÍSICA',
-                          style: pw.TextStyle(
-                            font: fonts.bold,
-                            fontSize: 8,
-                            color: rangeColor,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        pw.SizedBox(height: 4),
-                        pw.Text(
-                          rangeStatus,
-                          style: pw.TextStyle(
-                            font: fonts.black,
-                            fontSize: 10,
-                            color: rangeColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            PdfCommonWidgets.divider(),
-
-            // --- 4 QUADROS DE ESTATÍSTICA ---
-            pw.Row(
-              children: [
-                _buildStatBox(
-                  'PESO ATUAL',
-                  _statLabel(current),
-                  fonts,
-                  isPrimary: true,
-                ),
-                pw.SizedBox(width: 8),
-                _buildStatBox('MÍNIMO', _statLabel(min), fonts),
-                pw.SizedBox(width: 8),
-                _buildStatBox('MÉDIO', _statLabel(avg), fonts),
-                pw.SizedBox(width: 8),
-                _buildStatBox('MÁXIMO', _statLabel(max), fonts),
-              ],
-            ),
-
-            pw.SizedBox(height: 20),
-
-            // --- ANÁLISE CLÍNICA ---
-            PdfCommonWidgets.sectionTitle(
-              title: 'AVALIAÇÃO DE DESEMPENHO FÍSICO E TENDÊNCIA',
-              fonts: fonts,
-              color: _blue,
-            ),
-            pw.SizedBox(height: 8),
-            _buildClinicalAnalysis(summary, trendText, rangeColor, fonts),
-
-            pw.SizedBox(height: 20),
-
-            // --- TABELA DE PESAGENS ---
-            PdfCommonWidgets.sectionTitle(
-              title: 'REGISTROS CRONOLÓGICOS DE PESAGEM',
-              fonts: fonts,
-              color: _blue,
-            ),
-            pw.SizedBox(height: 8),
-            _buildWeightTable(weightLogs, fonts),
-
-            pw.SizedBox(height: 24),
-
-            // --- BLOCO DE CONFORMIDADE E AUDITORIA (SEM HASH INJUSTIFICADO) ---
-            pw.Container(
-              padding: const pw.EdgeInsets.all(12),
-              decoration: pw.BoxDecoration(
-                color: _lightGray,
-                border: pw.Border.all(color: _cardBorder),
-                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-              ),
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Row(
-                    children: [
-                      pw.Container(
-                        width: 8,
-                        height: 8,
-                        decoration: pw.BoxDecoration(
-                          color: PdfInstitutionalColors.greenInstitutional,
-                          shape: pw.BoxShape.circle,
-                        ),
-                      ),
-                      pw.SizedBox(width: 8),
-                      pw.Text(
-                        'REGISTRO VERIFICADO & SINCRONIZADO',
-                        style: pw.TextStyle(
-                          font: fonts.bold,
-                          fontSize: 9,
-                          color: PdfInstitutionalColors.greenInstitutional,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                  pw.SizedBox(height: 6),
-                  pw.Text(
-                    'Este documento reflete em tempo real o histórico ponderal do cão ${dog.name}, registrado e mantido pela equipe de condutores e veterinários do Canil K9 da GCM de Limeira. Todas as modificações no prontuário geram trilhas de auditoria imutáveis.',
-                    style: pw.TextStyle(
-                      font: fonts.regular,
-                      fontSize: 8.5,
-                      color: _textSecondary,
-                      lineSpacing: 1.3,
-                    ),
-                  ),
-                  pw.SizedBox(height: 8),
-                  pw.Row(
-                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                    children: [
-                      pw.Text(
-                        'Código de Rastreamento de Auditoria:',
-                        style: pw.TextStyle(
-                          font: fonts.regular,
-                          fontSize: 8,
-                          color: _textTertiary,
-                        ),
-                      ),
-                      pw.Text(
-                        _buildAuditReference(dog),
-                        style: pw.TextStyle(
-                          font: fonts.bold,
-                          fontSize: 8.5,
-                          color: _textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ];
-        },
+        fonts,
       ),
     );
 
-    return pdf.save();
+    // 2. 4 Quadros de Estatística / Métricas (PESO ATUAL, MÍNIMO, MÉDIO, MÁXIMO)
+    builder.addWidget(
+      pw.Row(
+        children: [
+          pw.Expanded(
+            child: ReportPrimitives.metricCard(
+              MetricCardData(
+                label: 'Peso Atual',
+                value: _statLabel(current),
+                tone: summary.isConclusive ? ReportTone.info : ReportTone.neutral,
+              ),
+              fonts,
+            ),
+          ),
+          pw.SizedBox(width: 8),
+          pw.Expanded(
+            child: ReportPrimitives.metricCard(
+              MetricCardData(
+                label: 'Mínimo',
+                value: _statLabel(min),
+                tone: ReportTone.neutral,
+              ),
+              fonts,
+            ),
+          ),
+          pw.SizedBox(width: 8),
+          pw.Expanded(
+            child: ReportPrimitives.metricCard(
+              MetricCardData(
+                label: 'Médio',
+                value: _statLabel(avg),
+                tone: ReportTone.neutral,
+              ),
+              fonts,
+            ),
+          ),
+          pw.SizedBox(width: 8),
+          pw.Expanded(
+            child: ReportPrimitives.metricCard(
+              MetricCardData(
+                label: 'Máximo',
+                value: _statLabel(max),
+                tone: ReportTone.neutral,
+              ),
+              fonts,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    builder.addWidget(pw.SizedBox(height: ReportSpacing.sm));
+
+    // 3. Análise Clínica e Tendência guiada por WeightPdfSummary
+    builder.addWidget(
+      ReportPrimitives.styledSectionTitle(
+        'AVALIAÇÃO DE DESEMPENHO FÍSICO E TENDÊNCIA',
+        fonts,
+        iconText: 'BIO',
+        subtitle: 'Análise bioestatística autoritativa baseada na série temporal de pesagens',
+      ),
+    );
+
+    builder.addWidget(
+      ReportPrimitives.summaryCard(
+        SummaryCardData(
+          title: 'Tendência Ponderal: $trendText',
+          description: summary.analysisMessage,
+          bulletItems: [
+            'Classificação: $rangeStatus',
+            if (summary.isConclusive && count >= 2)
+              'Avaliação baseada no extremo canônico de comparação da série histórica.',
+          ],
+          tone: rangeTone,
+        ),
+        fonts,
+      ),
+    );
+
+    builder.addWidget(pw.SizedBox(height: ReportSpacing.sm));
+
+    // 4. Gráfico de Evolução Ponderal K9
+    builder.addWidget(
+      ReportPrimitives.styledSectionTitle(
+        'EVOLUÇÃO PONDERAL (GRÁFICO)',
+        fonts,
+        iconText: 'EVO',
+        subtitle: 'Curva temporal de pesagens com faixa ideal operacional',
+      ),
+    );
+
+    final chartPoints = weightLogs.reversed
+        .map((l) => WeightChartPoint(date: l.date, weight: l.weight!))
+        .toList();
+
+    builder.addWidget(
+      ReportPrimitives.weightTrendChart(
+        points: chartPoints,
+        idealMin: dog.idealWeightMin,
+        idealMax: dog.idealWeightMax,
+        fonts: fonts,
+      ),
+    );
+
+    builder.addWidget(pw.SizedBox(height: ReportSpacing.sm));
+
+    // 5. Tabela Rica de Pesagens Cronológicas com zebra
+    builder.addWidget(
+      ReportPrimitives.styledSectionTitle(
+        'REGISTROS CRONOLÓGICOS DE PESAGEM',
+        fonts,
+        iconText: 'LOG',
+        subtitle: 'Histórico factual completo registrado pela equipe técnica',
+      ),
+    );
+
+    builder.addWidget(_buildWeightTable(weightLogs, fonts));
+
+    builder.addWidget(pw.SizedBox(height: ReportSpacing.md));
+
+    // 6. Bloco de Auditoria e Verificação Técnica
+    builder.addWidget(
+      ReportPrimitives.auditBlock(
+        AuditData(
+          verificationUrl: 'https://k9ops.com/v/$docId',
+          hash: docHash,
+          algorithm: 'SHA-256',
+          documentId: docId,
+          trackingCode: auditRef,
+          description:
+              'Este documento reflete em tempo real o histórico ponderal do cão ${dog.name}, registrado e mantido pela equipe de condutores e veterinários do Canil K9 da GCM de Limeira. Todas as modificações no prontuário geram trilhas de auditoria imutáveis.',
+        ),
+        fonts,
+      ),
+    );
+
+    return builder.buildPdf(customFonts: fonts);
   }
 
   /// Gera um ID de documento único estruturado.
@@ -530,274 +503,99 @@ class WeightHistoryPdf {
     return 'AUDIT-$dogPart-$truncatedTime';
   }
 
-  /// Caixa estatística.
-  static pw.Widget _buildStatBox(
-    String label,
-    String value,
-    PdfFonts fonts, {
-    bool isPrimary = false,
-  }) {
-    return pw.Expanded(
-      child: pw.Container(
-        padding: const pw.EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-        decoration: pw.BoxDecoration(
-          color: isPrimary ? _blue.withAlpha(20) : _lightGray,
-          border: pw.Border.all(
-            color: isPrimary ? _blue : _cardBorder,
-            width: 1,
-          ),
-          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-        ),
-        child: pw.Column(
-          children: [
-            pw.Text(
-              label,
-              style: pw.TextStyle(
-                font: fonts.bold,
-                fontSize: 8,
-                color: isPrimary ? _blue : _textTertiary,
-                letterSpacing: 0.5,
-              ),
-            ),
-            pw.SizedBox(height: 4),
-            pw.Text(
-              value,
-              style: pw.TextStyle(
-                font: fonts.black,
-                fontSize: 13,
-                color: isPrimary ? _blue : _textPrimary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   /// Rótulo de estatística: ausência explícita em vez de número fabricado.
   static String _statLabel(double? value) =>
       value == null ? '—' : '${value.toStringAsFixed(1)} kg';
 
-  /// Constrói a avaliação de desempenho clínico.
-  ///
-  /// A copy vem inteiramente de [WeightPdfSummary], que distingue os quatro
-  /// estados canônicos. Antes, este bloco derivava a mensagem de um
-  /// `currentWeight == null` e afirmava "Não há pesagens registradas" também em
-  /// `inconclusive`/`unavailable` — falso quando existem registros legíveis.
-  static pw.Widget _buildClinicalAnalysis(
-    WeightPdfSummary summary,
-    String trend,
-    PdfColor color,
-    PdfFonts fonts,
-  ) {
-    final message = summary.analysisMessage;
-
-    return pw.Container(
-      padding: const pw.EdgeInsets.all(12),
-      decoration: pw.BoxDecoration(
-        color: color.withAlpha(15),
-        border: pw.Border.all(color: color.withAlpha(40)),
-        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-      ),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text(
-            'Tendência de Peso: $trend',
-            style: pw.TextStyle(
-              font: fonts.bold,
-              fontSize: 10,
-              color: _textPrimary,
-            ),
-          ),
-          pw.SizedBox(height: 4),
-          pw.Text(
-            message,
-            style: pw.TextStyle(
-              font: fonts.regular,
-              fontSize: 9,
-              color: _textSecondary,
-              lineSpacing: 1.3,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Constrói a tabela de histórico de peso.
+  /// Constrói a tabela rica de histórico de peso.
   static pw.Widget _buildWeightTable(
     List<HealthLogModel> logs,
     PdfFonts fonts,
   ) {
     if (logs.isEmpty) {
-      return pw.Container(
-        height: 80,
-        alignment: pw.Alignment.center,
-        decoration: pw.BoxDecoration(
-          border: pw.Border.all(color: _cardBorder),
-          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+      return ReportPrimitives.observationBlock(
+        const ObservationBlockData(
+          title: 'Histórico de Pesagem',
+          text: 'Nenhuma pesagem registrada no histórico.',
         ),
-        child: pw.Text(
-          'Nenhuma pesagem registrada no histórico.',
-          style: pw.TextStyle(
-            font: fonts.regular,
-            fontSize: 10,
-            color: _textTertiary,
-          ),
+        fonts,
+      );
+    }
+
+    final columns = const [
+      DataTableColumn(
+        header: 'Data',
+        alignment: DataTableCellAlignment.center,
+        isMonospace: true,
+        flex: 1.2,
+      ),
+      DataTableColumn(
+        header: 'Peso (kg)',
+        alignment: DataTableCellAlignment.right,
+        isMonospace: true,
+        flex: 1.2,
+      ),
+      DataTableColumn(
+        header: 'Variação',
+        alignment: DataTableCellAlignment.right,
+        isMonospace: true,
+        flex: 1.2,
+      ),
+      DataTableColumn(header: 'Registrado Por', flex: 2.0),
+      DataTableColumn(header: 'Observações', flex: 3.0),
+    ];
+
+    final rows = <RichDataTableRow>[];
+    for (int index = 0; index < logs.length; index++) {
+      final log = logs[index];
+      final appDate = DateFormat('dd/MM/yyyy').format(log.date);
+      final weight = log.weight ?? 0.0;
+      final weightStr = '${weight.toStringAsFixed(1)} kg';
+
+      // Lógica de variação em relação ao registro cronológico anterior
+      double? diff;
+      if (index + 1 < logs.length) {
+        final prevWeight = logs[index + 1].weight;
+        if (prevWeight != null) {
+          diff = weight - prevWeight;
+        }
+      }
+
+      String diffStr = '—';
+      PdfColor diffColor = ReportColors.textSecondary;
+      if (diff != null && diff.abs() >= 0.1) {
+        diffStr = '${diff > 0 ? "+" : ""}${diff.toStringAsFixed(1)} kg';
+        diffColor = diff > 0
+            ? PdfColor.fromHex('B88A0C')
+            : PdfColor.fromHex('166534');
+      }
+
+      final registeredBy = log.vetName ?? log.createdBy ?? 'Sistema';
+      final obs = log.healthObservations.trim().isNotEmpty
+          ? log.healthObservations.trim()
+          : 'Nenhuma';
+
+      rows.add(
+        RichDataTableRow(
+          cells: [
+            RichTableCell.text(appDate, isMonospace: true),
+            RichTableCell.text(weightStr, isBold: true, isMonospace: true),
+            RichTableCell.text(
+              diffStr,
+              isBold: true,
+              isMonospace: true,
+              textColor: diffColor,
+            ),
+            RichTableCell.text(registeredBy),
+            RichTableCell.text(obs),
+          ],
         ),
       );
     }
 
-    final headers = [
-      'Data',
-      'Peso (kg)',
-      'Variação',
-      'Registrado Por',
-      'Observações',
-    ];
-
-    return pw.Table(
-      border: pw.TableBorder.all(color: _cardBorder, width: 0.5),
-      columnWidths: const {
-        0: pw.FlexColumnWidth(1.2),
-        1: pw.FlexColumnWidth(1.2),
-        2: pw.FlexColumnWidth(1.2),
-        3: pw.FlexColumnWidth(2.0),
-        4: pw.FlexColumnWidth(3.0),
-      },
-      children: [
-        // Table Header
-        pw.TableRow(
-          decoration: pw.BoxDecoration(color: _blue),
-          children: headers.map((header) {
-            return pw.Container(
-              padding: const pw.EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 8,
-              ),
-              alignment: pw.Alignment.centerLeft,
-              child: pw.Text(
-                header,
-                style: pw.TextStyle(
-                  font: fonts.bold,
-                  fontSize: 9,
-                  color: PdfInstitutionalColors.white,
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-        // Table Rows
-        ...List.generate(logs.length, (index) {
-          final log = logs[index];
-          final appDate = DateFormat('dd/MM/yyyy').format(log.date);
-          final weight = log.weight ?? 0.0;
-          final weightStr = '${weight.toStringAsFixed(1)} kg';
-
-          // Variation logic
-          double? diff;
-          if (index + 1 < logs.length) {
-            final prevWeight = logs[index + 1].weight;
-            if (prevWeight != null) {
-              diff = weight - prevWeight;
-            }
-          }
-
-          String diffStr = '—';
-          PdfColor diffColor = _textSecondary;
-          if (diff != null && diff.abs() >= 0.1) {
-            diffStr = '${diff > 0 ? "+" : ""}${diff.toStringAsFixed(1)} kg';
-            diffColor = diff > 0
-                ? PdfInstitutionalColors.amberWarning
-                : PdfInstitutionalColors.greenInstitutional;
-          }
-
-          final registeredBy = log.vetName ?? log.createdBy ?? 'Sistema';
-          final obs = log.healthObservations.trim().isNotEmpty
-              ? log.healthObservations
-              : 'Nenhuma';
-
-          final isRowOdd = index.isOdd;
-          final rowBg = isRowOdd ? _lightGray : PdfInstitutionalColors.white;
-
-          return pw.TableRow(
-            decoration: pw.BoxDecoration(color: rowBg),
-            children: [
-              pw.Container(
-                padding: const pw.EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 8,
-                ),
-                child: pw.Text(
-                  appDate,
-                  style: pw.TextStyle(
-                    font: fonts.regular,
-                    fontSize: 8.5,
-                    color: _textPrimary,
-                  ),
-                ),
-              ),
-              pw.Container(
-                padding: const pw.EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 8,
-                ),
-                child: pw.Text(
-                  weightStr,
-                  style: pw.TextStyle(
-                    font: fonts.bold,
-                    fontSize: 8.5,
-                    color: _textPrimary,
-                  ),
-                ),
-              ),
-              pw.Container(
-                padding: const pw.EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 8,
-                ),
-                child: pw.Text(
-                  diffStr,
-                  style: pw.TextStyle(
-                    font: fonts.bold,
-                    fontSize: 8.5,
-                    color: diffColor,
-                  ),
-                ),
-              ),
-              pw.Container(
-                padding: const pw.EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 8,
-                ),
-                child: pw.Text(
-                  registeredBy,
-                  style: pw.TextStyle(
-                    font: fonts.regular,
-                    fontSize: 8,
-                    color: _textSecondary,
-                  ),
-                ),
-              ),
-              pw.Container(
-                padding: const pw.EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 8,
-                ),
-                child: pw.Text(
-                  obs,
-                  style: pw.TextStyle(
-                    font: fonts.regular,
-                    fontSize: 8,
-                    color: _textSecondary,
-                  ),
-                ),
-              ),
-            ],
-          );
-        }),
-      ],
+    return ReportPrimitives.richDataTable(
+      RichDataTableData(columns: columns, rows: rows),
+      fonts,
     );
   }
 }

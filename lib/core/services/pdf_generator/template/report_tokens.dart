@@ -15,6 +15,13 @@ class ReportColors {
   static final borderStrong = PdfColor.fromHex('94A3B8');
   static final accent = PdfColor.fromHex('0A8E9D');
 
+  // Tons táticos e institucionais K9 Ops V2
+  static final darkNavy = PdfColor.fromHex('0A1A24');
+  static final darkNavySurface = PdfColor.fromHex('0E1F2C');
+  static final darkNavyBorder = PdfColor.fromHex('1A3345');
+  static final cyanAccent = PdfColor.fromHex('2BB6C4');
+  static final goldAccent = PdfColor.fromHex('E5A93C');
+
   // Auxiliares neutros
   static final white = surface;
   static final black = PdfColor.fromHex('000000');
