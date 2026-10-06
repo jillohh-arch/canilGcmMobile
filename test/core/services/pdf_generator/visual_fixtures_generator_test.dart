@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:canil_gcm/core/services/pdf_generator/nutrition_pdf.dart';
@@ -19,18 +20,24 @@ void main() {
     dateOfBirth: DateTime(2021, 3, 14),
     microchip: '900215004712345',
     registrationNumber: 'K9-2023-017',
+    cor: 'Fulvo com máscara preta',
     weight: 33.5,
-    conductorRa: 'GCM Silva',
+    conductorRa: 'Silva (GCM)',
     specialties: ['Patrulhamento', 'Busca e Resgate', 'Detecção', 'Apoio Operacional'],
     idealWeightMin: 32.0,
     idealWeightMax: 35.0,
   );
 
   final outputDir = Directory('build/visual_fixtures');
+  Uint8List? sampleDogPhoto;
 
   setUpAll(() async {
     if (!await outputDir.exists()) {
       await outputDir.create(recursive: true);
+    }
+    final photoFile = File('assets/images/k9_ops_loading_dog_static_v1.png');
+    if (photoFile.existsSync()) {
+      sampleDogPhoto = photoFile.readAsBytesSync();
     }
   });
 
@@ -105,7 +112,11 @@ void main() {
         ),
       ];
 
-      final bytes = await VaccinationPdf.generate(thor, logs);
+      final bytes = await VaccinationPdf.generate(
+        thor,
+        logs,
+        dogPhotoBytes: sampleDogPhoto,
+      );
       final file = File('${outputDir.path}/carteira_vacinacao_thor.pdf');
       await file.writeAsBytes(bytes);
 
@@ -148,6 +159,7 @@ void main() {
           currentKg: 33.5,
           oldestKg: 32.0,
         ),
+        dogPhotoBytes: sampleDogPhoto,
       );
       final file = File('${outputDir.path}/historico_peso_thor.pdf');
       await file.writeAsBytes(bytes);
@@ -191,6 +203,7 @@ void main() {
         conformityPercent: 93.0,
         conformCount: 13,
         divergentCount: 1,
+        dogPhotoBytes: sampleDogPhoto,
       );
       final file = File('${outputDir.path}/relatorio_nutricional_thor.pdf');
       await file.writeAsBytes(bytes);

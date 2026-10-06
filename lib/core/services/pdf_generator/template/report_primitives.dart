@@ -383,7 +383,7 @@ class ReportPrimitives {
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.stretch,
         children: [
-          // Linha Superior: Badge K9 OPS® + Categoria à esquerda | Motto/Unidade à direita
+          // Linha Superior: Logo K9 OPS com alto destaque e presença visual
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             crossAxisAlignment: pw.CrossAxisAlignment.center,
@@ -391,32 +391,67 @@ class ReportPrimitives {
               pw.Row(
                 crossAxisAlignment: pw.CrossAxisAlignment.center,
                 children: [
+                  // Insígnia / Símbolo tático do K9 OPS
                   pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                    width: 24,
+                    height: 24,
                     decoration: pw.BoxDecoration(
                       color: ReportColors.darkNavySurface,
-                      border: pw.Border.all(color: ReportColors.darkNavyBorder, width: 0.75),
-                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
+                      border: pw.Border.all(color: ReportColors.cyanAccent, width: 1),
+                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
                     ),
+                    alignment: pw.Alignment.center,
                     child: pw.Text(
-                      'K9 OPS®',
+                      'K9',
                       style: pw.TextStyle(
                         font: fonts.bold,
-                        fontSize: 8.5,
+                        fontSize: 11,
                         color: ReportColors.cyanAccent,
                         letterSpacing: 0.5,
                       ),
                     ),
                   ),
+                  pw.SizedBox(width: 8),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'K9 OPS®',
+                        style: pw.TextStyle(
+                          font: fonts.bold,
+                          fontSize: 14,
+                          color: ReportColors.white,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      pw.Text(
+                        'SISTEMA DE GESTÃO CANINA',
+                        style: pw.TextStyle(
+                          font: fonts.bold,
+                          fontSize: 6.5,
+                          color: ReportColors.cyanAccent,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ],
+                  ),
                   if (category != null && category.isNotEmpty) ...[
-                    pw.SizedBox(width: 8),
-                    pw.Text(
-                      category.toUpperCase(),
-                      style: pw.TextStyle(
-                        font: fonts.bold,
-                        fontSize: 7.5,
-                        color: ReportColors.cyanAccent,
-                        letterSpacing: 0.8,
+                    pw.SizedBox(width: 12),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: pw.BoxDecoration(
+                        color: ReportColors.darkNavySurface,
+                        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(2.5)),
+                        border: pw.Border.all(color: ReportColors.darkNavyBorder, width: 0.5),
+                      ),
+                      child: pw.Text(
+                        category.toUpperCase(),
+                        style: pw.TextStyle(
+                          font: fonts.bold,
+                          fontSize: 6.8,
+                          color: ReportColors.cyanAccent,
+                          letterSpacing: 0.6,
+                        ),
                       ),
                     ),
                   ],
@@ -801,156 +836,255 @@ class ReportPrimitives {
       );
     }
 
-    // Layout Tático Enriquecido (Avatar/Foto + Tags Operacionais)
+    // Layout Tático Enriquecido — Hero Section de Alto Impacto
+    final photoW = data.photoWidth;
+    final photoH = data.photoHeight;
+    final halfLength = (data.fields.length / 2).ceil();
+    final col1Fields = data.fields.take(halfLength).toList();
+    final col2Fields = data.fields.skip(halfLength).toList();
+
     return pw.Container(
       decoration: pw.BoxDecoration(
         color: ReportColors.surface,
         border: pw.Border.all(color: ReportColors.borderSoft, width: 1),
         borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
       ),
-      padding: const pw.EdgeInsets.all(ReportSpacing.md),
+      padding: const pw.EdgeInsets.all(10),
       margin: const pw.EdgeInsets.only(bottom: ReportSpacing.md),
-      child: pw.Column(
+      child: pw.Row(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.center,
-            children: [
-              // Avatar ou Placeholder Tático
-              if (data.avatar != null) ...[
-                pw.Container(
-                  width: 52,
-                  height: 52,
-                  decoration: pw.BoxDecoration(
-                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-                    border: pw.Border.all(color: ReportColors.borderSoft),
-                  ),
-                  child: pw.ClipRRect(
-                    horizontalRadius: 4,
-                    verticalRadius: 4,
-                    child: pw.Image(
-                      pw.MemoryImage(data.avatar!.bytes),
-                      fit: pw.BoxFit.cover,
+          // 1. FOTO DO CÃO AMPLIADA / TACTICAL HERO PORTRAIT
+          if (data.avatar != null) ...[
+            pw.Container(
+              width: photoW,
+              height: photoH,
+              decoration: pw.BoxDecoration(
+                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                border: pw.Border.all(color: ReportColors.borderSoft, width: 1),
+              ),
+              child: pw.ClipRRect(
+                horizontalRadius: 6,
+                verticalRadius: 6,
+                child: pw.Image(
+                  pw.MemoryImage(data.avatar!.bytes),
+                  fit: pw.BoxFit.cover,
+                ),
+              ),
+            ),
+            pw.SizedBox(width: 12),
+          ] else ...[
+            // Tactical placeholder ampliado com identidade K9 OPS
+            pw.Container(
+              width: photoW,
+              height: photoH,
+              decoration: pw.BoxDecoration(
+                color: ReportColors.darkNavy,
+                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                border: pw.Border.all(color: ReportColors.cyanAccent, width: 1),
+              ),
+              padding: const pw.EdgeInsets.all(6),
+              child: pw.Column(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  pw.Align(
+                    alignment: pw.Alignment.topLeft,
+                    child: pw.Text(
+                      'K9 OPS',
+                      style: pw.TextStyle(
+                        font: fonts.bold,
+                        fontSize: 6.5,
+                        color: ReportColors.cyanAccent,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
-                ),
-                pw.SizedBox(width: 12),
-              ] else ...[
-                pw.Container(
-                  width: 50,
-                  height: 50,
-                  decoration: pw.BoxDecoration(
-                    color: ReportColors.darkNavy,
-                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-                    border: pw.Border.all(color: ReportColors.cyanAccent, width: 1),
+                  pw.Center(
+                    child: pw.Text(
+                      data.avatarPlaceholder ?? 'K9',
+                      style: pw.TextStyle(
+                        font: fonts.bold,
+                        fontSize: 26,
+                        color: ReportColors.cyanAccent,
+                      ),
+                    ),
                   ),
-                  alignment: pw.Alignment.center,
-                  child: pw.Text(
-                    data.avatarPlaceholder ?? 'K9',
+                  pw.Text(
+                    'FOTO DO ANIMAL',
                     style: pw.TextStyle(
                       font: fonts.bold,
-                      fontSize: 16,
-                      color: ReportColors.cyanAccent,
+                      fontSize: 6,
+                      color: ReportColors.textMuted,
+                      letterSpacing: 0.5,
                     ),
                   ),
-                ),
-                pw.SizedBox(width: 12),
-              ],
+                ],
+              ),
+            ),
+            pw.SizedBox(width: 12),
+          ],
 
-              // Informações centrais e Badges
-              pw.Expanded(
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+          // 2. HERO FICHA DO CÃO (Campos e Badges ao lado da Foto)
+          pw.Expanded(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                // Linha Superior: Nome (Grande) + Badge de Registro + Status Pill
+                pw.Row(
+                  crossAxisAlignment: pw.CrossAxisAlignment.center,
                   children: [
                     pw.Text(
                       data.title,
                       style: pw.TextStyle(
                         font: fonts.bold,
-                        fontSize: 14,
+                        fontSize: 18,
                         color: ReportColors.textPrimary,
+                        letterSpacing: 0.5,
                       ),
                     ),
-                    if (data.subtitle != null && data.subtitle!.isNotEmpty) ...[
-                      pw.SizedBox(height: 2),
-                      pw.Text(
-                        data.subtitle!,
-                        style: pw.TextStyle(
-                          font: fonts.regular,
-                          fontSize: 8.5,
-                          color: ReportColors.textMuted,
+                    if (data.registrationBadge != null && data.registrationBadge!.isNotEmpty) ...[
+                      pw.SizedBox(width: 8),
+                      pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: pw.BoxDecoration(
+                          color: PdfColor.fromHex('E0F2FE'),
+                          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
+                          border: pw.Border.all(color: PdfColor.fromHex('BAE6FD'), width: 0.5),
+                        ),
+                        child: pw.Text(
+                          data.registrationBadge!,
+                          style: pw.TextStyle(
+                            font: fonts.bold,
+                            fontSize: 8,
+                            color: PdfColor.fromHex('0369A1'),
+                          ),
                         ),
                       ),
                     ],
-                    pw.SizedBox(height: 4),
-                    // Linha de tags e status
-                    pw.Wrap(
-                      spacing: 4,
-                      runSpacing: 3,
-                      crossAxisAlignment: pw.WrapCrossAlignment.center,
-                      children: [
-                        ...data.tags.map((tag) {
-                          return pw.Container(
-                            padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                            decoration: pw.BoxDecoration(
-                              color: ReportColors.darkNavy,
-                              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(2.5)),
-                            ),
-                            child: pw.Text(
-                              tag.toUpperCase(),
-                              style: pw.TextStyle(
-                                font: fonts.bold,
-                                fontSize: 6.8,
-                                color: ReportColors.goldAccent,
-                                letterSpacing: 0.4,
-                              ),
+                    pw.Spacer(),
+                    if (data.statusLabel != null && data.statusTone != null)
+                      statusBadge(data.statusLabel!, data.statusTone!, fonts),
+                  ],
+                ),
+                if (data.subtitle != null && data.subtitle!.isNotEmpty) ...[
+                  pw.SizedBox(height: 1),
+                  pw.Text(
+                    data.subtitle!,
+                    style: pw.TextStyle(
+                      font: fonts.regular,
+                      fontSize: 8,
+                      color: ReportColors.textMuted,
+                    ),
+                  ),
+                ],
+                pw.SizedBox(height: 4),
+                pw.Container(height: 0.5, color: ReportColors.borderSoft),
+                pw.SizedBox(height: 4),
+
+                // Grid de Campos em 2 Colunas Limpas
+                pw.Row(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Expanded(
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: col1Fields.map((field) {
+                          return pw.Padding(
+                            padding: const pw.EdgeInsets.only(bottom: 2.5),
+                            child: pw.Row(
+                              children: [
+                                pw.Text(
+                                  '${field.label}: ',
+                                  style: pw.TextStyle(
+                                    font: fonts.bold,
+                                    fontSize: 7.5,
+                                    color: ReportColors.textSecondary,
+                                  ),
+                                ),
+                                pw.Expanded(
+                                  child: pw.Text(
+                                    field.value,
+                                    style: pw.TextStyle(
+                                      font: field.isMonospace ? fonts.monoRegular : fonts.regular,
+                                      fontSize: 7.5,
+                                      color: ReportColors.textPrimary,
+                                    ),
+                                    maxLines: 1,
+                                  ),
+                                ),
+                              ],
                             ),
                           );
-                        }),
-                        if (data.statusLabel != null && data.statusTone != null)
-                          statusBadge(data.statusLabel!, data.statusTone!, fonts),
-                      ],
+                        }).toList(),
+                      ),
+                    ),
+                    pw.SizedBox(width: 8),
+                    pw.Expanded(
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: col2Fields.map((field) {
+                          return pw.Padding(
+                            padding: const pw.EdgeInsets.only(bottom: 2.5),
+                            child: pw.Row(
+                              children: [
+                                pw.Text(
+                                  '${field.label}: ',
+                                  style: pw.TextStyle(
+                                    font: fonts.bold,
+                                    fontSize: 7.5,
+                                    color: ReportColors.textSecondary,
+                                  ),
+                                ),
+                                pw.Expanded(
+                                  child: pw.Text(
+                                    field.value,
+                                    style: pw.TextStyle(
+                                      font: field.isMonospace ? fonts.monoRegular : fonts.regular,
+                                      fontSize: 7.5,
+                                      color: ReportColors.textPrimary,
+                                    ),
+                                    maxLines: 1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ],
-          ),
 
-          if (data.fields.isNotEmpty) ...[
-            pw.SizedBox(height: ReportSpacing.sm),
-            pw.Container(height: 0.5, color: ReportColors.borderSoft),
-            pw.SizedBox(height: ReportSpacing.sm),
-            pw.Wrap(
-              spacing: ReportSpacing.xl,
-              runSpacing: ReportSpacing.sm,
-              children: data.fields.map((field) {
-                return pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  mainAxisSize: pw.MainAxisSize.min,
-                  children: [
-                    pw.Text(
-                      field.label.toUpperCase(),
-                      style: pw.TextStyle(
-                        font: fonts.bold,
-                        fontSize: 7,
-                        color: ReportColors.textMuted,
-                        letterSpacing: 0.4,
-                      ),
-                    ),
-                    pw.SizedBox(height: 1),
-                    pw.Text(
-                      field.value,
-                      style: pw.TextStyle(
-                        font: field.isMonospace ? fonts.monoRegular : fonts.bold,
-                        fontSize: 8.5,
-                        color: ReportColors.textPrimary,
-                      ),
-                    ),
-                  ],
-                );
-              }).toList(),
+                // Tags de Especialidades e Cão de Trabalho
+                if (data.tags.isNotEmpty) ...[
+                  pw.SizedBox(height: 3),
+                  pw.Wrap(
+                    spacing: 4,
+                    runSpacing: 2,
+                    children: data.tags.map((tag) {
+                      return pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        decoration: pw.BoxDecoration(
+                          color: ReportColors.darkNavy,
+                          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(2)),
+                        ),
+                        child: pw.Text(
+                          tag.toUpperCase(),
+                          style: pw.TextStyle(
+                            font: fonts.bold,
+                            fontSize: 6.5,
+                            color: ReportColors.goldAccent,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );

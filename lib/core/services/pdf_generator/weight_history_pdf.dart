@@ -221,6 +221,7 @@ class WeightHistoryPdf {
     Dog dog,
     List<HealthLogModel> logs, {
     required WeightPdfAuthority authority,
+    Uint8List? dogPhotoBytes,
   }) async {
     final fonts = await PdfFonts.load();
 
@@ -279,12 +280,13 @@ class WeightHistoryPdf {
       archetypeConfig: ReportArchetypeConfig.clinicalTactical(),
     );
 
-    // 1. Card de Identidade Canina (com foto/avatar e tags de Cão de Trabalho)
+    // 1. Hero Section / Identidade do Cão (Foto Ampliada + Ficha em 2 Colunas)
     builder.addWidget(
       ReportPrimitives.entityIdentityBlock(
         EntityIdentityData(
           title: dog.name.toUpperCase(),
           subtitle: 'Raça: ${dog.breed}',
+          registrationBadge: dog.registrationNumber,
           tags: [
             'CÃO DE TRABALHO',
             if (dog.specialties != null) ...dog.specialties!,
@@ -293,23 +295,26 @@ class WeightHistoryPdf {
           statusTone: dog.status.toLowerCase() == 'ativo'
               ? ReportTone.positive
               : ReportTone.neutral,
+          avatar: dogPhotoBytes != null ? ReportImageSlot(bytes: dogPhotoBytes) : null,
           avatarPlaceholder: dog.name.isNotEmpty
               ? dog.name.substring(0, dog.name.length >= 2 ? 2 : 1).toUpperCase()
               : 'K9',
           fields: [
+            EntityIdentityField(label: 'Raça', value: dog.breed),
+            EntityIdentityField(label: 'Sexo', value: dog.sex == 'M' ? 'Macho' : 'Fêmea'),
+            EntityIdentityField(
+              label: 'Nascimento',
+              value: DateFormat('dd/MM/yyyy').format(dog.dateOfBirth),
+              isMonospace: true,
+            ),
             EntityIdentityField(
               label: 'Microchip',
               value: dog.microchip ?? 'Não informado',
               isMonospace: true,
             ),
             EntityIdentityField(
-              label: 'Matrícula',
-              value: dog.registrationNumber ?? 'Não informada',
-              isMonospace: true,
-            ),
-            EntityIdentityField(
-              label: 'Sexo',
-              value: dog.sex == 'M' ? 'Macho' : 'Fêmea',
+              label: 'Condutor',
+              value: dog.conductorRa != null ? 'GCM RA ${dog.conductorRa}' : 'Não informado',
             ),
             EntityIdentityField(
               label: 'Total de Pesagens',
@@ -320,10 +325,6 @@ class WeightHistoryPdf {
               value: dog.idealWeightMin != null && dog.idealWeightMax != null
                   ? '${dog.idealWeightMin!.toStringAsFixed(1)} kg a ${dog.idealWeightMax!.toStringAsFixed(1)} kg'
                   : 'Não configurada',
-            ),
-            EntityIdentityField(
-              label: 'Condutor (RA)',
-              value: dog.conductorRa != null ? 'RA ${dog.conductorRa}' : 'Não informado',
             ),
           ],
         ),

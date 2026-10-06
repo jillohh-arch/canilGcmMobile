@@ -252,22 +252,28 @@ class EntityIdentityField {
 class EntityIdentityData {
   final String title;
   final String? subtitle;
+  final String? registrationBadge;
   final List<EntityIdentityField> fields;
   final String? statusLabel;
   final ReportTone? statusTone;
   final ReportImageSlot? avatar;
   final List<String> tags;
   final String? avatarPlaceholder;
+  final double photoWidth;
+  final double photoHeight;
 
   const EntityIdentityData({
     required this.title,
     this.subtitle,
+    this.registrationBadge,
     this.fields = const [],
     this.statusLabel,
     this.statusTone,
     this.avatar,
     this.tags = const [],
     this.avatarPlaceholder,
+    this.photoWidth = 105,
+    this.photoHeight = 120,
   });
 }
 
