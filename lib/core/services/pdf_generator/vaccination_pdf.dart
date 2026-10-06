@@ -1,6 +1,4 @@
-import 'dart:convert';
 import 'dart:typed_data';
-import 'package:crypto/crypto.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/widgets.dart' as pw;
 
@@ -27,33 +25,26 @@ class VaccinationPdf {
         .toList()
       ..sort((a, b) => b.date.compareTo(a.date));
 
-    final docId = _buildDocId(dog);
     final overallStatus = _getOverallStatus(vaccineLogs);
     final overallTone = switch (overallStatus) {
       'EM DIA' => ReportTone.positive,
       'VENCIDA' => ReportTone.critical,
+      'REGISTRADA' => ReportTone.positive,
       _ => ReportTone.neutral,
     };
 
-    final auditRef = _buildAuditReference(dog);
     final now = DateTime.now();
-    final docHash = sha256
-        .convert(utf8.encode('$docId|${dog.id}|${dog.name}|${now.toIso8601String()}'))
-        .toString();
 
     final metadata = ReportMetadata(
       generatedAt: now,
-      documentId: docId,
       dogIdentity: '${dog.name} (${dog.breed})',
       operatorName: dog.conductorRa != null ? 'Condutor RA: ${dog.conductorRa}' : null,
-      callsign: 'K9-CANIL',
     );
 
     final builder = ReportTemplateBuilder(
       title: 'CARTEIRA DE VACINAÇÃO K9',
       subtitle: 'REGISTRO SANITÁRIO E CONTROLE DE IMUNOBIOLÓGICOS',
       category: 'PRONTUÁRIO MÉDICO VETERINÁRIO',
-      organization: 'CANIL DA GUARDA CIVIL MUNICIPAL DE LIMEIRA',
       motto: 'DISCIPLINA · PROTEÇÃO · RESULTADO',
       metadata: metadata,
       statusLabel: overallStatus,
@@ -104,8 +95,8 @@ class VaccinationPdf {
               isMonospace: true,
             ),
             EntityIdentityField(
-              label: 'Condutor / Unidade',
-              value: dog.conductorRa != null ? 'RA ${dog.conductorRa}' : 'GCM Limeira',
+              label: 'Condutor (RA)',
+              value: dog.conductorRa != null ? 'RA ${dog.conductorRa}' : 'Não informado',
             ),
             EntityIdentityField(
               label: 'Peso Registrado',
@@ -176,81 +167,171 @@ class VaccinationPdf {
         'HISTÓRICO DE VACINAS E IMUNIZAÇÕES',
         fonts,
         iconText: 'VAC',
-        subtitle: 'Registro cronológico de vacinas aplicadas com rastreabilidade de lote e CRMV',
+        subtitle: 'Registro cronológico de vacinas aplicadas e controle de revacinação',
       ),
     );
 
     // 5. Tabela Rica de Vacinações com zebra e status
     builder.addWidget(_buildImmunizationTable(vaccineLogs, fonts));
 
-    builder.addWidget(pw.SizedBox(height: ReportSpacing.md));
+    builder.addWidget(pw.SizedBox(height: ReportSpacing.sm));
 
-    // 6. Bloco de Auditoria e Verificação Técnica
-    builder.addWidget(
-      ReportPrimitives.auditBlock(
-        AuditData(
-          verificationUrl: 'https://k9ops.com/v/$docId',
-          hash: docHash,
-          algorithm: 'SHA-256',
-          documentId: docId,
-          trackingCode: auditRef,
-          description:
-              'Este documento reflete em tempo real o prontuário de saúde do cão ${dog.name}, registrado e mantido pela equipe de condutores e veterinários do Canil K9 da GCM de Limeira. Todas as modificações no prontuário geram trilhas de auditoria imutáveis.',
+    // 6. Observações Médicas e Sanitárias (conforme dados factuais da fonte)
+    final observations = <String>[];
+    if (dog.observacoes != null && dog.observacoes!.trim().isNotEmpty) {
+      observations.add(dog.observacoes!.trim());
+    }
+    for (final l in vaccineLogs) {
+      if (l.healthObservations.trim().isNotEmpty) {
+        final prefix = l.subtype ?? l.logType;
+        observations.add('$prefix: ${l.healthObservations.trim()}');
+      }
+    }
+
+    if (observations.isNotEmpty) {
+      builder.addWidget(
+        ReportPrimitives.styledSectionTitle(
+          'OBSERVAÇÕES MÉDICAS E SANITÁRIAS',
+          fonts,
+          iconText: 'OBS',
+          subtitle: 'Anotações clínicas e sanitárias registradas pela equipe técnica',
         ),
-        fonts,
+      );
+      builder.addWidget(
+        ReportPrimitives.summaryCard(
+          SummaryCardData(
+            title: 'REGISTROS E OBSERVAÇÕES CLÍNICAS',
+            bulletItems: observations,
+            tone: ReportTone.neutral,
+          ),
+          fonts,
+        ),
+      );
+      builder.addWidget(pw.SizedBox(height: ReportSpacing.sm));
+    }
+
+    // 7. Bloco Técnico de Emissão e Responsável Veterinário (se identificado na fonte)
+    final recentVetLog = vaccineLogs.cast<HealthLogModel?>().firstWhere(
+      (l) => l?.vetName != null && l!.vetName!.isNotEmpty,
+      orElse: () => null,
+    );
+
+    builder.addWidget(
+      pw.Container(
+        padding: const pw.EdgeInsets.all(ReportSpacing.sm),
+        decoration: pw.BoxDecoration(
+          color: ReportColors.surfaceSubtle,
+          border: pw.Border.all(color: ReportColors.borderSoft, width: 0.5),
+          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+        ),
+        child: pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: pw.CrossAxisAlignment.end,
+          children: [
+            if (recentVetLog != null) ...[
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'RESPONSÁVEL TÉCNICO',
+                    style: pw.TextStyle(
+                      font: fonts.bold,
+                      fontSize: 7,
+                      color: ReportColors.textMuted,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  pw.SizedBox(height: 2),
+                  pw.Text(
+                    recentVetLog.vetName!,
+                    style: pw.TextStyle(
+                      font: fonts.bold,
+                      fontSize: 8.5,
+                      color: ReportColors.textPrimary,
+                    ),
+                  ),
+                  if (recentVetLog.professionalCrmv != null &&
+                      recentVetLog.professionalCrmv!.isNotEmpty)
+                    pw.Text(
+                      'CRMV: ${recentVetLog.professionalCrmv!}',
+                      style: pw.TextStyle(
+                        font: fonts.monoRegular,
+                        fontSize: 7.5,
+                        color: ReportColors.textSecondary,
+                      ),
+                    ),
+                ],
+              ),
+            ] else ...[
+              pw.Text(
+                'HISTÓRICO SANITÁRIO K9',
+                style: pw.TextStyle(
+                  font: fonts.bold,
+                  fontSize: 7.5,
+                  color: ReportColors.textMuted,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: [
+                pw.Text(
+                  'DOCUMENTO EMITIDO PELO SISTEMA K9 OPS',
+                  style: pw.TextStyle(
+                    font: fonts.bold,
+                    fontSize: 7,
+                    color: ReportColors.textMuted,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                pw.SizedBox(height: 1),
+                pw.Text(
+                  'Emissão: ${DateFormat('dd/MM/yyyy HH:mm').format(now)}',
+                  style: pw.TextStyle(
+                    font: fonts.monoRegular,
+                    fontSize: 7.5,
+                    color: ReportColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
 
     return builder.buildPdf(customFonts: fonts);
   }
 
-  /// Gera um ID de documento estruturado único.
-  static String _buildDocId(Dog dog) {
-    final year = DateTime.now().year;
-    final month = DateTime.now().month.toString().padLeft(2, '0');
-    final seq = dog.id.length >= 4
-        ? dog.id.substring(0, 4).toUpperCase()
-        : dog.id.toUpperCase().padRight(4, '0');
-    return 'VAC: $year/$month/$seq-K9';
-  }
-
-  /// Gera uma referência de rastreamento de auditoria baseada no ID do cão.
-  static String _buildAuditReference(Dog dog) {
-    final dogPart = dog.id.length >= 6
-        ? dog.id.substring(0, 6).toUpperCase()
-        : dog.id.toUpperCase();
-    final timePart = DateTime.now().millisecondsSinceEpoch.toString();
-    final truncatedTime = timePart.length > 5
-        ? timePart.substring(timePart.length - 5)
-        : timePart;
-    return 'AUDIT-$dogPart-$truncatedTime';
-  }
-
-  /// Determina o status geral com base no histórico de vacinas.
+  /// Determina o status geral com base no histórico factual de vacinas.
   static String _getOverallStatus(List<HealthLogModel> vaccineLogs) {
-    if (vaccineLogs.isEmpty) return 'SEM DADOS';
+    if (vaccineLogs.isEmpty) return 'SEM REGISTROS';
     final now = DateTime.now();
     bool hasExpired = false;
+    bool hasScheduledDoses = false;
     for (final log in vaccineLogs) {
-      final nextDue =
-          log.nextDueDate ?? log.date.add(const Duration(days: 365));
-      if (now.isAfter(nextDue)) {
-        hasExpired = true;
-        break;
+      if (log.nextDueDate != null) {
+        hasScheduledDoses = true;
+        if (now.isAfter(log.nextDueDate!)) {
+          hasExpired = true;
+          break;
+        }
       }
     }
-    return hasExpired ? 'VENCIDA' : 'EM DIA';
+    if (hasExpired) return 'VENCIDA';
+    if (hasScheduledDoses) return 'EM DIA';
+    return 'REGISTRADA';
   }
 
-  /// Localiza a data da próxima dose futura mais próxima.
+  /// Localiza a data da próxima dose futura mais próxima conforme a fonte.
   static DateTime? _findNextUpcomingDate(List<HealthLogModel> logs) {
     DateTime? next;
     final now = DateTime.now();
     for (final log in logs) {
-      final due = log.nextDueDate ?? log.date.add(const Duration(days: 365));
-      if (due.isAfter(now)) {
-        if (next == null || due.isBefore(next)) {
-          next = due;
+      if (log.nextDueDate != null && log.nextDueDate!.isAfter(now)) {
+        if (next == null || log.nextDueDate!.isBefore(next)) {
+          next = log.nextDueDate;
         }
       }
     }
@@ -268,7 +349,7 @@ class VaccinationPdf {
     // Agrupar por tipo de vacina e obter a última data
     final latestByType = <String, HealthLogModel>{};
     for (final log in logs) {
-      final name = log.subtype ?? 'Geral';
+      final name = log.subtype ?? log.logType;
       if (!latestByType.containsKey(name) ||
           log.date.isAfter(latestByType[name]!.date)) {
         latestByType[name] = log;
@@ -278,8 +359,8 @@ class VaccinationPdf {
     bool hasOverdue = false;
     for (final entry in latestByType.entries) {
       final log = entry.value;
-      final nextDue =
-          log.nextDueDate ?? log.date.add(const Duration(days: 365));
+      if (log.nextDueDate == null) continue;
+      final nextDue = log.nextDueDate!;
       final diffDays = nextDue.difference(now).inDays;
 
       if (diffDays <= 30) {
@@ -297,7 +378,7 @@ class VaccinationPdf {
         const SummaryCardData(
           title: 'CONFORMIDADE SANITÁRIA OPERACIONAL',
           description:
-              'Todas as vacinações do cão estão em dia e com conformidade operacional.',
+              'Todas as vacinações do cão com data prevista cadastrada estão em conformidade.',
           tone: ReportTone.positive,
         ),
         fonts,
@@ -343,8 +424,7 @@ class VaccinationPdf {
     }
 
     final columns = const [
-      DataTableColumn(header: 'Vacina', flex: 2.0),
-      DataTableColumn(header: 'Lote / Fabricante', flex: 1.6),
+      DataTableColumn(header: 'Vacina', flex: 2.2),
       DataTableColumn(
         header: 'Aplicação',
         alignment: DataTableCellAlignment.center,
@@ -352,12 +432,12 @@ class VaccinationPdf {
         flex: 1.1,
       ),
       DataTableColumn(
-        header: 'Validade / Próx. Dose',
+        header: 'Próxima Dose',
         alignment: DataTableCellAlignment.center,
         isMonospace: true,
         flex: 1.3,
       ),
-      DataTableColumn(header: 'Veterinário / CRMV', flex: 2.2),
+      DataTableColumn(header: 'Veterinário / CRMV', flex: 2.4),
       DataTableColumn(
         header: 'Status',
         alignment: DataTableCellAlignment.center,
@@ -368,29 +448,30 @@ class VaccinationPdf {
     final now = DateTime.now();
 
     final rows = logs.map((log) {
-      final vaccineName = log.subtype ?? 'Vacina Geral';
+      final vaccineName = log.subtype ?? log.logType;
       final appDate = DateFormat('dd/MM/yyyy').format(log.date);
-      final nextDue =
-          log.nextDueDate ?? log.date.add(const Duration(days: 365));
-      final nextDueDateStr = DateFormat('dd/MM/yyyy').format(nextDue);
+      final nextDueDateStr = log.nextDueDate != null
+          ? DateFormat('dd/MM/yyyy').format(log.nextDueDate!)
+          : '—';
 
-      final isOverdue = now.isAfter(nextDue);
-      final statusStr = isOverdue ? 'Vencido' : 'OK';
-      final statusTone = isOverdue ? ReportTone.critical : ReportTone.positive;
+      final isOverdue = log.nextDueDate != null && now.isAfter(log.nextDueDate!);
+      final statusStr = log.nextDueDate == null
+          ? 'Aplicada'
+          : (isOverdue ? 'Vencida' : 'Em dia');
+      final statusTone = log.nextDueDate == null
+          ? ReportTone.neutral
+          : (isOverdue ? ReportTone.critical : ReportTone.positive);
 
-      final vetName = log.vetName ?? 'Não Informado';
+      final vetName = log.vetName ?? 'Veterinário não informado';
       final crmv = log.professionalCrmv != null && log.professionalCrmv!.isNotEmpty
           ? 'CRMV: ${log.professionalCrmv}'
-          : (log.professionalClinic ?? 'GCM Limeira');
-
-      final loteStr = log.healthObservations.trim().isNotEmpty
-          ? log.healthObservations.trim()
-          : (log.professionalClinic ?? 'Conforme protocolo');
+          : (log.professionalClinic != null && log.professionalClinic!.isNotEmpty
+              ? 'Clínica: ${log.professionalClinic}'
+              : null);
 
       return RichDataTableRow(
         cells: [
           RichTableCell.text(vaccineName, isBold: true),
-          RichTableCell.text(loteStr),
           RichTableCell.text(appDate, isMonospace: true),
           RichTableCell.text(nextDueDateStr, isMonospace: true),
           RichTableCell.twoLine(text: vetName, secondaryText: crmv),

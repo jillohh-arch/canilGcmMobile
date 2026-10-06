@@ -1,6 +1,4 @@
-import 'dart:convert';
 import 'dart:typed_data';
-import 'package:crypto/crypto.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -23,32 +21,23 @@ class NutritionPdf {
     required int divergentCount,
   }) async {
     final fonts = await PdfFonts.load();
-    final docId =
-        'NUT-${dog.name.toUpperCase()}-${DateFormat('yyMM').format(DateTime.now())}';
 
     final conformityTone = conformityPercent >= 85
         ? ReportTone.positive
         : (conformityPercent >= 70 ? ReportTone.attention : ReportTone.critical);
 
-    final auditRef = _buildAuditReference(dog);
     final now = DateTime.now();
-    final docHash = sha256
-        .convert(utf8.encode('$docId|${dog.id}|${dog.name}|${now.toIso8601String()}'))
-        .toString();
 
     final metadata = ReportMetadata(
       generatedAt: now,
-      documentId: docId,
       dogIdentity: '${dog.name} (${dog.breed})',
       operatorName: dog.conductorRa != null ? 'Condutor RA: ${dog.conductorRa}' : null,
-      callsign: 'K9-NUTRI',
     );
 
     final builder = ReportTemplateBuilder(
       title: 'RELATÓRIO NUTRICIONAL K9',
       subtitle: 'PRESCRIÇÃO DIETÉTICA E CONTROLE DE CONFORMIDADE',
       category: 'MANEJO NUTRICIONAL K9',
-      organization: 'CANIL DA GUARDA CIVIL MUNICIPAL DE LIMEIRA',
       motto: 'DISCIPLINA · PROTEÇÃO · RESULTADO',
       metadata: metadata,
       statusLabel: 'CONFORMIDADE: ${conformityPercent.toStringAsFixed(0)}%',
@@ -96,8 +85,8 @@ class NutritionPdf {
                   : 'Não informado',
             ),
             EntityIdentityField(
-              label: 'Condutor / Unidade',
-              value: dog.conductorRa != null ? 'RA ${dog.conductorRa}' : 'GCM Limeira',
+              label: 'Condutor (RA)',
+              value: dog.conductorRa != null ? 'RA ${dog.conductorRa}' : 'Não informado',
             ),
           ],
         ),
@@ -220,35 +209,42 @@ class NutritionPdf {
 
     builder.addWidget(pw.SizedBox(height: ReportSpacing.md));
 
-    // 5. Bloco de Auditoria e Verificação Técnica
+    // 5. Bloco de Emissão
     builder.addWidget(
-      ReportPrimitives.auditBlock(
-        AuditData(
-          verificationUrl: 'https://k9ops.com/v/$docId',
-          hash: docHash,
-          algorithm: 'SHA-256',
-          documentId: docId,
-          trackingCode: auditRef,
-          description:
-              'Este documento reflete em tempo real o histórico e controle nutricional do cão ${dog.name}, registrado e mantido pela equipe de condutores e veterinários do Canil K9 da GCM de Limeira.',
+      pw.Container(
+        padding: const pw.EdgeInsets.all(ReportSpacing.sm),
+        decoration: pw.BoxDecoration(
+          color: ReportColors.surfaceSubtle,
+          border: pw.Border.all(color: ReportColors.borderSoft, width: 0.5),
+          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
         ),
-        fonts,
+        child: pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: pw.CrossAxisAlignment.center,
+          children: [
+            pw.Text(
+              'MANEJO NUTRICIONAL K9 · SISTEMA K9 OPS',
+              style: pw.TextStyle(
+                font: fonts.bold,
+                fontSize: 7,
+                color: ReportColors.textMuted,
+                letterSpacing: 0.5,
+              ),
+            ),
+            pw.Text(
+              'Emissão: ${DateFormat('dd/MM/yyyy HH:mm').format(now)}',
+              style: pw.TextStyle(
+                font: fonts.monoRegular,
+                fontSize: 7.5,
+                color: ReportColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
 
     return builder.buildPdf(customFonts: fonts);
-  }
-
-  /// Gera uma referência de auditoria baseada no ID do cão.
-  static String _buildAuditReference(Dog dog) {
-    final dogPart = dog.id.length >= 6
-        ? dog.id.substring(0, 6).toUpperCase()
-        : dog.id.toUpperCase();
-    final timePart = DateTime.now().millisecondsSinceEpoch.toString();
-    final truncatedTime = timePart.length > 5
-        ? timePart.substring(timePart.length - 5)
-        : timePart;
-    return 'AUDIT-NUT-$dogPart-$truncatedTime';
   }
 
   /// Constrói a tabela rica de histórico de alimentação.

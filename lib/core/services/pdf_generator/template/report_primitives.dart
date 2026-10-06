@@ -422,15 +422,26 @@ class ReportPrimitives {
                   ],
                 ],
               ),
-              pw.Text(
-                (motto ?? organization ?? 'DISCIPLINA · PROTEÇÃO · RESULTADO').toUpperCase(),
-                style: pw.TextStyle(
-                  font: fonts.bold,
-                  fontSize: 7,
-                  color: ReportColors.textMuted,
-                  letterSpacing: 0.8,
+              if (organization != null && organization.isNotEmpty)
+                pw.Text(
+                  organization.toUpperCase(),
+                  style: pw.TextStyle(
+                    font: fonts.bold,
+                    fontSize: 7,
+                    color: ReportColors.textMuted,
+                    letterSpacing: 0.8,
+                  ),
+                )
+              else if (motto != null && motto.isNotEmpty)
+                pw.Text(
+                  motto.toUpperCase(),
+                  style: pw.TextStyle(
+                    font: fonts.bold,
+                    fontSize: 7,
+                    color: ReportColors.textMuted,
+                    letterSpacing: 0.8,
+                  ),
                 ),
-              ),
             ],
           ),
           pw.SizedBox(height: 8),

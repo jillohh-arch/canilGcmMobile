@@ -1,6 +1,4 @@
-import 'dart:convert';
 import 'dart:typed_data';
-import 'package:crypto/crypto.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -232,8 +230,6 @@ class WeightHistoryPdf {
         .toList()
       ..sort((a, b) => b.date.compareTo(a.date));
 
-    final docId = _buildDocId(dog);
-
     // Estatísticas derivadas SOMENTE de pesagens factuais (WEIGHT-01E-C2B).
     final weights = weightLogs.map((l) => l.weight!).toList();
     final summary = WeightPdfSummary.from(
@@ -263,25 +259,18 @@ class WeightHistoryPdf {
       _ => ReportTone.neutral,
     };
 
-    final auditRef = _buildAuditReference(dog);
     final now = DateTime.now();
-    final docHash = sha256
-        .convert(utf8.encode('$docId|${dog.id}|${dog.name}|${now.toIso8601String()}'))
-        .toString();
 
     final metadata = ReportMetadata(
       generatedAt: now,
-      documentId: docId,
       dogIdentity: '${dog.name} (${dog.breed})',
       operatorName: dog.conductorRa != null ? 'Condutor RA: ${dog.conductorRa}' : null,
-      callsign: 'K9-CANIL',
     );
 
     final builder = ReportTemplateBuilder(
       title: 'HISTÓRICO DE PESO K9',
       subtitle: 'ACOMPANHAMENTO BIOESTATÍSTICO E CONDICIONAMENTO FÍSICO',
       category: 'AVALIAÇÃO PONDERAL K9',
-      organization: 'CANIL DA GUARDA CIVIL MUNICIPAL DE LIMEIRA',
       motto: 'DISCIPLINA · PROTEÇÃO · RESULTADO',
       metadata: metadata,
       statusLabel: rangeStatus,
@@ -333,8 +322,8 @@ class WeightHistoryPdf {
                   : 'Não configurada',
             ),
             EntityIdentityField(
-              label: 'Condutor / Unidade',
-              value: dog.conductorRa != null ? 'RA ${dog.conductorRa}' : 'GCM Limeira',
+              label: 'Condutor (RA)',
+              value: dog.conductorRa != null ? 'RA ${dog.conductorRa}' : 'Não informado',
             ),
           ],
         ),
@@ -462,45 +451,42 @@ class WeightHistoryPdf {
 
     builder.addWidget(pw.SizedBox(height: ReportSpacing.md));
 
-    // 6. Bloco de Auditoria e Verificação Técnica
+    // 6. Bloco de Emissão
     builder.addWidget(
-      ReportPrimitives.auditBlock(
-        AuditData(
-          verificationUrl: 'https://k9ops.com/v/$docId',
-          hash: docHash,
-          algorithm: 'SHA-256',
-          documentId: docId,
-          trackingCode: auditRef,
-          description:
-              'Este documento reflete em tempo real o histórico ponderal do cão ${dog.name}, registrado e mantido pela equipe de condutores e veterinários do Canil K9 da GCM de Limeira. Todas as modificações no prontuário geram trilhas de auditoria imutáveis.',
+      pw.Container(
+        padding: const pw.EdgeInsets.all(ReportSpacing.sm),
+        decoration: pw.BoxDecoration(
+          color: ReportColors.surfaceSubtle,
+          border: pw.Border.all(color: ReportColors.borderSoft, width: 0.5),
+          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
         ),
-        fonts,
+        child: pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: pw.CrossAxisAlignment.center,
+          children: [
+            pw.Text(
+              'ACOMPANHAMENTO BIOESTATÍSTICO · SISTEMA K9 OPS',
+              style: pw.TextStyle(
+                font: fonts.bold,
+                fontSize: 7,
+                color: ReportColors.textMuted,
+                letterSpacing: 0.5,
+              ),
+            ),
+            pw.Text(
+              'Emissão: ${DateFormat('dd/MM/yyyy HH:mm').format(now)}',
+              style: pw.TextStyle(
+                font: fonts.monoRegular,
+                fontSize: 7.5,
+                color: ReportColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
 
     return builder.buildPdf(customFonts: fonts);
-  }
-
-  /// Gera um ID de documento único estruturado.
-  static String _buildDocId(Dog dog) {
-    final year = DateTime.now().year;
-    final month = DateTime.now().month.toString().padLeft(2, '0');
-    final seq = dog.id.length >= 4
-        ? dog.id.substring(0, 4).toUpperCase()
-        : dog.id.toUpperCase().padRight(4, '0');
-    return 'PESO: $year/$month/$seq-K9';
-  }
-
-  /// Gera uma referência de auditoria baseada no ID do cão e no timestamp atual.
-  static String _buildAuditReference(Dog dog) {
-    final dogPart = dog.id.length >= 6
-        ? dog.id.substring(0, 6).toUpperCase()
-        : dog.id.toUpperCase();
-    final timePart = DateTime.now().millisecondsSinceEpoch.toString();
-    final truncatedTime = timePart.length > 5
-        ? timePart.substring(timePart.length - 5)
-        : timePart;
-    return 'AUDIT-$dogPart-$truncatedTime';
   }
 
   /// Rótulo de estatística: ausência explícita em vez de número fabricado.
