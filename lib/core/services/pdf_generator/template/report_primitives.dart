@@ -383,7 +383,7 @@ class ReportPrimitives {
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.stretch,
         children: [
-          // Linha Superior: Logo K9 OPS com alto destaque e presença visual
+          // Linha Superior: Logo K9 OPS Oficial com alto destaque e presença visual
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             crossAxisAlignment: pw.CrossAxisAlignment.center,
@@ -391,27 +391,17 @@ class ReportPrimitives {
               pw.Row(
                 crossAxisAlignment: pw.CrossAxisAlignment.center,
                 children: [
-                  // Insígnia / Símbolo tático do K9 OPS
-                  pw.Container(
-                    width: 24,
-                    height: 24,
-                    decoration: pw.BoxDecoration(
-                      color: ReportColors.darkNavySurface,
-                      border: pw.Border.all(color: ReportColors.cyanAccent, width: 1),
-                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-                    ),
-                    alignment: pw.Alignment.center,
-                    child: pw.Text(
-                      'K9',
-                      style: pw.TextStyle(
-                        font: fonts.bold,
-                        fontSize: 11,
-                        color: ReportColors.cyanAccent,
-                        letterSpacing: 0.5,
+                  // Logo Oficial do K9 Ops (ProductMark)
+                  if (branding.productMarkImage != null) ...[
+                    pw.ConstrainedBox(
+                      constraints: const pw.BoxConstraints(maxWidth: 38, maxHeight: 44),
+                      child: pw.Image(
+                        pw.MemoryImage(branding.productMarkImage!.bytes),
+                        fit: pw.BoxFit.contain,
                       ),
                     ),
-                  ),
-                  pw.SizedBox(width: 8),
+                    pw.SizedBox(width: 10),
+                  ],
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
@@ -419,7 +409,7 @@ class ReportPrimitives {
                         'K9 OPS®',
                         style: pw.TextStyle(
                           font: fonts.bold,
-                          fontSize: 14,
+                          fontSize: 16,
                           color: ReportColors.white,
                           letterSpacing: 0.8,
                         ),
@@ -428,7 +418,7 @@ class ReportPrimitives {
                         'SISTEMA DE GESTÃO CANINA',
                         style: pw.TextStyle(
                           font: fonts.bold,
-                          fontSize: 6.5,
+                          fontSize: 7,
                           color: ReportColors.cyanAccent,
                           letterSpacing: 0.8,
                         ),
@@ -468,14 +458,37 @@ class ReportPrimitives {
                   ),
                 )
               else if (motto != null && motto.isNotEmpty)
-                pw.Text(
-                  motto.toUpperCase(),
-                  style: pw.TextStyle(
-                    font: fonts.bold,
-                    fontSize: 7,
-                    color: ReportColors.textMuted,
-                    letterSpacing: 0.8,
-                  ),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    pw.Text(
+                      'DISCIPLINA',
+                      style: pw.TextStyle(
+                        font: fonts.bold,
+                        fontSize: 6.8,
+                        color: ReportColors.textMuted,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                    pw.Text(
+                      'PROTEÇÃO',
+                      style: pw.TextStyle(
+                        font: fonts.bold,
+                        fontSize: 6.8,
+                        color: ReportColors.textMuted,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                    pw.Text(
+                      'RESULTADO',
+                      style: pw.TextStyle(
+                        font: fonts.bold,
+                        fontSize: 6.8,
+                        color: ReportColors.textMuted,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                  ],
                 ),
             ],
           ),
@@ -589,6 +602,7 @@ class ReportPrimitives {
     required String title,
     String? documentId,
     required PdfFonts fonts,
+    ReportBranding branding = const ReportBranding(),
   }) {
     return pw.Container(
       decoration: pw.BoxDecoration(
@@ -603,6 +617,16 @@ class ReportPrimitives {
         children: [
           pw.Row(
             children: [
+              if (branding.productMarkImage != null) ...[
+                pw.ConstrainedBox(
+                  constraints: const pw.BoxConstraints(maxWidth: 16, maxHeight: 16),
+                  child: pw.Image(
+                    pw.MemoryImage(branding.productMarkImage!.bytes),
+                    fit: pw.BoxFit.contain,
+                  ),
+                ),
+                pw.SizedBox(width: 6),
+              ],
               pw.Text(
                 'K9 OPS® · ',
                 style: pw.TextStyle(font: fonts.bold, fontSize: 8, color: ReportColors.cyanAccent),

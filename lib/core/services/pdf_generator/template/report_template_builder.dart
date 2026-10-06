@@ -118,6 +118,7 @@ class ReportTemplateBuilder {
             return ReportPrimitives.darkCompactContinuationHeader(
               title: title,
               documentId: metadata.documentId,
+              branding: branding,
               fonts: fonts,
             );
           }

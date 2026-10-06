@@ -14,8 +14,10 @@ class VaccinationPdf {
     Dog dog,
     List<HealthLogModel> logs, {
     Uint8List? dogPhotoBytes,
+    Uint8List? k9LogoBytes,
   }) async {
     final fonts = await PdfFonts.load();
+    final logoBytes = k9LogoBytes ?? await ReportBrandingAssets.loadOfficialLogo();
 
     // Filtra logs de vacinação do cão (preservando ordenação decrescente de data)
     final vaccineLogs = logs
@@ -57,6 +59,9 @@ class VaccinationPdf {
       category: 'PRONTUÁRIO MÉDICO VETERINÁRIO',
       motto: 'DISCIPLINA · PROTEÇÃO · RESULTADO',
       metadata: metadata,
+      branding: ReportBranding(
+        productMarkImage: logoBytes != null ? ReportImageSlot(bytes: logoBytes) : null,
+      ),
       statusLabel: nextDoseStatusLabel,
       statusTone: overallTone,
       useDarkFooter: true,

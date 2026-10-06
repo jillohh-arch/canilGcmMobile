@@ -20,8 +20,10 @@ class NutritionPdf {
     required int conformCount,
     required int divergentCount,
     Uint8List? dogPhotoBytes,
+    Uint8List? k9LogoBytes,
   }) async {
     final fonts = await PdfFonts.load();
+    final logoBytes = k9LogoBytes ?? await ReportBrandingAssets.loadOfficialLogo();
 
     final conformityTone = conformityPercent >= 85
         ? ReportTone.positive
@@ -41,6 +43,9 @@ class NutritionPdf {
       category: 'MANEJO NUTRICIONAL K9',
       motto: 'DISCIPLINA · PROTEÇÃO · RESULTADO',
       metadata: metadata,
+      branding: ReportBranding(
+        productMarkImage: logoBytes != null ? ReportImageSlot(bytes: logoBytes) : null,
+      ),
       statusLabel: 'CONFORMIDADE: ${conformityPercent.toStringAsFixed(0)}%',
       statusTone: conformityTone,
       useDarkFooter: true,

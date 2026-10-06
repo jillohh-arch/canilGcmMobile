@@ -222,8 +222,10 @@ class WeightHistoryPdf {
     List<HealthLogModel> logs, {
     required WeightPdfAuthority authority,
     Uint8List? dogPhotoBytes,
+    Uint8List? k9LogoBytes,
   }) async {
     final fonts = await PdfFonts.load();
+    final logoBytes = k9LogoBytes ?? await ReportBrandingAssets.loadOfficialLogo();
 
     // Filtra logs de pesagem do cão (mais recentes primeiro)
     final weightLogs = logs
@@ -274,6 +276,9 @@ class WeightHistoryPdf {
       category: 'AVALIAÇÃO PONDERAL K9',
       motto: 'DISCIPLINA · PROTEÇÃO · RESULTADO',
       metadata: metadata,
+      branding: ReportBranding(
+        productMarkImage: logoBytes != null ? ReportImageSlot(bytes: logoBytes) : null,
+      ),
       statusLabel: rangeStatus,
       statusTone: rangeTone,
       useDarkFooter: true,

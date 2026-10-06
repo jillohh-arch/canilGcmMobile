@@ -30,6 +30,7 @@ void main() {
 
   final outputDir = Directory('build/visual_fixtures');
   Uint8List? sampleDogPhoto;
+  Uint8List? sampleLogo;
 
   setUpAll(() async {
     if (!await outputDir.exists()) {
@@ -38,6 +39,10 @@ void main() {
     final photoFile = File('assets/images/k9_ops_loading_dog_static_v1.png');
     if (photoFile.existsSync()) {
       sampleDogPhoto = photoFile.readAsBytesSync();
+    }
+    final logoFile = File('assets/images/logo-app.png');
+    if (logoFile.existsSync()) {
+      sampleLogo = logoFile.readAsBytesSync();
     }
   });
 
@@ -112,10 +117,12 @@ void main() {
         ),
       ];
 
+      expect(sampleLogo, isNotNull);
       final bytes = await VaccinationPdf.generate(
         thor,
         logs,
         dogPhotoBytes: sampleDogPhoto,
+        k9LogoBytes: sampleLogo,
       );
       final file = File('${outputDir.path}/carteira_vacinacao_thor.pdf');
       await file.writeAsBytes(bytes);
@@ -160,6 +167,7 @@ void main() {
           oldestKg: 32.0,
         ),
         dogPhotoBytes: sampleDogPhoto,
+        k9LogoBytes: sampleLogo,
       );
       final file = File('${outputDir.path}/historico_peso_thor.pdf');
       await file.writeAsBytes(bytes);
@@ -204,6 +212,7 @@ void main() {
         conformCount: 13,
         divergentCount: 1,
         dogPhotoBytes: sampleDogPhoto,
+        k9LogoBytes: sampleLogo,
       );
       final file = File('${outputDir.path}/relatorio_nutricional_thor.pdf');
       await file.writeAsBytes(bytes);
@@ -229,7 +238,11 @@ void main() {
         ),
       );
 
-      final bytes = await VaccinationPdf.generate(thor, longList);
+      final bytes = await VaccinationPdf.generate(
+        thor,
+        longList,
+        k9LogoBytes: sampleLogo,
+      );
       final file = File('${outputDir.path}/carteira_vacinacao_multipage.pdf');
       await file.writeAsBytes(bytes);
 
