@@ -3,13 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
-import 'package:canil_gcm/core/services/pdf_generator/pdf_colors.dart';
+import 'package:canil_gcm/core/services/pdf_generator/operational_history_pdf.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/widgets/app_feedback.dart';
 import 'package:canil_gcm/core/widgets/binomio_header.dart';
@@ -276,145 +274,22 @@ class _HistoryScreenState extends State<HistoryScreen>
       return;
     }
 
-    final bytes = await _buildHistoryPdf(entries, dog, handlerName);
+    final range = _periodDateRange();
+    final rangeEnd = range.end.subtract(const Duration(days: 1));
+    final dateLabel =
+        '${DateFormat('dd/MM/yyyy').format(range.start)} a ${DateFormat('dd/MM/yyyy').format(rangeEnd)}';
+
+    final bytes = await OperationalHistoryPdf.generate(
+      entries: entries,
+      dog: dog,
+      handlerName: handlerName,
+      periodLabel: dateLabel,
+    );
     final dogName = dog?.name ?? 'operador';
     await Printing.layoutPdf(
       onLayout: (_) async => bytes,
       name:
           'historico_${dogName}_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf',
-    );
-  }
-
-  Future<Uint8List> _buildHistoryPdf(
-    List<HistoryEntry> entries,
-    Dog? dog,
-    String handlerName,
-  ) async {
-    final pdf = pw.Document();
-    final range = _periodDateRange();
-    final accent = PdfInstitutionalColors.purple;
-    final rangeEnd = range.end.subtract(const Duration(days: 1));
-    final dateLabel =
-        '${DateFormat('dd/MM/yyyy').format(range.start)} a ${DateFormat('dd/MM/yyyy').format(rangeEnd)}';
-
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(28),
-        build: (context) => [
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text(
-                    'GUARDA CIVIL MUNICIPAL DE LIMEIRA',
-                    style: pw.TextStyle(
-                      fontSize: 11,
-                      fontWeight: pw.FontWeight.bold,
-                      color: accent,
-                    ),
-                  ),
-                  pw.SizedBox(height: 4),
-                  pw.Text(
-                    'Histórico operacional do cão K9',
-                    style: pw.TextStyle(
-                      fontSize: 22,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              pw.Text(
-                DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now()),
-                style: const pw.TextStyle(fontSize: 9),
-              ),
-            ],
-          ),
-          pw.SizedBox(height: 14),
-          pw.Container(height: 2, color: accent),
-          pw.SizedBox(height: 14),
-          pw.Container(
-            padding: const pw.EdgeInsets.all(12),
-            decoration: pw.BoxDecoration(
-              color: PdfInstitutionalColors.historyBackground,
-              border: pw.Border.all(color: accent, width: 0.6),
-              borderRadius: pw.BorderRadius.circular(4),
-            ),
-            child: pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                _pdfMetric('Cao K9', dog?.name ?? 'Sem K9'),
-                _pdfMetric('Condutor', handlerName),
-                _pdfMetric('Periodo', dateLabel),
-                _pdfMetric('Registros', entries.length.toString()),
-              ],
-            ),
-          ),
-          pw.SizedBox(height: 18),
-          pw.TableHelper.fromTextArray(
-            headers: const ['Data', 'Categoria', 'Registro', 'Responsável'],
-            data: entries
-                .map(
-                  (entry) => [
-                    DateFormat('dd/MM HH:mm').format(entry.time),
-                    entry.category,
-                    '${entry.title}\n${entry.subtitle}',
-                    entry.author,
-                  ],
-                )
-                .toList(),
-            headerDecoration: pw.BoxDecoration(color: accent),
-            headerStyle: pw.TextStyle(
-              color: PdfInstitutionalColors.white,
-              fontSize: 9,
-              fontWeight: pw.FontWeight.bold,
-            ),
-            cellStyle: const pw.TextStyle(fontSize: 8),
-            cellAlignment: pw.Alignment.centerLeft,
-            cellPadding: const pw.EdgeInsets.all(6),
-            oddRowDecoration: pw.BoxDecoration(
-              color: PdfInstitutionalColors.lightGray,
-            ),
-          ),
-        ],
-        footer: (context) => pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            pw.Text(
-              'Canil K9 GCM Limeira',
-              style: const pw.TextStyle(fontSize: 8),
-            ),
-            pw.Text(
-              'Página ${context.pageNumber} de ${context.pagesCount}',
-              style: const pw.TextStyle(fontSize: 8),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    return pdf.save();
-  }
-
-  pw.Widget _pdfMetric(String label, String value) {
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text(
-          label.toUpperCase(),
-          style: pw.TextStyle(
-            fontSize: 7,
-            color: PdfInstitutionalColors.grey600,
-          ),
-        ),
-        pw.SizedBox(height: 3),
-        pw.Text(
-          value,
-          style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
-        ),
-      ],
     );
   }
 }
