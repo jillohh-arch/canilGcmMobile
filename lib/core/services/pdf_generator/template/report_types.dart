@@ -462,6 +462,7 @@ class RichTableCell {
   final String? secondaryText;
   final ReportTone? badgeTone;
   final String? badgeText;
+  final ReportTone? dotTone;
   final PdfColor? textColor;
   final bool isBold;
   final bool isMonospace;
@@ -472,6 +473,7 @@ class RichTableCell {
     this.secondaryText,
     this.badgeTone,
     this.badgeText,
+    this.dotTone,
     this.textColor,
     this.isBold = false,
     this.isMonospace = false,
@@ -486,7 +488,8 @@ class RichTableCell {
     this.alignment,
   })  : secondaryText = null,
         badgeTone = null,
-        badgeText = null;
+        badgeText = null,
+        dotTone = null;
 
   const RichTableCell.badge({
     required this.badgeText,
@@ -494,9 +497,22 @@ class RichTableCell {
     this.alignment,
   })  : text = badgeText ?? '',
         secondaryText = null,
+        dotTone = null,
         textColor = null,
         isBold = true,
         isMonospace = false;
+
+  const RichTableCell.semanticDot({
+    required this.text,
+    required ReportTone tone,
+    this.secondaryText,
+    this.isBold = true,
+    this.isMonospace = false,
+    this.textColor,
+    this.alignment,
+  })  : dotTone = tone,
+        badgeTone = null,
+        badgeText = null;
 
   const RichTableCell.twoLine({
     required this.text,
@@ -505,6 +521,7 @@ class RichTableCell {
     this.alignment,
   })  : badgeTone = null,
         badgeText = null,
+        dotTone = null,
         textColor = null,
         isBold = true;
 }

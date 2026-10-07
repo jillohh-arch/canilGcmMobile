@@ -173,7 +173,7 @@ class TrainingTacticalPdf {
       ReportPrimitives.entityIdentityBlock(
         EntityIdentityData(
           title: dog.name.toUpperCase(),
-          subtitle: 'Raça: ${dog.breed}',
+          subtitle: null,
           registrationBadge: dog.registrationNumber,
           tags: [
             'CÃO DE TRABALHO',
@@ -378,29 +378,30 @@ class TrainingTacticalPdf {
         header: 'Data / Hora',
         alignment: DataTableCellAlignment.center,
         isMonospace: true,
-        flex: 1.1,
+        flex: 1.10,
       ),
       DataTableColumn(
         header: 'Modalidade',
-        alignment: DataTableCellAlignment.center,
-        flex: 1.3,
+        alignment: DataTableCellAlignment.left,
+        flex: 1.85,
       ),
       DataTableColumn(
         header: 'Local / Ambiente',
-        flex: 1.6,
+        flex: 1.35,
       ),
       DataTableColumn(
         header: 'Especificação Técnica',
-        flex: 1.6,
+        flex: 1.50,
       ),
       DataTableColumn(
         header: 'Observações do Condutor',
-        flex: 2.4,
+        flex: 2.20,
       ),
     ];
 
     final rows = records.map((record) {
-      final dateStr = DateFormat('dd/MM/yyyy HH:mm').format(record.date);
+      final dateFormatted = DateFormat('dd/MM/yyyy').format(record.date);
+      final timeFormatted = DateFormat('HH:mm').format(record.date);
       final modalityTone = _resolveModalityTone(record.trainingType);
 
       final weatherStr = record.weather != null && record.weather!.isNotEmpty
@@ -424,10 +425,15 @@ class TrainingTacticalPdf {
 
       return RichDataTableRow(
         cells: [
-          RichTableCell.text(dateStr, isMonospace: true),
-          RichTableCell.badge(
-            badgeText: record.trainingType,
-            badgeTone: modalityTone,
+          RichTableCell.twoLine(
+            text: dateFormatted,
+            secondaryText: timeFormatted,
+            isMonospace: true,
+            alignment: DataTableCellAlignment.center,
+          ),
+          RichTableCell.semanticDot(
+            text: record.trainingType,
+            tone: modalityTone,
           ),
           RichTableCell.twoLine(
             text: record.location,

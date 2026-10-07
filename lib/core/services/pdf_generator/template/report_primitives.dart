@@ -1759,7 +1759,61 @@ class ReportPrimitives {
     final align = cell.alignment ?? col.alignment;
     final pdfAlign = _alignmentToPdfAlignment(align);
 
-    // 1. Célula com Badge
+    // 1. Célula com Ponto Semântico (suporta quebra dinâmica de 2+ linhas sem truncamento)
+    if (cell.dotTone != null) {
+      final toneColors = ReportToneColors.of(cell.dotTone!);
+      return pw.Container(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 3.5),
+        alignment: pdfAlign,
+        child: pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          mainAxisSize: pw.MainAxisSize.max,
+          children: [
+            pw.Container(
+              margin: const pw.EdgeInsets.only(top: 2.5, right: 4.5),
+              width: 5,
+              height: 5,
+              decoration: pw.BoxDecoration(
+                color: toneColors.accent,
+                shape: pw.BoxShape.circle,
+              ),
+            ),
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: align == DataTableCellAlignment.center
+                    ? pw.CrossAxisAlignment.center
+                    : (align == DataTableCellAlignment.right ? pw.CrossAxisAlignment.end : pw.CrossAxisAlignment.start),
+                mainAxisSize: pw.MainAxisSize.min,
+                children: [
+                  pw.Text(
+                    cell.text,
+                    style: pw.TextStyle(
+                      font: cell.isBold ? fonts.bold : fonts.regular,
+                      fontSize: 7.8,
+                      color: cell.textColor ?? ReportColors.textPrimary,
+                      lineSpacing: 1.15,
+                    ),
+                  ),
+                  if (cell.secondaryText != null && cell.secondaryText!.isNotEmpty) ...[
+                    pw.SizedBox(height: 1),
+                    pw.Text(
+                      cell.secondaryText!,
+                      style: pw.TextStyle(
+                        font: cell.isMonospace ? fonts.monoRegular : fonts.regular,
+                        fontSize: 7,
+                        color: ReportColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 2. Célula com Badge
     if (cell.badgeTone != null && cell.badgeText != null) {
       return pw.Container(
         padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3.5),

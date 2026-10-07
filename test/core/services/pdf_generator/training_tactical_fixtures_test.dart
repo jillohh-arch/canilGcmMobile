@@ -143,18 +143,49 @@ void main() {
     });
 
     test('3. Gera PDF representativo de Treino Multipage (Estresse)', () async {
+      final modalitySamples = [
+        'FARO DE ENTORPECENTES',
+        'PROTEÇÃO E GUARDA',
+        'OBEDIÊNCIA TÁTICA',
+        'DETECÇÃO DE ARMAS E MUNIÇÕES',
+        'FARO GERAL',
+      ];
+
+      final locationSamples = [
+        'Centro de Treinamento Tático K9',
+        'Edificação Confinada com Pavimento Superior e Múltiplos Acessos',
+        'Pátio Logístico de Cargas e Contêineres em Área Portuária Seca',
+        'Parque Ecológico Municipal - Área de Mata Fechada e Terreno Acidentado',
+        'Pista de Obstáculos e Condicionamento Operacional',
+      ];
+
+      final substanceSamples = [
+        'Odor Alvo de Entorpecente Série A (simulador certificado)',
+        'Pólvora de Armamento Calibre .40 e Simulador Balístico',
+        null,
+        'Artigo Tático Pessoal com Odor Humano Específico',
+        'Mistura de Odores Concorrentes em Ambiente Perturbado',
+      ];
+
+      final notesSamples = [
+        'Indicação passiva precisa com foco sustentado e persistência olfativa em compartimento confinado.',
+        'Ataque frontal sob pressão de estampido simulado com mordida cheia e largada imediata ao comando verbal.',
+        'Evolução em marcha, transições rápidas de posições e foco atencional contínuo sem dispersão.',
+        'Varredura metodológica de perímetro com localização célere do artefato em compartimento oculto sob forro.',
+        'Simulado tático em terreno acidentado com desnível acentuado; o cão manteve trilha olfativa sem desvio diante de perturbações externas.',
+      ];
+
       final manySessions = List.generate(
-        42,
+        45,
         (i) => makeSession(
           id: 'multi-$i',
-          date: DateTime(2026, 10, 5, 12, 0).subtract(Duration(hours: i * 16)),
-          trainingType: i % 3 == 0
-              ? 'Faro de Entorpecentes'
-              : (i % 3 == 1 ? 'Proteção e Guarda' : 'Obediência Tática'),
-          location: 'Setor de Instrução ${i % 4 + 1}',
-          substanceUsed: i % 3 == 0 ? 'Odor Alvo Série $i' : null,
-          searchDuration: 180 + (i * 15),
-          handlerNotes: 'Registro instrucional da sessão de treinamento #$i.',
+          date: DateTime(2026, 10, 5, 12, 0).subtract(Duration(hours: i * 14)),
+          trainingType: modalitySamples[i % modalitySamples.length],
+          location: locationSamples[i % locationSamples.length],
+          substanceUsed: substanceSamples[i % substanceSamples.length],
+          searchDuration: 180 + (i * 20),
+          weather: i % 2 == 0 ? 'Ensolarado, 26°C' : 'Chuvoso com Vento Moderado',
+          handlerNotes: notesSamples[i % notesSamples.length],
         ),
       );
 

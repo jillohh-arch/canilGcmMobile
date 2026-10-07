@@ -246,5 +246,63 @@ void main() {
       expect(bytes, isNotEmpty);
       expect(bytes.take(4), orderedEquals('%PDF'.codeUnits));
     });
+
+    test('8. R2 Layout: Rótulos longos de modalidade e quebra fluida sem truncamento', () async {
+      final variedSessions = [
+        makeSession(
+          id: 'var-1',
+          date: DateTime(2026, 10, 5, 14, 30),
+          trainingType: 'FARO DE ENTORPECENTES',
+          location: 'Pátio de Cargas - Área Confinada',
+          substanceUsed: 'Cocaína (simulador)',
+          searchDuration: 210,
+          handlerNotes: 'Indicação passiva precisa com foco sustentado.',
+        ),
+        makeSession(
+          id: 'var-2',
+          date: DateTime(2026, 10, 4, 11, 0),
+          trainingType: 'PROTEÇÃO E GUARDA',
+          location: 'Campo Tático de Instrução',
+          searchDuration: 600,
+          handlerNotes: 'Ataque frontal com mordida cheia e largada imediata sob comando verbal.',
+        ),
+        makeSession(
+          id: 'var-3',
+          date: DateTime(2026, 10, 3, 9, 15),
+          trainingType: 'OBEDIÊNCIA TÁTICA',
+          location: 'Pista de Agility K9',
+          searchDuration: 300,
+          handlerNotes: 'Evolução na marcha e atenção focada.',
+        ),
+        makeSession(
+          id: 'var-4',
+          date: DateTime(2026, 10, 2, 16, 45),
+          trainingType: 'DETECÇÃO DE ARMAS E MUNIÇÕES',
+          location: 'Edificação Escolar Desocupada',
+          substanceUsed: 'Pólvora e simulador balístico',
+          searchDuration: 360,
+          handlerNotes: 'Localização em compartimento oculto sem contaminação do ambiente.',
+        ),
+        makeSession(
+          id: 'var-5',
+          date: DateTime(2026, 10, 1, 8, 0),
+          trainingType: 'FARO GERAL',
+          location: 'Área Aberta',
+          searchDuration: 180,
+          handlerNotes: 'Varredura exploratória inicial.',
+        ),
+      ];
+
+      final bytes = await TrainingTacticalPdf.generate(
+        dog: dog,
+        sessions: variedSessions,
+        conductorCallsign: 'GCM 1CL Silva',
+        dogPhotoBytes: sampleDogPhoto,
+        k9LogoBytes: sampleLogo,
+      );
+
+      expect(bytes, isNotEmpty);
+      expect(bytes.take(4), orderedEquals('%PDF'.codeUnits));
+    });
   });
 }
