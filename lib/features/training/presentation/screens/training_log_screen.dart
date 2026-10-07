@@ -6,7 +6,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:printing/printing.dart';
 import 'package:canil_gcm/core/theme/app_theme.dart';
 import 'package:canil_gcm/core/widgets/app_feedback.dart';
-import 'package:canil_gcm/core/services/report_service.dart';
+import 'package:canil_gcm/core/services/pdf_generator/training_tactical_pdf.dart';
 import 'package:canil_gcm/core/services/handler_identity_service.dart';
 import 'package:canil_gcm/features/training/domain/training_session_model.dart';
 import 'package:canil_gcm/features/training/presentation/viewmodels/training_viewmodel.dart';
@@ -127,27 +127,16 @@ class _TrainingLogScreenState extends State<TrainingLogScreen> {
       return;
     }
 
-    final entries = trainings
-        .map(
-          (t) => ReportEntry(
-            date: t.date,
-            type: t.trainingType,
-            location: t.location.isNotEmpty ? t.location : 'Canil GCM',
-            observations: t.handlerNotes,
-          ),
-        )
-        .toList();
-
     try {
       final first = trainings.first.date;
       final last = trainings.last.date;
       String fmt(DateTime d) =>
           '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
-      final pdfBytes = await ReportService.generateActivityReport(
+      final pdfBytes = await TrainingTacticalPdf.generate(
         dog: dog,
         conductorCallsign: callsign,
-        entries: entries,
+        sessions: trainings,
         period: 'Treinos — ${fmt(first)} a ${fmt(last)}',
       );
 

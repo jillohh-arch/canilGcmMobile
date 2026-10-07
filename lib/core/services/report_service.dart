@@ -6,6 +6,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 import 'pdf_generator/pdf_colors.dart';
+import 'pdf_generator/training_tactical_pdf.dart';
 
 part 'report_service_entry.dart';
 part 'report_service_formatters.dart';
@@ -14,7 +15,7 @@ part 'report_service_widgets.dart';
 
 class ReportService {
   /// Gera o relatório tático formal de atividades em PDF.
-  /// Use [Printing.layoutPdf] ou [Printing.sharePdf] com os bytes retornados.
+  /// Delegado para o gerador canônico F70 [TrainingTacticalPdf].
   static Future<Uint8List> generateActivityReport({
     required Dog dog,
     required String conductorCallsign,
@@ -22,12 +23,11 @@ class ReportService {
     String institution = 'PREFEITURA MUNICIPAL — CANIL GCM',
     String period = '',
   }) {
-    return _ActivityReportPdfBuilder(
+    return TrainingTacticalPdf.generate(
       dog: dog,
       conductorCallsign: conductorCallsign,
       entries: entries,
-      institution: institution,
       period: period,
-    ).build();
+    );
   }
 }

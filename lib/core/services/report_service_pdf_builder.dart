@@ -12,6 +12,8 @@ class _ReportFonts {
   });
 }
 
+@Deprecated('Substituído por TrainingTacticalPdf em pdf_generator')
+// ignore: unused_element
 class _ActivityReportPdfBuilder {
   final Dog dog;
   final String conductorCallsign;
