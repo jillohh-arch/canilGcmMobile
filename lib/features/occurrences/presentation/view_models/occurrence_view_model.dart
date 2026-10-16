@@ -73,10 +73,12 @@ class OccurrenceViewModel extends ChangeNotifier {
   void watchByContext({String? dogId, String? handlerRa}) {
     final cleanDogId = dogId?.trim();
     final cleanRa = handlerRa?.trim();
-    final effectiveDog =
-        (cleanDogId != null && cleanDogId.isNotEmpty) ? cleanDogId : null;
-    final effectiveRa =
-        (cleanRa != null && cleanRa.isNotEmpty) ? cleanRa : null;
+    final effectiveDog = (cleanDogId != null && cleanDogId.isNotEmpty)
+        ? cleanDogId
+        : null;
+    final effectiveRa = (cleanRa != null && cleanRa.isNotEmpty)
+        ? cleanRa
+        : null;
 
     if (effectiveDog == _watchedByDogId &&
         effectiveRa == _watchedByHandlerRa &&
@@ -120,10 +122,12 @@ class OccurrenceViewModel extends ChangeNotifier {
   void watchOpenForContext({String? dogId, String? handlerRa}) {
     final cleanDogId = dogId?.trim();
     final cleanRa = handlerRa?.trim();
-    final effectiveDog =
-        (cleanDogId != null && cleanDogId.isNotEmpty) ? cleanDogId : null;
-    final effectiveRa =
-        (cleanRa != null && cleanRa.isNotEmpty) ? cleanRa : null;
+    final effectiveDog = (cleanDogId != null && cleanDogId.isNotEmpty)
+        ? cleanDogId
+        : null;
+    final effectiveRa = (cleanRa != null && cleanRa.isNotEmpty)
+        ? cleanRa
+        : null;
 
     if (effectiveDog == _watchedDogId &&
         effectiveRa == _watchedHandlerRa &&
@@ -601,10 +605,7 @@ class OccurrenceViewModel extends ChangeNotifier {
     String? dogId,
     String? handlerRa,
   }) async {
-    return _repository.findOpenForContext(
-      dogId: dogId,
-      handlerRa: handlerRa,
-    );
+    return _repository.findOpenForContext(dogId: dogId, handlerRa: handlerRa);
   }
 
   Future<List<OccurrenceEvent>> getEvents(String occurrenceId) async {
@@ -617,7 +618,7 @@ class OccurrenceViewModel extends ChangeNotifier {
   Future<Uint8List> generatePdf({
     required Occurrence occurrence,
     required List<OccurrenceEvent> events,
-    required Dog dog,
+    Dog? dog,
     required String handlerName,
     required String handlerRa,
   }) async {
@@ -638,15 +639,22 @@ class OccurrenceViewModel extends ChangeNotifier {
         );
       }
     }
+    final Dog? dogForPdf = _hasDogForOccurrence(enrichedOccurrence)
+        ? dog
+        : null;
     final generator = OccurrencePdfGenerator();
     return generator.generate(
       occurrence: enrichedOccurrence,
       events: events,
-      dog: dog,
+      dog: dogForPdf,
       handlerName: handlerName,
       handlerRa: handlerRa,
       integrityVerdict: integrityVerdict,
     );
+  }
+
+  bool _hasDogForOccurrence(Occurrence occurrence) {
+    return occurrence.effectiveServiceDogId.trim().isNotEmpty;
   }
 
   Future<void> recordPdfAccess({

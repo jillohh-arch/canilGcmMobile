@@ -152,9 +152,13 @@ class _RegistroDetalhePageState extends State<RegistroDetalhePage> {
       } else {
         final latestOcc = await occurrenceVM.getById(original.id) ?? original;
         final events = await occurrenceVM.getEvents(original.id);
+        final rawDogId = latestOcc.effectiveServiceDogId.trim();
         final matchingDogs = dogVM.dogs.where((d) => d.id == latestOcc.dogId);
         final dog = matchingDogs.isNotEmpty ? matchingDogs.first : null;
-        if (dog == null) throw Exception('Dados do cão não disponíveis');
+        // No-K9 contract: when effectiveServiceDogId is empty, proceed with null dog (no invented K9)
+        if (dog == null && rawDogId.isNotEmpty) {
+          throw Exception('Dados do cão não disponíveis');
+        }
 
         bytes = await occurrenceVM.generatePdf(
           occurrence: latestOcc,
@@ -425,14 +429,16 @@ class HistoryDetailScaffold extends StatelessWidget {
     String secondInfoValue = 'Não informado';
     if (detail.type == HistoryEntryType.occurrence) {
       secondInfoLabel = 'OPERAÇÃO';
-      final startStr = detail.source.details['Início']?.toString() ??
+      final startStr =
+          detail.source.details['Início']?.toString() ??
           DateFormat('HH:mm').format(detail.dateTime);
       final endStr = detail.source.details['Fim']?.toString();
       if (endStr != null && endStr.isNotEmpty) {
         secondInfoValue = '$startStr → $endStr';
       } else {
-        secondInfoValue =
-            detail.source.isInProgress ? '$startStr → Em andamento' : startStr;
+        secondInfoValue = detail.source.isInProgress
+            ? '$startStr → Em andamento'
+            : startStr;
       }
     } else if (detail.type == HistoryEntryType.training) {
       secondInfoLabel = 'LINHA';
@@ -2753,8 +2759,7 @@ bool isConditioningTraining(RecordDetail detail) {
   if (original is ConditioningSession) return true;
   if (original is TrainingSessionModel) {
     if (original.trainingType.toLowerCase().contains('condicion')) return true;
-    final specialty =
-        original.metadata?['specialty']?.toString().toLowerCase();
+    final specialty = original.metadata?['specialty']?.toString().toLowerCase();
     if (specialty != null && specialty.contains('condicion')) return true;
   }
 
@@ -2811,12 +2816,12 @@ class HistoryCondicionamentoBody extends StatelessWidget {
       ...detail.source.details,
       if (session?.metadata != null) ...session!.metadata!,
       if (condSession != null) ...{
-        'exercise':
-            condSession.exerciseNameCustom ?? condSession.exerciseType,
+        'exercise': condSession.exerciseNameCustom ?? condSession.exerciseType,
         'intensity': condSession.intensity,
         'condition': condSession.postCondition,
         'notes': condSession.observations,
-        if (condSession.gpsTrackId != null) 'gpsTrackId': condSession.gpsTrackId,
+        if (condSession.gpsTrackId != null)
+          'gpsTrackId': condSession.gpsTrackId,
         ...condSession.metrics,
       },
     };
@@ -2877,10 +2882,10 @@ class HistoryCondicionamentoBody extends StatelessWidget {
     final notes = metadataNotes.isNotEmpty
         ? metadataNotes
         : (detail.notes.isNotEmpty &&
-                detail.notes != detail.subtitle &&
-                detail.notes != detail.location
-            ? detail.notes
-            : '');
+                  detail.notes != detail.subtitle &&
+                  detail.notes != detail.location
+              ? detail.notes
+              : '');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3211,7 +3216,8 @@ class HistoryCondicionamentoBody extends StatelessWidget {
     final List<Map<String, String>> metrics = [];
 
     // Duration
-    final rawDuration = metadata['duration']?.toString() ??
+    final rawDuration =
+        metadata['duration']?.toString() ??
         metadata['duration_minutes']?.toString() ??
         metadata['duracao']?.toString() ??
         (detail.duration.isNotEmpty && detail.duration != 'Não informado'
@@ -3226,7 +3232,8 @@ class HistoryCondicionamentoBody extends StatelessWidget {
     }
 
     // Distance
-    final rawDistance = metadata['distance']?.toString() ??
+    final rawDistance =
+        metadata['distance']?.toString() ??
         metadata['distance_meters']?.toString() ??
         metadata['max_distance_meters']?.toString() ??
         metadata['distancia']?.toString();
@@ -3236,7 +3243,8 @@ class HistoryCondicionamentoBody extends StatelessWidget {
       if (!str.contains('km') && !str.contains('m')) {
         final numVal = double.tryParse(str);
         if (numVal != null) {
-          final isExplicitMeters = metadata.containsKey('distance_meters') ||
+          final isExplicitMeters =
+              metadata.containsKey('distance_meters') ||
               metadata.containsKey('max_distance_meters');
           if (isExplicitMeters) {
             formatted = numVal >= 1000
@@ -3255,7 +3263,8 @@ class HistoryCondicionamentoBody extends StatelessWidget {
     }
 
     // Repetitions
-    final rawReps = metadata['reps']?.toString() ??
+    final rawReps =
+        metadata['reps']?.toString() ??
         metadata['repetitions']?.toString() ??
         metadata['repeticoes']?.toString();
     if (rawReps != null && rawReps.trim().isNotEmpty) {
@@ -3267,8 +3276,8 @@ class HistoryCondicionamentoBody extends StatelessWidget {
     }
 
     // Sets
-    final rawSets = metadata['sets']?.toString() ??
-        metadata['series']?.toString();
+    final rawSets =
+        metadata['sets']?.toString() ?? metadata['series']?.toString();
     if (rawSets != null && rawSets.trim().isNotEmpty) {
       final str = rawSets.trim();
       final formatted = str.contains('x') || str.contains('série')
@@ -3278,7 +3287,8 @@ class HistoryCondicionamentoBody extends StatelessWidget {
     }
 
     // Speed
-    final rawSpeed = metadata['speed']?.toString() ??
+    final rawSpeed =
+        metadata['speed']?.toString() ??
         metadata['velocity_kmh']?.toString() ??
         metadata['velocidade']?.toString();
     if (rawSpeed != null && rawSpeed.trim().isNotEmpty) {
@@ -3288,7 +3298,8 @@ class HistoryCondicionamentoBody extends StatelessWidget {
     }
 
     // Load
-    final rawLoad = metadata['load']?.toString() ??
+    final rawLoad =
+        metadata['load']?.toString() ??
         metadata['load_kg']?.toString() ??
         metadata['carga']?.toString();
     if (rawLoad != null && rawLoad.trim().isNotEmpty) {
@@ -3298,7 +3309,8 @@ class HistoryCondicionamentoBody extends StatelessWidget {
     }
 
     // Height
-    final rawHeight = metadata['height']?.toString() ??
+    final rawHeight =
+        metadata['height']?.toString() ??
         metadata['max_height_cm']?.toString() ??
         metadata['altura']?.toString();
     if (rawHeight != null && rawHeight.trim().isNotEmpty) {
@@ -3310,7 +3322,8 @@ class HistoryCondicionamentoBody extends StatelessWidget {
     }
 
     // Diagonal
-    final rawDiag = metadata['diagonal']?.toString() ??
+    final rawDiag =
+        metadata['diagonal']?.toString() ??
         metadata['diagonal_meters']?.toString();
     if (rawDiag != null && rawDiag.trim().isNotEmpty) {
       final str = rawDiag.trim();
@@ -3364,8 +3377,7 @@ class HistoryObedienciaBody extends StatelessWidget {
 
     final demais = commands
         .where(
-          (name) =>
-              !operacionais.contains(name) && !posicionais.contains(name),
+          (name) => !operacionais.contains(name) && !posicionais.contains(name),
         )
         .toList();
 

@@ -86,13 +86,17 @@ Occurrence _occ({
   List<String> finalizationPhotos = const [],
   String? vehicleLabel,
   String? vehicleModel,
+  String dogId = 'dog-synth',
+  String? serviceDogId,
+  bool sealIntegrity = true,
 }) {
   return Occurrence(
     id: id,
     shiftId: 'shift-synth',
     primaryHandlerId: 'handler-synth-titular',
     primaryHandlerRa: '90001',
-    dogId: 'dog-synth',
+    dogId: dogId,
+    serviceDogId: serviceDogId,
     typeCode: 'APOIO',
     typeName: typeName,
     locationAddress: locationAddress,
@@ -115,8 +119,9 @@ Occurrence _occ({
     signatureRequestAt: signatureRequestAt,
     signatureDeadline: signatureDeadline,
     signatureRound: signatureRound,
-    integrityHash: integrityHash ?? _hashF64,
-    hashVersion: hashVersion,
+    // Lifecycle contract: only sealed/finalized records carry an integrity hash.
+    integrityHash: sealIntegrity ? (integrityHash ?? _hashF64) : null,
+    hashVersion: sealIntegrity ? hashVersion : null,
     vehicleLabel: vehicleLabel,
     vehicleModel: vehicleModel,
   );
@@ -135,6 +140,16 @@ String _longNarrative() =>
             12)
         .trim();
 
+Dog? _dogFor(Occurrence occurrence) {
+  final sid = occurrence.serviceDogId?.trim();
+  final did = occurrence.dogId.trim();
+  // No-K9 contract: empty serviceDogId and empty/absent dogId => no dog
+  if (did.isEmpty) return null;
+  if (sid != null && sid.isEmpty) return null;
+  if (sid == null && occurrence.dogId == '') return null;
+  return _dog();
+}
+
 Future<Uint8List> _generate({
   required Occurrence occurrence,
   required List<OccurrenceEvent> events,
@@ -142,10 +157,11 @@ Future<Uint8List> _generate({
   List<Amendment>? amendmentsOverride,
   Map<int, Uint8List>? syntheticImageBytesByItemNumber,
 }) {
+  // No invented dog for null-dog fixtures (R2-01)
   return OccurrencePdfGenerator().generate(
     occurrence: occurrence,
     events: events,
-    dog: _dog(),
+    dog: _dogFor(occurrence),
     handlerName: 'GCM 1CL Silva [DEMO]',
     handlerRa: '90001',
     integrityVerdict: verdict,
@@ -326,6 +342,8 @@ void main() {
       final occ = _occ(
         id: '${_syntheticPrefix}D',
         status: OccurrenceStatus.finalized,
+        dogId: '',
+        serviceDogId: '',
       );
       final bytes = await _generate(
         occurrence: occ,
@@ -337,6 +355,10 @@ void main() {
         bytes: bytes,
       );
       expect(file.existsSync(), isTrue);
+      final text = String.fromCharCodes(bytes);
+      // No-K9 contract: must not invent Rex identity when canonical record has no service dog
+      expect(text.contains('Rex'), isFalse, reason: 'D must not show dog Rex');
+      expect(text.contains('K9-SYNTH-001'), isFalse);
     });
 
     test(
@@ -650,14 +672,26 @@ void main() {
         gpsLat: null,
         gpsLng: null,
         gpsAccuracy: null,
+        sealIntegrity: false,
       );
-      final bytes = await _generate(occurrence: occ, events: []);
+      // Lifecycle contract: in-progress must not appear sealed
+      final bytes = await _generate(occurrence: occ, events: [], verdict: null);
       final file = await writeFixturePdf(
         dir: _outDir,
         filename: 'L_no_location_media.pdf',
         bytes: bytes,
       );
       expect(file.existsSync(), isTrue);
+      expect(
+        occ.integrityHash,
+        isNull,
+        reason: 'L unsealed fixture must carry no hash',
+      );
+      final state = OccurrencePdfGenerator.integrityStateTextForTest(
+        hasHash: false,
+        verdict: null,
+      );
+      expect(state, contains('PENDENTE'));
     });
   });
 }

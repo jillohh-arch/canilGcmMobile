@@ -451,14 +451,14 @@ class _OccurrenceConfirmationScreenState
 
     final events = await occVM.getEvents(data.occurrenceId);
 
-    // Buscar cão
+    // Buscar cão — allow null dog for no-K9 occurrences (R2-01)
     final dogId = occ.dogId;
     final dogs = dogVM.dogs.where((d) => d.id == dogId);
     final dog = dogs.isNotEmpty
         ? dogs.first
         : (dogVM.dogs.isNotEmpty ? dogVM.dogs.first : null);
-
-    if (dog == null) {
+    final hasK9 = occ.effectiveServiceDogId.trim().isNotEmpty;
+    if (dog == null && hasK9) {
       throw Exception('Dados do cão não disponíveis');
     }
 

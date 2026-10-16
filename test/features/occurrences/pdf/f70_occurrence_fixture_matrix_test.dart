@@ -83,13 +83,17 @@ Occurrence _occ({
   List<String> finalizationPhotos = const [],
   String? vehicleLabel,
   String? vehicleModel,
+  String dogId = 'dog-synth',
+  String? serviceDogId,
+  bool sealIntegrity = true,
 }) {
   return Occurrence(
     id: id,
     shiftId: 'shift-synth',
     primaryHandlerId: 'handler-synth-titular',
     primaryHandlerRa: '90001',
-    dogId: 'dog-synth',
+    dogId: dogId,
+    serviceDogId: serviceDogId,
     typeCode: 'APOIO',
     typeName: typeName,
     locationAddress: locationAddress,
@@ -112,8 +116,8 @@ Occurrence _occ({
     signatureRequestAt: signatureRequestAt,
     signatureDeadline: signatureDeadline,
     signatureRound: signatureRound,
-    integrityHash: integrityHash ?? _hashF64,
-    hashVersion: hashVersion,
+    integrityHash: sealIntegrity ? (integrityHash ?? _hashF64) : null,
+    hashVersion: sealIntegrity ? hashVersion : null,
     vehicleLabel: vehicleLabel,
     vehicleModel: vehicleModel,
   );
@@ -132,6 +136,13 @@ String _longNarrative() =>
             12)
         .trim();
 
+Dog? _dogFor(Occurrence o) {
+  if (o.dogId.trim().isEmpty) return null;
+  final sid = o.serviceDogId?.trim();
+  if (sid != null && sid.isEmpty) return null;
+  return _dog();
+}
+
 Future<Uint8List> _generate({
   required Occurrence occurrence,
   required List<OccurrenceEvent> events,
@@ -140,7 +151,7 @@ Future<Uint8List> _generate({
   return OccurrencePdfGenerator().generate(
     occurrence: occurrence,
     events: events,
-    dog: _dog(),
+    dog: _dogFor(occurrence),
     handlerName: 'GCM 1CL Silva [DEMO]',
     handlerRa: '90001',
     integrityVerdict: verdict,
@@ -302,12 +313,15 @@ void main() {
       final occ = _occ(
         id: '${_syntheticPrefix}D',
         status: OccurrenceStatus.finalized,
+        dogId: '',
+        serviceDogId: '',
       );
       final bytes = await _generate(
         occurrence: occ,
         events: [_evt(i: 0, occId: occ.id)],
       );
       expect(bytes, isNotEmpty);
+      expect(String.fromCharCodes(bytes).contains('Rex'), isFalse);
     });
 
     test('E: multiple evidence images with varied aspect ratios', () async {
@@ -483,9 +497,19 @@ void main() {
         gpsLat: null,
         gpsLng: null,
         gpsAccuracy: null,
+        sealIntegrity: false,
       );
       final bytes = await _generate(occurrence: occ, events: []);
       expect(bytes, isNotEmpty);
+      // Unsealed lifecycle: hash box must show unsealed state (PENDENTE or prior-hash-free)
+      // PDF text is encoded via font subsets — raw byte scan is fragile; verify via integrity helper contract
+      final state = OccurrencePdfGenerator.integrityStateTextForTest(
+        hasHash: false,
+        verdict: null,
+      );
+      expect(state, contains('PENDENTE'));
+      // Also verify the occurrence itself carries no seal
+      expect(occ.integrityHash, isNull);
     });
   });
 

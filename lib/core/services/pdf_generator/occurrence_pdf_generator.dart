@@ -86,7 +86,7 @@ class OccurrencePdfGenerator {
   Future<Uint8List> generate({
     required Occurrence occurrence,
     required List<OccurrenceEvent> events,
-    required Dog dog,
+    Dog? dog,
     required String handlerName,
     required String handlerRa,
     IntegrityVerdict? integrityVerdict,
@@ -173,7 +173,7 @@ class OccurrencePdfGenerator {
       callsign: ctx.occurrence.vehicleLabel,
       period:
           '${_formatDate(start)}  ${_formatTime(start)} → ${_formatTime(end)}  ·  $duration',
-      dogIdentity: ctx.dog.name,
+      dogIdentity: ctx.dog?.name,
     );
 
     final builder = ReportTemplateBuilder(
@@ -497,21 +497,29 @@ class OccurrencePdfGenerator {
 
   // ── Hero / binômio ───────────────────────────────────────────────────
 
+  bool _hasK9(_OccurrencePdfContext ctx) =>
+      ctx.dog != null && ctx.dog!.name.trim().isNotEmpty;
+
   pw.Widget _buildHeroSection(_OccurrencePdfContext ctx) {
     final f = ctx.fonts;
+    final hasK9 = _hasK9(ctx);
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         ReportPrimitives.styledSectionTitle(
-          'BINÔMIO RESPONSÁVEL',
+          hasK9 ? 'BINÔMIO RESPONSÁVEL' : 'GUARNIÇÃO RESPONSÁVEL',
           f,
-          iconText: 'K9',
-          subtitle: 'Dupla operacional responsável pelo registro',
+          iconText: hasK9 ? 'K9' : 'GR',
+          subtitle: hasK9
+              ? 'Dupla operacional responsável pelo registro'
+              : 'Condutor responsável pelo registro — sem emprego de cão K9',
         ),
         _binomioF70(ctx),
         pw.SizedBox(height: 6),
         pw.Text(
-          'O cão K9 não assina; sua presença é atestada pelos condutores da guarnição.',
+          hasK9
+              ? 'O cão K9 não assina; sua presença é atestada pelos condutores da guarnição.'
+              : 'Nenhum cão K9 empregado nesta ocorrência; registro sob responsabilidade do condutor.',
           style: pw.TextStyle(
             font: f.regular,
             fontSize: 7,
@@ -525,6 +533,98 @@ class OccurrencePdfGenerator {
 
   pw.Widget _binomioF70(_OccurrencePdfContext ctx) {
     final f = ctx.fonts;
+    final hasK9 = _hasK9(ctx);
+    // No-K9 contract: never invent dog identity when canonical record has no service dog
+    if (!hasK9) {
+      return pw.Container(
+        decoration: pw.BoxDecoration(
+          color: ReportColors.surface,
+          border: pw.Border.all(color: ReportColors.borderSoft, width: 1),
+          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+        ),
+        padding: const pw.EdgeInsets.all(12),
+        child: pw.Row(
+          children: [
+            pw.Container(
+              width: 46,
+              height: 46,
+              decoration: pw.BoxDecoration(
+                color: ReportColors.surfaceSubtle,
+                shape: pw.BoxShape.circle,
+                border: pw.Border.all(
+                  color: ReportColors.borderSoft,
+                  width: 1.2,
+                ),
+              ),
+              child: pw.Center(
+                child: pw.Text(
+                  'SEM\nK9',
+                  textAlign: pw.TextAlign.center,
+                  style: pw.TextStyle(
+                    font: f.bold,
+                    fontSize: 7,
+                    lineSpacing: 1,
+                    color: ReportColors.textMuted,
+                  ),
+                ),
+              ),
+            ),
+            pw.SizedBox(width: 10),
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  _tinyLabel(
+                    'Atuação sem K9',
+                    f,
+                    color: ReportColors.textMuted,
+                  ),
+                  pw.SizedBox(height: 2),
+                  pw.Text(
+                    'Sem cão K9 vinculado',
+                    style: _bodyBold(
+                      f,
+                      size: 11,
+                      color: ReportColors.textMuted,
+                    ),
+                  ),
+                  pw.Text(
+                    'Cão não empregado nesta ocorrência (sem dog_id de serviço).',
+                    style: _body(f, size: 8, color: _inkSoft),
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(width: 18),
+            pw.Expanded(
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.end,
+                children: [
+                  pw.Expanded(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.end,
+                      children: [
+                        _tinyLabel('Condutor', f, color: ReportColors.accent),
+                        pw.SizedBox(height: 2),
+                        pw.Text(ctx.handlerName, style: _bodyBold(f, size: 11)),
+                        pw.Text(
+                          'RA: ${ctx.handlerRa}\nUnidade: Canil K9 — Limeira',
+                          textAlign: pw.TextAlign.right,
+                          style: _body(f, size: 8, color: _inkSoft),
+                        ),
+                      ],
+                    ),
+                  ),
+                  pw.SizedBox(width: 10),
+                  _avatarF70('FOTO\nGCM', f),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    final dog = ctx.dog!;
     return pw.Container(
       decoration: pw.BoxDecoration(
         color: ReportColors.surface,
@@ -545,9 +645,9 @@ class OccurrencePdfGenerator {
                     children: [
                       _tinyLabel('Cão K9', f, color: ReportColors.accent),
                       pw.SizedBox(height: 2),
-                      pw.Text(ctx.dog.name, style: _bodyBold(f, size: 11)),
+                      pw.Text(dog.name, style: _bodyBold(f, size: 11)),
                       pw.Text(
-                        'Raça: ${ctx.dog.breed}\nMatrícula: ${ctx.dog.registrationNumber ?? 'N/I'}',
+                        'Raça: ${dog.breed}\nMatrícula: ${dog.registrationNumber ?? 'N/I'}',
                         style: _body(f, size: 8, color: _inkSoft),
                       ),
                     ],
@@ -559,9 +659,13 @@ class OccurrencePdfGenerator {
           pw.Container(
             width: 18,
             alignment: pw.Alignment.center,
-            child: pw.Text(
-              '<>',
-              style: _mono(f, size: 8, color: ReportColors.textMuted),
+            child: pw.Container(
+              width: 4,
+              height: 4,
+              decoration: pw.BoxDecoration(
+                color: ReportColors.borderSoft,
+                shape: pw.BoxShape.circle,
+              ),
             ),
           ),
           pw.Expanded(
@@ -749,10 +853,22 @@ class OccurrencePdfGenerator {
 
   // ── Location ─────────────────────────────────────────────────────────
 
+  bool _hasLocation(_OccurrencePdfContext ctx) {
+    final hasAddress =
+        ctx.occurrence.locationAddress?.trim().isNotEmpty == true;
+    final hasGps =
+        ctx.occurrence.gpsLat != null && ctx.occurrence.gpsLng != null;
+    final hasEventGps = ctx.events.any(
+      (e) => e.gpsLat != null && e.gpsLng != null,
+    );
+    return hasAddress || hasGps || hasEventGps;
+  }
+
   pw.Widget _buildLocationSection(_OccurrencePdfContext ctx) {
     final f = ctx.fonts;
     final start = _operationStart(ctx);
     final end = _operationEnd(ctx);
+    final hasLoc = _hasLocation(ctx);
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
@@ -760,131 +876,194 @@ class OccurrencePdfGenerator {
           'LOCALIZAÇÃO E DADOS OPERACIONAIS',
           f,
           iconText: 'LOC',
-          subtitle: 'Endereço, coordenadas e contexto administrativo',
+          subtitle: hasLoc
+              ? 'Endereço, coordenadas e contexto administrativo'
+              : 'Sem localização registrada — ocorrência sem coordenadas',
         ),
-        pw.Row(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Expanded(
-              flex: 7,
-              child: pw.Container(
-                decoration: pw.BoxDecoration(
-                  border: pw.Border.all(color: ReportColors.borderSoft),
-                  borderRadius: const pw.BorderRadius.all(
-                    pw.Radius.circular(6),
+        if (!hasLoc)
+          pw.Container(
+            padding: const pw.EdgeInsets.all(12),
+            decoration: pw.BoxDecoration(
+              color: ReportColors.surfaceSubtle,
+              border: pw.Border.all(color: ReportColors.borderSoft),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+            ),
+            child: pw.Row(
+              children: [
+                pw.Container(
+                  width: 36,
+                  height: 36,
+                  decoration: pw.BoxDecoration(
+                    color: ReportColors.surface,
+                    shape: pw.BoxShape.circle,
+                    border: pw.Border.all(color: ReportColors.borderSoft),
+                  ),
+                  child: pw.Center(
+                    child: pw.Text(
+                      '!',
+                      style: _bodyBold(
+                        f,
+                        size: 14,
+                        color: ReportColors.textMuted,
+                      ),
+                    ),
                   ),
                 ),
+                pw.SizedBox(width: 10),
+                pw.Expanded(
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'LOCALIZAÇÃO NÃO INFORMADA',
+                        style: _bodyBold(
+                          f,
+                          size: 9,
+                          color: ReportColors.textMuted,
+                        ),
+                      ),
+                      pw.SizedBox(height: 3),
+                      pw.Text(
+                        'Endereço e coordenadas GPS não foram registrados nesta ocorrência. O mapa permanece indisponível até que o condutor informe a localização.',
+                        style: _body(f, size: 7.5, color: _inkSoft),
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        'GPS indisponível  ·  Mapa esquemático indisponível',
+                        style: _mono(f, size: 7, color: _inkFaint),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Expanded(
+                flex: 7,
+                child: pw.Container(
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: ReportColors.borderSoft),
+                    borderRadius: const pw.BorderRadius.all(
+                      pw.Radius.circular(6),
+                    ),
+                  ),
+                  child: pw.Column(
+                    children: [
+                      pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 7,
+                        ),
+                        decoration: pw.BoxDecoration(
+                          color: ReportColors.surfaceSubtle,
+                          border: pw.Border(
+                            bottom: pw.BorderSide(
+                              color: ReportColors.borderSoft,
+                            ),
+                          ),
+                        ),
+                        child: pw.Row(
+                          children: [
+                            pw.Text(
+                              'O',
+                              style: _bodyBold(
+                                f,
+                                size: 8,
+                                color: ReportColors.accent,
+                              ),
+                            ),
+                            pw.SizedBox(width: 6),
+                            pw.Text(
+                              'MAPA DA OCORRÊNCIA',
+                              style: _bodyBold(
+                                f,
+                                size: 7.5,
+                                color: ReportColors.accent,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      _mapCanvasF70(ctx, height: 170),
+                      pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        decoration: pw.BoxDecoration(
+                          color: ReportColors.surfaceSubtle,
+                          border: pw.Border(
+                            top: pw.BorderSide(color: ReportColors.borderSoft),
+                          ),
+                        ),
+                        child: pw.Row(
+                          children: [
+                            pw.Text(
+                              'P',
+                              style: _bodyBold(
+                                f,
+                                size: 8,
+                                color: ReportColors.accent,
+                              ),
+                            ),
+                            pw.SizedBox(width: 6),
+                            pw.Expanded(
+                              child: pw.Column(
+                                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                                children: [
+                                  pw.Text(
+                                    _locationMain(ctx.occurrence),
+                                    style: _bodyBold(f, size: 9.5),
+                                  ),
+                                  pw.Text(
+                                    _locationSub(ctx.occurrence),
+                                    style: _body(f, size: 7.5, color: _inkSoft),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            pw.Text(
+                              _gpsText(
+                                ctx.occurrence.gpsLat,
+                                ctx.occurrence.gpsLng,
+                                precision: 5,
+                              ),
+                              style: _mono(
+                                f,
+                                size: 7.5,
+                                color: ReportColors.accent,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              pw.SizedBox(width: 10),
+              pw.Expanded(
+                flex: 5,
                 child: pw.Column(
                   children: [
-                    pw.Container(
-                      padding: const pw.EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 7,
-                      ),
-                      decoration: pw.BoxDecoration(
-                        color: ReportColors.surfaceSubtle,
-                        border: pw.Border(
-                          bottom: pw.BorderSide(color: ReportColors.borderSoft),
-                        ),
-                      ),
-                      child: pw.Row(
-                        children: [
-                          pw.Text(
-                            'O',
-                            style: _bodyBold(
-                              f,
-                              size: 8,
-                              color: ReportColors.accent,
-                            ),
-                          ),
-                          pw.SizedBox(width: 6),
-                          pw.Text(
-                            'MAPA DA OCORRÊNCIA',
-                            style: _bodyBold(
-                              f,
-                              size: 7.5,
-                              color: ReportColors.accent,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    _mapCanvasF70(ctx, height: 170),
-                    pw.Container(
-                      padding: const pw.EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
-                      ),
-                      decoration: pw.BoxDecoration(
-                        color: ReportColors.surfaceSubtle,
-                        border: pw.Border(
-                          top: pw.BorderSide(color: ReportColors.borderSoft),
-                        ),
-                      ),
-                      child: pw.Row(
-                        children: [
-                          pw.Text(
-                            'P',
-                            style: _bodyBold(
-                              f,
-                              size: 8,
-                              color: ReportColors.accent,
-                            ),
-                          ),
-                          pw.SizedBox(width: 6),
-                          pw.Expanded(
-                            child: pw.Column(
-                              crossAxisAlignment: pw.CrossAxisAlignment.start,
-                              children: [
-                                pw.Text(
-                                  _locationMain(ctx.occurrence),
-                                  style: _bodyBold(f, size: 9.5),
-                                ),
-                                pw.Text(
-                                  _locationSub(ctx.occurrence),
-                                  style: _body(f, size: 7.5, color: _inkSoft),
-                                ),
-                              ],
-                            ),
-                          ),
-                          pw.Text(
-                            _gpsText(
-                              ctx.occurrence.gpsLat,
-                              ctx.occurrence.gpsLng,
-                              precision: 5,
-                            ),
-                            style: _mono(
-                              f,
-                              size: 7.5,
-                              color: ReportColors.accent,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    _infoBoxF70('Endereço', [
+                      _locationMain(ctx.occurrence),
+                      _locationSub(ctx.occurrence),
+                      'Limeira/SP',
+                    ], f),
+                    pw.SizedBox(height: 8),
+                    _coordinateBoxF70(ctx),
+                    pw.SizedBox(height: 8),
+                    _gpsSignalF70(ctx),
                   ],
                 ),
               ),
-            ),
-            pw.SizedBox(width: 10),
-            pw.Expanded(
-              flex: 5,
-              child: pw.Column(
-                children: [
-                  _infoBoxF70('Endereço', [
-                    _locationMain(ctx.occurrence),
-                    _locationSub(ctx.occurrence),
-                    'Limeira/SP',
-                  ], f),
-                  pw.SizedBox(height: 8),
-                  _coordinateBoxF70(ctx),
-                  pw.SizedBox(height: 8),
-                  _gpsSignalF70(ctx),
-                ],
-              ),
-            ),
-          ],
-        ),
+            ],
+          ),
         pw.SizedBox(height: 10),
         // Dados administrativos — F70 dataTable-friendly grid
         pw.Container(
@@ -1508,12 +1687,15 @@ class OccurrencePdfGenerator {
 
   // ── Timeline ─────────────────────────────────────────────────────────
 
+  String _eventCountLabel(int n) => n == 1 ? '1 ação' : '$n ações';
+
   pw.Widget _buildTimelineSection(_OccurrencePdfContext ctx) {
     final f = ctx.fonts;
     final start = _operationStart(ctx);
     final end = _operationEnd(ctx);
     final entries = ctx.events;
-    return pw.Column(
+    // Keep heading + summary + first event atomically (avoid orphan heading)
+    final headerGroup = pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         ReportPrimitives.styledSectionTitle(
@@ -1537,7 +1719,7 @@ class OccurrencePdfGenerator {
               pw.Expanded(
                 child: _timelineSummaryF70(
                   'Eventos',
-                  '${ctx.events.length} ações',
+                  _eventCountLabel(ctx.events.length),
                   f,
                 ),
               ),
@@ -1556,13 +1738,28 @@ class OccurrencePdfGenerator {
         if (entries.isEmpty)
           _emptyBox('Nenhum evento registrado na ocorrência.', f)
         else
-          ...entries.asMap().entries.map(
-            (entry) => _timelineEventF70(
-              entry.value,
-              f,
-              last: entry.key == entries.length - 1,
-            ),
-          ),
+          _timelineEventF70(entries.first, f, last: entries.length == 1),
+      ],
+    );
+    final remaining = entries.length <= 1
+        ? <pw.Widget>[]
+        : entries
+              .sublist(1)
+              .asMap()
+              .entries
+              .map(
+                (e) => _timelineEventF70(
+                  e.value,
+                  f,
+                  last: e.key == entries.length - 2,
+                ),
+              )
+              .toList();
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        headerGroup,
+        ...remaining,
         pw.SizedBox(height: 8),
         _timelineLegendF70(f),
       ],
@@ -2556,28 +2753,10 @@ class OccurrencePdfGenerator {
   pw.Widget _buildValidationSection(_OccurrencePdfContext ctx) {
     final f = ctx.fonts;
     final createdAt = ctx.occurrence.finalizedAt ?? ctx.occurrence.updatedAt;
-    return pw.Column(
+    // Keep integrity hash+QR together with admin metadata (avoid near-empty final page)
+    final adminBlock = pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        ReportPrimitives.styledSectionTitle(
-          'INTEGRIDADE DO DOCUMENTO',
-          f,
-          iconText: 'INT',
-          subtitle: 'Selo SHA-256 e verificação online',
-        ),
-        pw.Row(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Expanded(child: _hashBoxF70(ctx)),
-            pw.SizedBox(width: 10),
-            pw.Expanded(child: _verificationBoxF70(ctx)),
-          ],
-        ),
-        if (_shouldShowTeamAndSignatures(ctx)) ...[
-          pw.SizedBox(height: 12),
-          _buildTeamAndSignaturesSectionF70(ctx),
-        ],
-        pw.SizedBox(height: 10),
         pw.Container(height: 0.5, color: ReportColors.borderSoft),
         pw.SizedBox(height: 8),
         pw.Wrap(
@@ -2600,6 +2779,38 @@ class OccurrencePdfGenerator {
               mono: true,
             ),
             _docInfoF70('Sistema', 'Canil K9 — GCM Limeira', f),
+          ],
+        ),
+      ],
+    );
+    final hashRow = pw.Row(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Expanded(child: _hashBoxF70(ctx)),
+        pw.SizedBox(width: 10),
+        pw.Expanded(child: _verificationBoxF70(ctx)),
+      ],
+    );
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        ReportPrimitives.styledSectionTitle(
+          'INTEGRIDADE DO DOCUMENTO',
+          f,
+          iconText: 'INT',
+          subtitle: 'Selo SHA-256 e verificação online',
+        ),
+        // Keep hash verification QR grouped with admin metadata below
+        pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            hashRow,
+            if (_shouldShowTeamAndSignatures(ctx)) ...[
+              pw.SizedBox(height: 12),
+              _buildTeamAndSignaturesSectionF70(ctx),
+            ],
+            pw.SizedBox(height: 10),
+            adminBlock,
           ],
         ),
       ],
@@ -3244,7 +3455,12 @@ class OccurrencePdfGenerator {
   pw.Widget _buildAmendmentsSection(_OccurrencePdfContext ctx) {
     final dateFmt = DateFormat('dd/MM/yyyy HH:mm');
 
-    return pw.Column(
+    // Keep heading + intro + first amendment together to avoid orphan heading
+    final first = ctx.amendments.isNotEmpty ? ctx.amendments.first : null;
+    final rest = ctx.amendments.length > 1
+        ? ctx.amendments.sublist(1)
+        : const <Amendment>[];
+    final headerGroup = pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         ReportPrimitives.styledSectionTitle(
@@ -3275,7 +3491,14 @@ class OccurrencePdfGenerator {
           ),
         ),
         pw.SizedBox(height: 10),
-        ...ctx.amendments.map(
+        if (first != null) _buildAmendmentEntryF70(ctx, first, dateFmt),
+      ],
+    );
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        headerGroup,
+        ...rest.map(
           (amendment) => _buildAmendmentEntryF70(ctx, amendment, dateFmt),
         ),
       ],
@@ -3528,7 +3751,7 @@ class _PdfDisplacementPoint {
 class _OccurrencePdfContext {
   final Occurrence occurrence;
   final List<OccurrenceEvent> events;
-  final Dog dog;
+  final Dog? dog;
   final String handlerName;
   final String handlerRa;
   final String docId;
@@ -3544,7 +3767,7 @@ class _OccurrencePdfContext {
   const _OccurrencePdfContext({
     required this.occurrence,
     required this.events,
-    required this.dog,
+    this.dog,
     required this.handlerName,
     required this.handlerRa,
     required this.docId,
