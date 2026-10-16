@@ -78,6 +78,11 @@ class OccurrencePdfGenerator {
   /// Gera o PDF completo e retorna os bytes.
   ///
   /// Mantém a assinatura pública intacta (mock-safe nos testes).
+  ///
+  /// Parâmetros de teste/injeção (opcionais):
+  /// - [amendmentsOverride] injeta aditamentos sintéticos sem tocar Firestore.
+  /// - [syntheticImageBytesByItemNumber] injeta bytes de imagem sintética por
+  ///   número do item de mídia (`_PdfMediaItem.number`), sem rede.
   Future<Uint8List> generate({
     required Occurrence occurrence,
     required List<OccurrenceEvent> events,
@@ -85,6 +90,8 @@ class OccurrencePdfGenerator {
     required String handlerName,
     required String handlerRa,
     IntegrityVerdict? integrityVerdict,
+    @visibleForTesting List<Amendment>? amendmentsOverride,
+    @visibleForTesting Map<int, Uint8List>? syntheticImageBytesByItemNumber,
   }) async {
     final fonts = await PdfFonts.load();
     final logoBytes = await ReportBrandingAssets.loadOfficialLogo();
@@ -94,11 +101,44 @@ class OccurrencePdfGenerator {
       ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
     final locations = OccurrenceLocationService.clusterEventsSync(sortedEvents);
-    final media = await _buildMediaItems(sortedEvents);
-    final finalizationMedia = await _buildFinalizationMediaItems(occurrence);
-    final amendments = await AmendmentRepository().listByOccurrence(
-      occurrence.id,
-    );
+    var media = await _buildMediaItems(sortedEvents);
+    var finalizationMedia = await _buildFinalizationMediaItems(occurrence);
+    if (syntheticImageBytesByItemNumber != null &&
+        syntheticImageBytesByItemNumber.isNotEmpty) {
+      media = media
+          .map(
+            (item) => syntheticImageBytesByItemNumber.containsKey(item.number)
+                ? _PdfMediaItem(
+                    number: item.number,
+                    url: item.url,
+                    image: pw.MemoryImage(
+                      syntheticImageBytesByItemNumber[item.number]!,
+                    ),
+                    event: item.event,
+                  )
+                : item,
+          )
+          .toList();
+      // Finalization items use 1-based numbering matching event items; offset to avoid collision
+      // For simplicity, reuse same map for finalization when keys overlap (callers should avoid overlap by using disjoint ranges)
+      finalizationMedia = finalizationMedia
+          .map(
+            (item) =>
+                syntheticImageBytesByItemNumber.containsKey(1000 + item.number)
+                ? _PdfFinalizationMediaItem(
+                    number: item.number,
+                    url: item.url,
+                    image: pw.MemoryImage(
+                      syntheticImageBytesByItemNumber[1000 + item.number]!,
+                    ),
+                  )
+                : item,
+          )
+          .toList();
+    }
+    final amendments =
+        amendmentsOverride ??
+        await AmendmentRepository().listByOccurrence(occurrence.id);
 
     final ctx = _OccurrencePdfContext(
       occurrence: occurrence,
