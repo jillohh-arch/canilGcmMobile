@@ -589,7 +589,7 @@ class OccurrencePdfGenerator {
                     ),
                   ),
                   pw.Text(
-                    'Cão não empregado nesta ocorrência (sem dog_id de serviço).',
+                    'Cão não empregado nesta ocorrência.',
                     style: _body(f, size: 8, color: _inkSoft),
                   ),
                 ],
@@ -2750,10 +2750,41 @@ class OccurrencePdfGenerator {
 
   // ── Validation / integrity / team / signatures ───────────────────────
 
+  pw.Widget _verificationPendingF70(PdfFonts fonts) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(10),
+      decoration: pw.BoxDecoration(
+        color: ReportColors.surfaceSubtle,
+        border: pw.Border.all(color: ReportColors.borderSoft),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            'VERIFICAÇÃO ONLINE — INDISPONÍVEL',
+            style: _bodyBold(fonts, size: 7.5, color: ReportColors.textMuted),
+          ),
+          pw.SizedBox(height: 6),
+          pw.Text(
+            'Este rascunho ainda não possui selo de integridade. A verificação por QR e o selo SHA-256 só estarão disponíveis após a finalização e o selamento oficial no servidor; até então, o hash permanece não calculado.',
+            style: _body(fonts, size: 7, color: _inkSoft),
+          ),
+        ],
+      ),
+    );
+  }
+
   pw.Widget _buildValidationSection(_OccurrencePdfContext ctx) {
     final f = ctx.fonts;
     final createdAt = ctx.occurrence.finalizedAt ?? ctx.occurrence.updatedAt;
-    // Keep integrity hash+QR together with admin metadata (avoid near-empty final page)
+    // F40 rule: unsealed occurrences have no authoritative hash version nor active QR verification.
+    final storedHash = ctx.occurrence.integrityHash?.trim();
+    final hasHash = storedHash != null && storedHash.isNotEmpty;
+    final isUnsealed = !hasHash;
+    final versionValue = isUnsealed
+        ? '—'
+        : 'hash v${ctx.occurrence.hashVersion ?? 2}';
     final adminBlock = pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
@@ -2765,12 +2796,7 @@ class OccurrencePdfGenerator {
           children: [
             _docInfoF70('ID do documento', ctx.docId, f, mono: true),
             _docInfoF70('Tipo', 'Registro Operacional K9', f),
-            _docInfoF70(
-              'Versão',
-              'hash v${ctx.occurrence.hashVersion ?? 2}',
-              f,
-              mono: true,
-            ),
+            _docInfoF70('Versão', versionValue, f, mono: true),
             _docInfoF70('Criado em', _formatDateTime(createdAt), f, mono: true),
             _docInfoF70(
               'Sincronizado',
@@ -2788,10 +2814,15 @@ class OccurrencePdfGenerator {
       children: [
         pw.Expanded(child: _hashBoxF70(ctx)),
         pw.SizedBox(width: 10),
-        pw.Expanded(child: _verificationBoxF70(ctx)),
+        pw.Expanded(
+          child: isUnsealed
+              ? _verificationPendingF70(f)
+              : _verificationBoxF70(ctx),
+        ),
       ],
     );
-    return pw.Column(
+    // Keep heading + hash/verification together; admin metadata allowed to paginate independently.
+    final headerGroup = pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         ReportPrimitives.styledSectionTitle(
@@ -2800,19 +2831,19 @@ class OccurrencePdfGenerator {
           iconText: 'INT',
           subtitle: 'Selo SHA-256 e verificação online',
         ),
-        // Keep hash verification QR grouped with admin metadata below
-        pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            hashRow,
-            if (_shouldShowTeamAndSignatures(ctx)) ...[
-              pw.SizedBox(height: 12),
-              _buildTeamAndSignaturesSectionF70(ctx),
-            ],
-            pw.SizedBox(height: 10),
-            adminBlock,
-          ],
-        ),
+        hashRow,
+      ],
+    );
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        headerGroup,
+        if (_shouldShowTeamAndSignatures(ctx)) ...[
+          pw.SizedBox(height: 12),
+          _buildTeamAndSignaturesSectionF70(ctx),
+        ],
+        pw.SizedBox(height: 10),
+        adminBlock,
       ],
     );
   }

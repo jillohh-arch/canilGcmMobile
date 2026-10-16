@@ -342,6 +342,7 @@ void main() {
       final occ = _occ(
         id: '${_syntheticPrefix}D',
         status: OccurrenceStatus.finalized,
+        typeName: 'Averiguação sem emprego de K9 [DEMO]',
         dogId: '',
         serviceDogId: '',
       );
