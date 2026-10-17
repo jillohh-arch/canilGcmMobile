@@ -220,6 +220,10 @@ class OccurrencePdfGenerator {
     builder.addWidget(pw.SizedBox(height: ReportSpacing.sm));
     builder.addWidget(_buildReportSection(ctx));
     builder.addWidget(pw.SizedBox(height: ReportSpacing.sm));
+    // F70 R4: keep the entire concluding (integrity + hash/QR + team + document
+    // metadata) section on a fresh page so no administrative-metadata-only
+    // orphan page can be produced.
+    builder.addWidget(pw.NewPage());
     builder.addWidget(_buildValidationSection(ctx));
     if (ctx.amendments.isNotEmpty) {
       builder.addWidget(pw.SizedBox(height: ReportSpacing.sm));
@@ -2422,17 +2426,37 @@ class OccurrencePdfGenerator {
 
   pw.Widget _buildReportSection(_OccurrencePdfContext ctx) {
     final f = ctx.fonts;
+    final repoReport = ctx.occurrence.finalReport?.trim();
+    final hasReport = repoReport != null && repoReport.isNotEmpty;
+    final persistedHasNoOccurrence = ctx.occurrence.results.contains(
+      OccurrenceResult.noOccurrence,
+    );
     final activeResults = ctx.occurrence.results
         .where((r) => r != OccurrenceResult.noOccurrence)
         .toList();
-    final report = ctx.occurrence.finalReport?.trim();
-    final resultCards = <pw.Widget>[
-      if (activeResults.isEmpty)
+    final hasExplicitResults =
+        activeResults.isNotEmpty || persistedHasNoOccurrence;
+    // Neutral empty-state: binding F40 CT.F40-F70.EMPTY-RESULTS-AUTHORITY-R1 — do not synthesize noOccurrence.
+    final resultWidgets = <pw.Widget>[
+      if (!hasExplicitResults)
+        _emptyBox('Nenhum desfecho operacional registrado.', f)
+      else if (activeResults.isEmpty)
         _resultCardF70(OccurrenceResult.noOccurrence, ctx)
       else
         ...activeResults.map((result) => _resultCardF70(result, ctx)),
       if (ctx.media.isNotEmpty) _resultCardF70(null, ctx),
     ];
+    final isOpenOrCanceled =
+        ctx.occurrence.status.isOpen ||
+        ctx.occurrence.status == OccurrenceStatus.canceled;
+    final resultsSubtitle = (!isOpenOrCanceled && hasExplicitResults)
+        ? 'Desfechos formais registrados na finalização'
+        : 'Desfechos operacionais';
+    final needsRelatoPlaceholder = hasExplicitResults && !hasReport;
+    final reportParagraphs = _buildReportParagraphsF70(
+      hasReport ? repoReport : null,
+      f,
+    );
 
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -2441,9 +2465,9 @@ class OccurrencePdfGenerator {
           'RESULTADOS',
           f,
           iconText: 'RES',
-          subtitle: 'Desfechos formais registrados na finalização',
+          subtitle: resultsSubtitle,
         ),
-        ..._buildResultCardsGridF70(resultCards),
+        ..._buildResultCardsGridF70(resultWidgets),
         pw.SizedBox(height: 10),
         ReportPrimitives.styledSectionTitle(
           'RELATO INSTITUCIONAL',
@@ -2464,20 +2488,31 @@ class OccurrencePdfGenerator {
           ),
         ),
         pw.SizedBox(height: 8),
-        ..._buildReportParagraphsF70(report, f),
-        pw.SizedBox(height: 6),
-        pw.Container(
-          padding: const pw.EdgeInsets.all(8),
-          decoration: pw.BoxDecoration(
-            color: ReportColors.surfaceSubtle,
-            border: pw.Border.all(color: ReportColors.borderSoft, width: 0.5),
-            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+        ...reportParagraphs,
+        if (needsRelatoPlaceholder)
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(top: 6),
+            child: pw.Text(
+              'Relato institucional não registrado na finalização.',
+              style: _body(f, size: 8, color: _inkSoft),
+            ),
+          )
+        else if (!needsRelatoPlaceholder)
+          pw.SizedBox(height: 6),
+        if (!needsRelatoPlaceholder) ...[
+          pw.Container(
+            padding: const pw.EdgeInsets.all(8),
+            decoration: pw.BoxDecoration(
+              color: ReportColors.surfaceSubtle,
+              border: pw.Border.all(color: ReportColors.borderSoft, width: 0.5),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+            ),
+            child: pw.Text(
+              'Relato transcrito de áudio gravado em campo, quando aplicável, e revisado pelo condutor responsável antes da finalização.',
+              style: _body(f, size: 7, color: _inkSoft),
+            ),
           ),
-          child: pw.Text(
-            'Relato transcrito de áudio gravado em campo, quando aplicável, e revisado pelo condutor responsável antes da finalização.',
-            style: _body(f, size: 7, color: _inkSoft),
-          ),
-        ),
+        ],
       ],
     );
   }
