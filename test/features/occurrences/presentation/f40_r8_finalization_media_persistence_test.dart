@@ -141,7 +141,7 @@ class _TestOccurrenceViewModel extends OccurrenceViewModel {
   Future<Uint8List> generatePdf({
     required Occurrence occurrence,
     required List<OccurrenceEvent> events,
-    required Dog dog,
+    Dog? dog,
     required String handlerName,
     required String handlerRa,
   }) async {
