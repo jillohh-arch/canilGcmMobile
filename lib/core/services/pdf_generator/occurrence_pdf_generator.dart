@@ -3344,7 +3344,7 @@ class OccurrencePdfGenerator {
     required IntegrityVerdict? verdict,
   }) {
     if (!hasHash) {
-      return 'PENDENTE\nFinalize a ocorrência para cristalizar o hash.';
+      return 'PENDENTE\nEste registro não possui selo de integridade armazenado.';
     }
     if (verdict == null) {
       return 'SELO ARMAZENADO\nVerificação local indisponível neste PDF. Confirme pelo QR Code.';
