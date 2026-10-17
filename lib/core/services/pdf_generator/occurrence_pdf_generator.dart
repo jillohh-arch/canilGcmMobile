@@ -2767,7 +2767,7 @@ class OccurrencePdfGenerator {
           ),
           pw.SizedBox(height: 6),
           pw.Text(
-            'Este rascunho ainda não possui selo de integridade. A verificação por QR e o selo SHA-256 só estarão disponíveis após a finalização e o selamento oficial no servidor; até então, o hash permanece não calculado.',
+            'Este registro não possui selo de integridade armazenado. A verificação por QR permanece indisponível enquanto não houver um selo canônico disponível.',
             style: _body(fonts, size: 7, color: _inkSoft),
           ),
         ],
