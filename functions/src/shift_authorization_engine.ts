@@ -138,6 +138,11 @@ export interface ShiftCommandInput {
   readonly shiftGroupLabel?: string | null;
   readonly vehicle?: VehicleInput | null;
   readonly role?: string | null;
+  /** Optional F40 context, included in actor-bound idempotency. */
+  readonly sessionId?: string | null;
+  readonly generationId?: string | null;
+  readonly operationContext?: string | null;
+  readonly receiptVersion?: string | null;
 }
 
 export interface ShiftCommandResult {
@@ -148,6 +153,45 @@ export interface ShiftCommandResult {
   readonly acknowledgementRecorded: boolean;
   readonly shiftId: string | null;
   readonly wasNoOp: boolean;
+}
+
+export type K9AssociationIntent = "NO_K9_ASSOCIATION" | "K9_ASSOCIATION_REQUESTED";
+export type K9GuardDecision =
+  | {readonly status: "ALLOWED"; readonly dogId: string; readonly restrictionIds: readonly string[]; readonly authorityRevision: string | null}
+  | {readonly status: "DENIED" | "UNKNOWN" | "CONFLICT"; readonly reason: string; readonly dogId?: string};
+
+export interface K9AssociationGuardInput {
+  readonly transaction: ShiftTxn;
+  readonly trustedActor: ShiftActor | null | undefined;
+  readonly dogId?: string | null;
+  readonly associationIntent: K9AssociationIntent;
+  readonly acknowledgedRestrictionIds?: readonly string[];
+  readonly operationContext?: string | null;
+  readonly currentAuthorityEvidence?: {readonly actorUid: string; readonly actorRa: string; readonly dogId: string; readonly revision?: string | null} | null;
+  readonly now?: Date;
+}
+
+/** Canonical, transaction-aware F20 guard for writers owned by another front. */
+export async function evaluateK9AssociationInTransaction(input: K9AssociationGuardInput): Promise<K9GuardDecision> {
+  if (input.associationIntent === "NO_K9_ASSOCIATION") return {status: "ALLOWED", dogId: "", restrictionIds: [], authorityRevision: null};
+  const dogId = nonEmpty(input.dogId);
+  const actor = input.trustedActor;
+  if (!dogId || !actor || !actor.uid || !actor.ra) return {status: "UNKNOWN", reason: "missing_trusted_actor_or_k9", dogId: dogId ?? undefined};
+  const evidence = input.currentAuthorityEvidence;
+  if (!evidence) return {status: "UNKNOWN", reason: "missing_authority_evidence", dogId};
+  if (evidence.actorUid !== actor.uid || evidence.actorRa !== actor.ra || evidence.dogId !== dogId) return {status: "CONFLICT", reason: "authority_evidence_mismatch", dogId};
+  const dog = await input.transaction.get(`dogs/${dogId}`);
+  if (!dog.exists) return {status: "DENIED", reason: "k9_not_found", dogId};
+  const restrictions = await input.transaction.getCollection(`dogs/${dogId}/${RESTRICTIONS_SUBCOLLECTION}`);
+  const decision = evaluateShiftRestrictionGuard({restrictions, requestedActivity: null, now: input.now ?? new Date()});
+  if (decision.outcome === "unavailable") return {status: "UNKNOWN", reason: decision.reasonCode, dogId};
+  if (!decisionAllowsMutation(decision)) return {status: "DENIED", reason: decision.outcome, dogId};
+  const acknowledged = input.acknowledgedRestrictionIds ?? [];
+  if (decisionRequiresAcknowledgement(decision)) {
+    const missing = decision.restrictions.filter((r) => r.level === "partial" && !acknowledged.includes(r.id));
+    if (missing.length) return {status: "DENIED", reason: "partial_acknowledgement_required", dogId};
+  }
+  return {status: "ALLOWED", dogId, restrictionIds: decision.restrictions.map((r) => r.id), authorityRevision: evidence.revision ?? null};
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -339,6 +383,33 @@ export function fingerprintCommand(input: ShiftCommandInput): string {
   ].join("|");
 }
 
+/** Fingerprint OP-AUTH vinculada ao ator confiável e ao contexto material. */
+export function actorBoundFingerprint(
+  actor: ShiftActor,
+  input: ShiftCommandInput,
+): string {
+  const payload = {
+    action: input.action,
+    dogId: input.dogId,
+    vehicleId: nonEmpty(input.vehicle?.id),
+    role: nonEmpty(input.role),
+    shiftGroupId: nonEmpty(input.shiftGroupId),
+    shiftGroupCode: nonEmpty(input.shiftGroupCode),
+    shiftGroupLabel: nonEmpty(input.shiftGroupLabel),
+    acknowledgedRestrictionIds: [...(input.acknowledgedRestrictionIds ?? [])].sort(),
+    sessionId: nonEmpty(input.sessionId),
+    generationId: nonEmpty(input.generationId),
+    operationContext: nonEmpty(input.operationContext),
+  };
+  return JSON.stringify({
+    version: 2,
+    actorUid: actor.uid,
+    actorRa: actor.ra,
+    operationId: input.operationId,
+    payload,
+  });
+}
+
 export interface ShiftGuardContext {
   readonly decision: ShiftRestrictionDecision;
   readonly acknowledgementRecorded: boolean;
@@ -448,7 +519,7 @@ export async function runShiftAuthorizedCommand(
   }
 
   const normalized: ShiftCommandInput = {...input, dogId, operationId, role};
-  const fingerprint = fingerprintCommand(normalized);
+  const fingerprint = actorBoundFingerprint(actor, normalized);
   const receiptPath = `shift_operations/${operationId}`;
 
   // O fan-out precisa da lista de membros da guarnição. Firestore não permite
@@ -468,7 +539,15 @@ export async function runShiftAuthorizedCommand(
     const receiptSnap = await txn.get(receiptPath);
     if (receiptSnap.exists) {
       const data = receiptSnap.data ?? {};
-      if (data.fingerprint !== fingerprint) {
+      const legacy = data.receipt_version !== 2 ||
+        typeof data.actor_uid !== "string" ||
+        typeof data.actor_ra !== "string";
+      // Legacy receipts lack the trusted UID binding and cannot be safely
+      // promoted to a current replay authority. Fail closed until the owning
+      // writer/client migrates the receipt to version 2.
+      if (legacy || (!legacy && (data.fingerprint !== fingerprint ||
+          data.actor_uid !== actor.uid || data.actor_ra !== actor.ra ||
+          data.operation_type !== normalized.action || data.operation_id !== operationId))) {
         throw new ShiftAuthorizationError(
           "failed-precondition",
           "idempotency_conflict",
@@ -537,9 +616,13 @@ export async function runShiftAuthorizedCommand(
     };
 
     txn.set(receiptPath, {
+      receipt_version: 2,
       fingerprint,
       action: normalized.action,
+      operation_type: normalized.action,
+      operation_id: operationId,
       dog_id: dogId,
+      actor_uid: actor.uid,
       actor_ra: actor.ra,
       created_at: deps.serverTimestamp(),
       result: result as unknown as JsonMap,
