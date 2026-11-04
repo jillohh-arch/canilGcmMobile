@@ -28,6 +28,7 @@ import {
   AccessProfileAction,
   AccessProfileWriterCaller,
   AccessProfileWriterDeps,
+  decideVehicleActionGrant,
   isCanonicalCapability,
   runAdminDuplicateAccessProfile,
   runAdminSaveAccessProfile,
@@ -1990,6 +1991,192 @@ async function testHealthReadExplicitlyRejectedFailsClosed(): Promise<void> {
   assertZeroWrites(db, "save com health.read produz zero escritas");
 }
 
+async function testVehicleCapabilitiesAndRevocation() {
+  assert.strictEqual(
+    isCanonicalCapability("vehicles", "self_regularize_prior_occupancy"),
+    true,
+    "vehicles.self_regularize_prior_occupancy deve ser canônico",
+  );
+  assert.strictEqual(
+    isCanonicalCapability("vehicles", "exceptionally_reconcile_operational_engagement"),
+    true,
+    "vehicles.exceptionally_reconcile_operational_engagement deve ser canônico",
+  );
+
+  // Criar perfil com as duas capabilities
+  const db = createFakeDb();
+  const deps = createDeps(db);
+  await runAdminSaveAccessProfile(
+    makeRequest({
+      id: "perfil_veicular",
+      profile: sourceProfile({
+        id: "perfil_veicular",
+        permissions: {
+          vehicles: {
+            self_regularize_prior_occupancy: true,
+            exceptionally_reconcile_operational_engagement: true,
+          },
+        },
+      }),
+    }),
+    deps,
+  );
+
+  const stored = db._doc("access_profiles/perfil_veicular");
+  assert.ok(stored, "perfil veicular deve ter sido criado");
+  const storedPerms = (stored.permissions ?? {}) as JsonMap;
+  const vehiclePerms = (storedPerms.vehicles ?? {}) as JsonMap;
+  assert.strictEqual(vehiclePerms.self_regularize_prior_occupancy, true);
+  assert.strictEqual(vehiclePerms.exceptionally_reconcile_operational_engagement, true);
+  assert.strictEqual(stored.grant_revision, 1);
+
+  // Revogar self_regularize_prior_occupancy em merge (edit)
+  const updatedT = (stored.updated_at as admin.firestore.Timestamp).toMillis();
+  await runAdminSaveAccessProfile(
+    makeRequest({
+      id: "perfil_veicular",
+      expectedUpdatedAt: updatedT,
+      profile: sourceProfile({
+        id: "perfil_veicular",
+        permissions: {
+          vehicles: {
+            self_regularize_prior_occupancy: false,
+          },
+        },
+      }),
+    }),
+    deps,
+  );
+
+  const afterEdit = db._doc("access_profiles/perfil_veicular")!;
+  const afterPerms = (afterEdit.permissions ?? {}) as JsonMap;
+  const afterVehicles = (afterPerms.vehicles ?? {}) as JsonMap;
+  assert.strictEqual(afterVehicles.self_regularize_prior_occupancy, undefined, "deve ter sido revogado via delete em merge");
+  assert.strictEqual(afterVehicles.exceptionally_reconcile_operational_engagement, true, "deve preservar capability não alterada");
+  assert.strictEqual(afterEdit.grant_revision, 2, "revisão deve avançar monotonicamente");
+}
+
+async function testMonotonicGrantRevisions() {
+  const db = createFakeDb();
+  const deps = createDeps(db);
+
+  // 1. Criação inicial: grant_revision = 1
+  await runAdminSaveAccessProfile(
+    makeRequest({
+      id: "perfil_monotono",
+      profile: sourceProfile({ id: "perfil_monotono" }),
+    }),
+    deps,
+  );
+  let doc = db._doc("access_profiles/perfil_monotono")!;
+  assert.strictEqual(doc.grant_revision, 1, "criação inicial deve ter grant_revision = 1");
+  assert.strictEqual(doc.revision, 1);
+  assert.strictEqual(doc.authority_revision, 1);
+
+  // 2. Primeiro EDIT: grant_revision = 2
+  let t = (doc.updated_at as admin.firestore.Timestamp).toMillis();
+  await runAdminSaveAccessProfile(
+    makeRequest({
+      id: "perfil_monotono",
+      expectedUpdatedAt: t,
+      profile: sourceProfile({ id: "perfil_monotono", name: "Perfil Monótono Editado" }),
+    }),
+    deps,
+  );
+  doc = db._doc("access_profiles/perfil_monotono")!;
+  assert.strictEqual(doc.grant_revision, 2, "primeiro edit deve avançar grant_revision para 2");
+
+  // 3. Segundo EDIT com tentativa do cliente de regredir grant_revision: servidor avança para 3
+  t = (doc.updated_at as admin.firestore.Timestamp).toMillis();
+  await runAdminSaveAccessProfile(
+    makeRequest({
+      id: "perfil_monotono",
+      expectedUpdatedAt: t,
+      profile: sourceProfile({ id: "perfil_monotono", grant_revision: 0 }),
+    }),
+    deps,
+  );
+  doc = db._doc("access_profiles/perfil_monotono")!;
+  assert.strictEqual(doc.grant_revision, 3, "segundo edit deve avançar para 3 ignorando regressão do cliente");
+}
+
+async function testProhibitImplicitAdminBypass() {
+  const activeUser = { uid: "uid-operador", ra: "123", active: true, status: "active" };
+  const adminUser = { uid: "uid-admin", ra: "999", active: true, status: "active", admin: true, role: "admin" };
+  const profileWithGrant = {
+    id: "profile_op",
+    status: "active",
+    grant_revision: 4,
+    permissions: {
+      vehicles: {
+        self_regularize_prior_occupancy: true,
+      },
+    },
+  };
+  const profileWithoutGrant = {
+    id: "profile_admin",
+    status: "active",
+    grant_revision: 1,
+    permissions: {
+      vehicles: {
+        view: true,
+      },
+    },
+  };
+
+  // 1. Operador com grant explícito -> Granted
+  const res1 = decideVehicleActionGrant({
+    authPresent: true,
+    ra: "123",
+    userDoc: activeUser,
+    profileDoc: profileWithGrant,
+    action: "self_regularize_prior_occupancy",
+  });
+  assert.strictEqual(res1.kind, "granted");
+  if (res1.kind === "granted") {
+    assert.strictEqual(res1.grantRevision, 4);
+  }
+
+  // 2. Administrador SEM grant explícito -> Denied (proibido bypass)
+  const res2 = decideVehicleActionGrant({
+    authPresent: true,
+    ra: "999",
+    userDoc: adminUser,
+    profileDoc: profileWithoutGrant,
+    action: "self_regularize_prior_occupancy",
+  });
+  assert.strictEqual(res2.kind, "denied");
+  if (res2.kind === "denied") {
+    assert.strictEqual(res2.reason, "capability_not_granted");
+  }
+
+  // 3. Perfil inativo -> Denied
+  const res3 = decideVehicleActionGrant({
+    authPresent: true,
+    ra: "123",
+    userDoc: activeUser,
+    profileDoc: { ...profileWithGrant, status: "inactive" },
+    action: "self_regularize_prior_occupancy",
+  });
+  assert.strictEqual(res3.kind, "denied");
+  if (res3.kind === "denied") {
+    assert.strictEqual(res3.reason, "inactive_access_profile");
+  }
+
+  // 4. Usuário inativo ou excluído -> Denied
+  const res4 = decideVehicleActionGrant({
+    authPresent: true,
+    ra: "123",
+    userDoc: { ...activeUser, active: false },
+    profileDoc: profileWithGrant,
+    action: "self_regularize_prior_occupancy",
+  });
+  assert.strictEqual(res4.kind, "denied");
+  if (res4.kind === "denied") {
+    assert.strictEqual(res4.reason, "user_inactive_or_deleted");
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 const tests: Array<[string, () => Promise<void>]> = [
@@ -2033,6 +2220,9 @@ const tests: Array<[string, () => Promise<void>]> = [
   ["escopo: nunca vira global", testScopeNeverBecomesGlobal],
   ["contrato de códigos de erro", testErrorCodeContract],
   ["CT3.AUTH-HEALTH-01: health.read rejeitado no save", testHealthReadExplicitlyRejectedFailsClosed],
+  ["veículos: capability estendida e revogação tri-state", testVehicleCapabilitiesAndRevocation],
+  ["veículos: monotonicidade de grant_revision", testMonotonicGrantRevisions],
+  ["veículos: proibição de bypass de administrador", testProhibitImplicitAdminBypass],
 ];
 
 (async () => {

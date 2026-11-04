@@ -80,7 +80,10 @@ export type AccessProfileAction =
   // `cancel_restriction` tem nome próprio porque um cancel indevido recoloca
   // um K9 em operação sem afirmar melhora clínica.
   | "release_restriction"
-  | "cancel_restriction";
+  | "cancel_restriction"
+  // Veículos / Ocupação Operacional (F10 Runtime Authority / Gate Wave 3)
+  | "self_regularize_prior_occupancy"
+  | "exceptionally_reconcile_operational_engagement";
 
 /**
  * Dependências externas ao comportamento do writer.
@@ -209,7 +212,11 @@ export const CANONICAL_ACCESS_PROFILE_CAPABILITIES: Record<string, ReadonlySet<s
   shifts: new Set(BASE_ACCESS_PROFILE_ACTIONS),
   training: new Set(BASE_ACCESS_PROFILE_ACTIONS),
   training_matrix: new Set(BASE_ACCESS_PROFILE_ACTIONS),
-  vehicles: new Set(BASE_ACCESS_PROFILE_ACTIONS),
+  vehicles: new Set<string>([
+    ...BASE_ACCESS_PROFILE_ACTIONS,
+    "self_regularize_prior_occupancy",
+    "exceptionally_reconcile_operational_engagement",
+  ]),
   // `me` no seed carrega apenas o par mínimo de autogestão.
   me: new Set<string>(["view", "edit"]),
   // `health` acumula o conjunto administrativo do seed mais as capabilities
@@ -366,15 +373,28 @@ export function accessProfilePayload(
     // autoridade de seed (`adminSeedAccessProfiles`) ou que derivam de um
     // perfil já existente (`adminDuplicateAccessProfile`).
     storedSeedVersion?: number | null;
+    // Revisão de grant monotonicamente crescente para governança de autoridade F10.
+    storedGrantRevision?: number | null;
   },
   auditEntry: AccessProfileAuditEntryFactory,
 ): JsonMap {
   const status =
     options.status ??
     (stringValue(source.status) === "inactive" ? "inactive" : "active");
+  const currentGrantRevision =
+    options.storedGrantRevision !== undefined && options.storedGrantRevision !== null
+      ? options.storedGrantRevision
+      : (optionalNumberValue(source.grant_revision) ?? optionalNumberValue(source.revision) ?? 0);
+  const nextGrantRevision = options.exists
+    ? Math.max(currentGrantRevision + 1, optionalNumberValue(source.grant_revision) ?? 0)
+    : Math.max(1, optionalNumberValue(source.grant_revision) ?? 1);
+
   const payload: JsonMap = {
     id: profileId,
     description: optionalString(source, "description") ?? "",
+    grant_revision: nextGrantRevision,
+    revision: nextGrantRevision,
+    authority_revision: nextGrantRevision,
     level: optionalString(source, "level") ?? "restrito",
     module_tags: stringList(source.module_tags),
     name: requiredString(source, "name"),
@@ -505,6 +525,7 @@ export async function runAdminSaveAccessProfile(
             // seeding/reconciliação. Um perfil manual não tem proveniência de
             // seed — logo, 0.
             storedSeedVersion: 0,
+            storedGrantRevision: 0,
           },
           deps.auditEntry,
         ),
@@ -561,6 +582,11 @@ export async function runAdminSaveAccessProfile(
           // senão o merge preserva o `true` e a revogação é um no-op.
           permissionMode: "merge",
           storedSeedVersion: optionalNumberValue(stored.seed_version) ?? 0,
+          storedGrantRevision:
+            optionalNumberValue(stored.grant_revision) ??
+            optionalNumberValue(stored.revision) ??
+            optionalNumberValue(stored.authority_revision) ??
+            0,
         },
         deps.auditEntry,
       ),
@@ -611,6 +637,7 @@ export async function runAdminDuplicateAccessProfile(
         // set() sem merge cria um documento novo: um FieldValue.delete() nesse
         // formato lançaria em runtime, então `false` apenas omite a chave.
         permissionMode: "replace",
+        storedGrantRevision: 0,
       },
       deps.auditEntry,
     ),
@@ -658,6 +685,9 @@ export async function runAdminSeedAccessProfiles(
       // omitido: o seeder permanece a autoridade que avança/reconcilia
       // `seed_version`.
       permissionMode: "merge",
+      storedGrantRevision: snapshot.exists
+        ? (optionalNumberValue(snapshot.data()?.grant_revision) ?? optionalNumberValue(snapshot.data()?.revision) ?? 0)
+        : 0,
     }, deps.auditEntry), {merge: true});
   }
 
@@ -695,4 +725,58 @@ export async function runAdminSeedAccessProfiles(
   }
   await batch.commit();
   return {archived, created, updated};
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROIBIÇÃO DE ADMINISTRATOR BYPASS IMPLÍCITO EM VEÍCULOS / OCUPAÇÃO
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface VehicleActionGrantInputs {
+  authPresent: boolean;
+  ra: string;
+  userDoc: JsonMap | undefined;
+  profileDoc: JsonMap | undefined;
+  action: "self_regularize_prior_occupancy" | "exceptionally_reconcile_operational_engagement";
+}
+
+export type VehicleActionGrantResolution =
+  | { kind: "granted"; grantRevision: number }
+  | { kind: "denied"; reason: string };
+
+export function decideVehicleActionGrant(
+  inputs: VehicleActionGrantInputs,
+): VehicleActionGrantResolution {
+  if (!inputs.authPresent) return { kind: "denied", reason: "missing_auth" };
+  if (!inputs.ra || !inputs.ra.trim()) return { kind: "denied", reason: "unresolved_ra" };
+  if (!inputs.userDoc) return { kind: "denied", reason: "missing_user" };
+  if (inputs.userDoc.active === false || inputs.userDoc.status === "inactive" || inputs.userDoc.deleted_at != null) {
+    return { kind: "denied", reason: "user_inactive_or_deleted" };
+  }
+  if (!inputs.profileDoc) return { kind: "denied", reason: "missing_access_profile" };
+
+  const profileStatus = inputs.profileDoc.status;
+  if (profileStatus !== undefined && profileStatus !== null) {
+    if (typeof profileStatus !== "string" || profileStatus.trim() !== "active") {
+      return { kind: "denied", reason: "inactive_access_profile" };
+    }
+  }
+
+  const permissions = isPlainObject(inputs.profileDoc.permissions)
+    ? (inputs.profileDoc.permissions as JsonMap)
+    : {};
+  const vehiclePerms = isPlainObject(permissions.vehicles)
+    ? (permissions.vehicles as JsonMap)
+    : {};
+
+  if (vehiclePerms[inputs.action] !== true) {
+    return { kind: "denied", reason: "capability_not_granted" };
+  }
+
+  const grantRevision =
+    optionalNumberValue(inputs.profileDoc.grant_revision) ??
+    optionalNumberValue(inputs.profileDoc.revision) ??
+    optionalNumberValue(inputs.profileDoc.authority_revision) ??
+    1;
+
+  return { kind: "granted", grantRevision };
 }

@@ -1,0 +1,1122 @@
+{
+  "version": "1.1.0",
+  "source_commit": "a2a7d25fbee67983805e4bbafb408af7f71b98bf",
+  "generated_at": "2026-11-03T12:00:00.000Z",
+  "vectors": [
+    {
+      "id": "identity-resolve-valid-active-confirmed",
+      "category": "identity",
+      "description": "UID/RA válido, ativo e confirmado resolve para TrustedIdentity",
+      "input": {
+        "bindings": [
+          {
+            "uid": "uid-1",
+            "ra": "123",
+            "active": true,
+            "confirmed": true,
+            "revision": 1
+          }
+        ],
+        "uid": "uid-1"
+      },
+      "expected": {
+        "state": "allowed",
+        "result": {
+          "uid": "uid-1",
+          "ra": "123",
+          "revision": 1,
+          "active": true,
+          "confirmed": true
+        }
+      },
+      "source_function": "resolveUniqueBinding",
+      "notes": "Derivado de identity.test.ts linha 5: resolve one active confirmed UID/RA pair"
+    },
+    {
+      "id": "identity-unconfirmed-returns-null",
+      "category": "identity",
+      "description": "Identidade ativa mas não confirmada retorna null",
+      "input": {
+        "bindings": [
+          {
+            "uid": "uid-1",
+            "ra": "123",
+            "active": true,
+            "confirmed": false,
+            "revision": 1
+          }
+        ],
+        "uid": "uid-1"
+      },
+      "expected": {
+        "state": "denied",
+        "result": null
+      },
+      "source_function": "resolveUniqueBinding",
+      "notes": "Derivado de identity.test.ts linha 14: rejects active but unconfirmed binding"
+    },
+    {
+      "id": "identity-inactive-returns-null",
+      "category": "identity",
+      "description": "Identidade inativa retorna null mesmo se confirmada",
+      "input": {
+        "bindings": [
+          {
+            "uid": "uid-1",
+            "ra": "123",
+            "active": false,
+            "confirmed": true,
+            "revision": 1
+          }
+        ],
+        "uid": "uid-1"
+      },
+      "expected": {
+        "state": "denied",
+        "result": null
+      },
+      "source_function": "resolveUniqueBinding",
+      "notes": "Derivado de identity.test.ts linha 12: fails closed for inactive identity bindings"
+    },
+    {
+      "id": "identity-ambiguous-duplicate-uid-returns-null",
+      "category": "identity",
+      "description": "Dois bindings ativos para mesmo UID retorna null",
+      "input": {
+        "bindings": [
+          {
+            "uid": "uid-1",
+            "ra": "123",
+            "active": true,
+            "confirmed": true,
+            "revision": 1
+          },
+          {
+            "uid": "uid-1",
+            "ra": "124",
+            "active": true,
+            "confirmed": true,
+            "revision": 1
+          }
+        ],
+        "uid": "uid-1"
+      },
+      "expected": {
+        "state": "denied",
+        "result": null
+      },
+      "source_function": "resolveUniqueBinding",
+      "notes": "Derivado de identity.test.ts linha 8: matches.length !== 1 retorna null"
+    },
+    {
+      "id": "identity-ra-conflict-uniqueness-false",
+      "category": "identity",
+      "description": "Mesmo RA para UIDs diferentes falha validateBindingUniqueness",
+      "input": {
+        "bindings": [
+          {
+            "uid": "uid-1",
+            "ra": "123",
+            "active": true,
+            "confirmed": true,
+            "revision": 1
+          },
+          {
+            "uid": "uid-2",
+            "ra": "123",
+            "active": true,
+            "confirmed": true,
+            "revision": 1
+          }
+        ]
+      },
+      "expected": {
+        "state": "denied",
+        "result": false
+      },
+      "source_function": "validateBindingUniqueness",
+      "notes": "Derivado de identity.test.ts linha 7: duplicate RAs return false"
+    },
+    {
+      "id": "identity-invalid-revision-throws",
+      "category": "identity",
+      "description": "Revision não inteiro ou menor que 1 lança invalid_identity_binding",
+      "input": {
+        "binding": {
+          "uid": "",
+          "ra": "123",
+          "active": true,
+          "confirmed": true,
+          "revision": 1
+        }
+      },
+      "expected": {
+        "state": "denied",
+        "error": "invalid_identity_binding"
+      },
+      "source_function": "validateIdentityBinding",
+      "notes": "Derivado de identity.test.ts linha 10: empty uid throws; revision < 1 or non-integer also throws per identity.ts linha 10"
+    },
+    {
+      "id": "identity-caller-ra-mismatch-returns-null",
+      "category": "identity",
+      "description": "requestedRa diferente do binding RA retorna null",
+      "input": {
+        "bindings": [
+          {
+            "uid": "uid-1",
+            "ra": "123",
+            "active": true,
+            "confirmed": true,
+            "revision": 1
+          }
+        ],
+        "uid": "uid-1",
+        "requestedRa": "999"
+      },
+      "expected": {
+        "state": "denied",
+        "result": null
+      },
+      "source_function": "resolveUniqueBinding",
+      "notes": "Derivado de identity.test.ts linha 9: caller RA mismatch returns null"
+    },
+    {
+      "id": "identity-malformed-active-record-returns-null",
+      "category": "identity",
+      "description": "Binding ativo malformado (confirmed faltando) contamina resolução mesmo com outro válido",
+      "input": {
+        "bindings": [
+          {
+            "uid": "uid-1",
+            "ra": "123",
+            "active": true,
+            "confirmed": true,
+            "revision": 1
+          },
+          {
+            "uid": "uid-2",
+            "ra": "124",
+            "active": true,
+            "confirmed": false,
+            "revision": 1
+          }
+        ],
+        "uid": "uid-1"
+      },
+      "expected": {
+        "state": "denied",
+        "result": null
+      },
+      "source_function": "resolveUniqueBinding",
+      "notes": "Derivado de identity.test.ts linha 21-24: malformed active records cause null even when target is valid"
+    },
+    {
+      "id": "capabilities-self-regularize-full-evidence-allowed",
+      "category": "capabilities",
+      "description": "SELF_REGULARIZE com identity + evidence + f40 válidos resulta em allowed",
+      "input": {
+        "identity": {
+          "uid": "uid-1",
+          "ra": "123",
+          "revision": 1,
+          "active": true,
+          "confirmed": true
+        },
+        "capability": "vehicles.self_regularize_prior_occupancy",
+        "evidence": {
+          "identity": {
+            "uid": "uid-1",
+            "ra": "123",
+            "revision": 1,
+            "active": true,
+            "confirmed": true
+          },
+          "capability": "vehicles.self_regularize_prior_occupancy",
+          "grantRevision": 1,
+          "authorityRevision": 1
+        },
+        "f40": {
+          "activeMembership": true,
+          "confirmed": true,
+          "incomingCrewMember": true,
+          "generation": "g1"
+        }
+      },
+      "expected": {
+        "state": "allowed",
+        "reason": "explicit_evidence_and_eligibility",
+        "capability": "vehicles.self_regularize_prior_occupancy"
+      },
+      "source_function": "evaluateCapability",
+      "notes": "Derivado de capabilities.test.ts linha 8"
+    },
+    {
+      "id": "capabilities-role-only-denied",
+      "category": "capabilities",
+      "description": "Capability desconhecida (role-only sem grant) resulta em denied",
+      "input": {
+        "identity": {
+          "uid": "uid-1",
+          "ra": "123",
+          "revision": 1,
+          "active": true,
+          "confirmed": true
+        },
+        "capability": "gestor"
+      },
+      "expected": {
+        "state": "denied",
+        "reason": "unknown_capability",
+        "capability": "vehicles.self_regularize_prior_occupancy"
+      },
+      "source_function": "evaluateCapability",
+      "notes": "Derivado de capabilities.test.ts linha 10: capability not in RATIFIED_CAPABILITIES"
+    },
+    {
+      "id": "capabilities-missing-evidence-unknown",
+      "category": "capabilities",
+      "description": "Evidence ausente ou não confiável resulta em unknown",
+      "input": {
+        "identity": {
+          "uid": "uid-1",
+          "ra": "123",
+          "revision": 1,
+          "active": true,
+          "confirmed": true
+        },
+        "capability": "vehicles.self_regularize_prior_occupancy"
+      },
+      "expected": {
+        "state": "unknown",
+        "reason": "missing_or_untrusted_evidence",
+        "capability": "vehicles.self_regularize_prior_occupancy"
+      },
+      "source_function": "evaluateCapability",
+      "notes": "Sem evidence, a verificação de capabilities.ts linha 13 falha e retorna unknown"
+    },
+    {
+      "id": "capabilities-revoked-grant-denied",
+      "category": "capabilities",
+      "description": "Grant revogado (revocationRevision >= grantRevision) resulta em denied",
+      "input": {
+        "identity": {
+          "uid": "uid-1",
+          "ra": "123",
+          "revision": 1,
+          "active": true,
+          "confirmed": true
+        },
+        "capability": "vehicles.self_regularize_prior_occupancy",
+        "evidence": {
+          "identity": {
+            "uid": "uid-1",
+            "ra": "123",
+            "revision": 1,
+            "active": true,
+            "confirmed": true
+          },
+          "capability": "vehicles.self_regularize_prior_occupancy",
+          "grantRevision": 1,
+          "authorityRevision": 1,
+          "revocationRevision": 1
+        },
+        "f40": {
+          "activeMembership": true,
+          "confirmed": true,
+          "incomingCrewMember": true,
+          "generation": "g1"
+        }
+      },
+      "expected": {
+        "state": "denied",
+        "reason": "capability_revoked",
+        "capability": "vehicles.self_regularize_prior_occupancy"
+      },
+      "source_function": "evaluateCapability",
+      "notes": "Derivado de capabilities.test.ts linha 18: revocationRevision >= grantRevision triggers denied"
+    },
+    {
+      "id": "capabilities-f40-incoming-crew-false-unknown",
+      "category": "capabilities",
+      "description": "F40 eligibility com incomingCrewMember false resulta em unknown",
+      "input": {
+        "identity": {
+          "uid": "uid-1",
+          "ra": "123",
+          "revision": 1,
+          "active": true,
+          "confirmed": true
+        },
+        "capability": "vehicles.self_regularize_prior_occupancy",
+        "evidence": {
+          "identity": {
+            "uid": "uid-1",
+            "ra": "123",
+            "revision": 1,
+            "active": true,
+            "confirmed": true
+          },
+          "capability": "vehicles.self_regularize_prior_occupancy",
+          "grantRevision": 1,
+          "authorityRevision": 1
+        },
+        "f40": {
+          "activeMembership": true,
+          "confirmed": true,
+          "incomingCrewMember": false,
+          "generation": "g1"
+        }
+      },
+      "expected": {
+        "state": "unknown",
+        "reason": "f40_eligibility_missing",
+        "capability": "vehicles.self_regularize_prior_occupancy"
+      },
+      "source_function": "evaluateCapability",
+      "notes": "Derivado de capabilities.test.ts linha 11: incomingCrewMember false triggers f40_eligibility_missing"
+    },
+    {
+      "id": "capabilities-exceptional-reconcile-missing-designation-denied",
+      "category": "capabilities",
+      "description": "EXCEPTIONAL_RECONCILE sem designation/evidenceRefs/justification resulta em denied",
+      "input": {
+        "identity": {
+          "uid": "uid-1",
+          "ra": "123",
+          "revision": 1,
+          "active": true,
+          "confirmed": true
+        },
+        "capability": "vehicles.exceptionally_reconcile_operational_engagement",
+        "evidence": {
+          "identity": {
+            "uid": "uid-1",
+            "ra": "123",
+            "revision": 1,
+            "active": true,
+            "confirmed": true
+          },
+          "capability": "vehicles.exceptionally_reconcile_operational_engagement",
+          "grantRevision": 1,
+          "authorityRevision": 1
+        },
+        "f40": {
+          "activeMembership": true,
+          "confirmed": true,
+          "incomingCrewMember": true,
+          "generation": "g1"
+        }
+      },
+      "expected": {
+        "state": "denied",
+        "reason": "designation_evidence_or_justification_missing",
+        "capability": "vehicles.exceptionally_reconcile_operational_engagement"
+      },
+      "source_function": "evaluateCapability",
+      "notes": "Derivado de capabilities.test.ts linha 15: missing designation/evidenceRefs/justification"
+    },
+    {
+      "id": "capabilities-exceptional-reconcile-complete-allowed",
+      "category": "capabilities",
+      "description": "EXCEPTIONAL_RECONCILE com designation + evidenceRefs + justification resulta em allowed",
+      "input": {
+        "identity": {
+          "uid": "uid-1",
+          "ra": "123",
+          "revision": 1,
+          "active": true,
+          "confirmed": true
+        },
+        "capability": "vehicles.exceptionally_reconcile_operational_engagement",
+        "evidence": {
+          "identity": {
+            "uid": "uid-1",
+            "ra": "123",
+            "revision": 1,
+            "active": true,
+            "confirmed": true
+          },
+          "capability": "vehicles.exceptionally_reconcile_operational_engagement",
+          "grantRevision": 1,
+          "authorityRevision": 1,
+          "designation": "supervisor",
+          "evidenceRefs": [
+            "e1"
+          ],
+          "justification": "reconciliation"
+        },
+        "f40": {
+          "activeMembership": true,
+          "confirmed": true,
+          "incomingCrewMember": true,
+          "generation": "g1"
+        }
+      },
+      "expected": {
+        "state": "allowed",
+        "reason": "explicit_evidence_and_eligibility",
+        "capability": "vehicles.exceptionally_reconcile_operational_engagement"
+      },
+      "source_function": "evaluateCapability",
+      "notes": "Derivado de capabilities.test.ts linha 16"
+    },
+    {
+      "id": "capabilities-trusted-identity-missing-unknown",
+      "category": "capabilities",
+      "description": "Sem identity (undefined) resulta em unknown trusted_identity_missing",
+      "input": {
+        "capability": "vehicles.self_regularize_prior_occupancy"
+      },
+      "expected": {
+        "state": "unknown",
+        "reason": "trusted_identity_missing",
+        "capability": "vehicles.self_regularize_prior_occupancy"
+      },
+      "source_function": "evaluateCapability",
+      "notes": "Derivado de adapters.test.ts linha 3 e capabilities.ts linha 11"
+    },
+    {
+      "id": "capabilities-identity-not-active-confirmed-denied",
+      "category": "capabilities",
+      "description": "Identity com active=false ou confirmed=false resulta em denied",
+      "input": {
+        "identity": {
+          "uid": "uid-1",
+          "ra": "123",
+          "revision": 1,
+          "active": false,
+          "confirmed": true
+        },
+        "capability": "vehicles.self_regularize_prior_occupancy"
+      },
+      "expected": {
+        "state": "denied",
+        "reason": "identity_not_active_confirmed",
+        "capability": "vehicles.self_regularize_prior_occupancy"
+      },
+      "source_function": "evaluateCapability",
+      "notes": "Derivado de capabilities.ts linha 12: !identity.active || !identity.confirmed"
+    },
+    {
+      "id": "capabilities-exceptional-reconcile-supervisor-without-f40-allowed",
+      "category": "capabilities",
+      "description": "EXCEPTIONAL_RECONCILE com supervisor + evidenceRefs + justification sem f40 resulta em allowed",
+      "input": {
+        "identity": {
+          "uid": "uid-sup-1",
+          "ra": "SUP01",
+          "revision": 1,
+          "active": true,
+          "confirmed": true
+        },
+        "capability": "vehicles.exceptionally_reconcile_operational_engagement",
+        "evidence": {
+          "identity": {
+            "uid": "uid-sup-1",
+            "ra": "SUP01",
+            "revision": 1,
+            "active": true,
+            "confirmed": true
+          },
+          "capability": "vehicles.exceptionally_reconcile_operational_engagement",
+          "grantRevision": 1,
+          "authorityRevision": 1,
+          "designation": "supervisor",
+          "evidenceRefs": [
+            "disp-887"
+          ],
+          "justification": "Stale operational shift reconciled by supervisor"
+        }
+      },
+      "expected": {
+        "state": "allowed",
+        "reason": "explicit_evidence_and_eligibility",
+        "capability": "vehicles.exceptionally_reconcile_operational_engagement"
+      },
+      "source_function": "evaluateCapability",
+      "notes": "RATIFY-W3-02: Supervisor reconciles without requiring incoming crew membership"
+    },
+    {
+      "id": "capabilities-exceptional-reconcile-operational-inspector-allowed",
+      "category": "capabilities",
+      "description": "EXCEPTIONAL_RECONCILE com operational_inspector e incomingCrewMember false resulta em allowed",
+      "input": {
+        "identity": {
+          "uid": "uid-insp-1",
+          "ra": "INSP01",
+          "revision": 1,
+          "active": true,
+          "confirmed": true
+        },
+        "capability": "vehicles.exceptionally_reconcile_operational_engagement",
+        "evidence": {
+          "identity": {
+            "uid": "uid-insp-1",
+            "ra": "INSP01",
+            "revision": 1,
+            "active": true,
+            "confirmed": true
+          },
+          "capability": "vehicles.exceptionally_reconcile_operational_engagement",
+          "grantRevision": 2,
+          "authorityRevision": 2,
+          "designation": "operational_inspector",
+          "evidenceRefs": [
+            "insp-report-42"
+          ],
+          "justification": "Inspector closure of abandoned occupancy session"
+        },
+        "f40": {
+          "activeMembership": false,
+          "confirmed": false,
+          "incomingCrewMember": false,
+          "generation": "g0"
+        }
+      },
+      "expected": {
+        "state": "allowed",
+        "reason": "explicit_evidence_and_eligibility",
+        "capability": "vehicles.exceptionally_reconcile_operational_engagement"
+      },
+      "source_function": "evaluateCapability",
+      "notes": "RATIFY-W3-02: Inspector reconciles regardless of incoming crew membership flag"
+    },
+    {
+      "id": "capabilities-exceptional-reconcile-invalid-designation-denied",
+      "category": "capabilities",
+      "description": "EXCEPTIONAL_RECONCILE com designation não autorizada resulta em denied",
+      "input": {
+        "identity": {
+          "uid": "uid-1",
+          "ra": "123",
+          "revision": 1,
+          "active": true,
+          "confirmed": true
+        },
+        "capability": "vehicles.exceptionally_reconcile_operational_engagement",
+        "evidence": {
+          "identity": {
+            "uid": "uid-1",
+            "ra": "123",
+            "revision": 1,
+            "active": true,
+            "confirmed": true
+          },
+          "capability": "vehicles.exceptionally_reconcile_operational_engagement",
+          "grantRevision": 1,
+          "authorityRevision": 1,
+          "designation": "condutor",
+          "evidenceRefs": [
+            "ref-1"
+          ],
+          "justification": "Reconciliation attempt without supervisor role"
+        }
+      },
+      "expected": {
+        "state": "denied",
+        "reason": "designation_evidence_or_justification_missing",
+        "capability": "vehicles.exceptionally_reconcile_operational_engagement"
+      },
+      "source_function": "evaluateCapability",
+      "notes": "RATIFY-W3-02: Only supervisor or operational_inspector designation is authorized"
+    },
+    {
+      "id": "capabilities-exceptional-reconcile-empty-evidence-refs-denied",
+      "category": "capabilities",
+      "description": "EXCEPTIONAL_RECONCILE com evidenceRefs vazio resulta em denied",
+      "input": {
+        "identity": {
+          "uid": "uid-1",
+          "ra": "123",
+          "revision": 1,
+          "active": true,
+          "confirmed": true
+        },
+        "capability": "vehicles.exceptionally_reconcile_operational_engagement",
+        "evidence": {
+          "identity": {
+            "uid": "uid-1",
+            "ra": "123",
+            "revision": 1,
+            "active": true,
+            "confirmed": true
+          },
+          "capability": "vehicles.exceptionally_reconcile_operational_engagement",
+          "grantRevision": 1,
+          "authorityRevision": 1,
+          "designation": "supervisor",
+          "evidenceRefs": [],
+          "justification": "Reconciliation without evidence reference"
+        }
+      },
+      "expected": {
+        "state": "denied",
+        "reason": "designation_evidence_or_justification_missing",
+        "capability": "vehicles.exceptionally_reconcile_operational_engagement"
+      },
+      "source_function": "evaluateCapability",
+      "notes": "RATIFY-W3-02: Engagement-specific evidence contract requires at least one non-empty evidenceRef"
+    },
+    {
+      "id": "capabilities-exceptional-reconcile-empty-justification-denied",
+      "category": "capabilities",
+      "description": "EXCEPTIONAL_RECONCILE com justificativa vazia resulta em denied",
+      "input": {
+        "identity": {
+          "uid": "uid-1",
+          "ra": "123",
+          "revision": 1,
+          "active": true,
+          "confirmed": true
+        },
+        "capability": "vehicles.exceptionally_reconcile_operational_engagement",
+        "evidence": {
+          "identity": {
+            "uid": "uid-1",
+            "ra": "123",
+            "revision": 1,
+            "active": true,
+            "confirmed": true
+          },
+          "capability": "vehicles.exceptionally_reconcile_operational_engagement",
+          "grantRevision": 1,
+          "authorityRevision": 1,
+          "designation": "supervisor",
+          "evidenceRefs": [
+            "e1"
+          ],
+          "justification": "   "
+        }
+      },
+      "expected": {
+        "state": "denied",
+        "reason": "designation_evidence_or_justification_missing",
+        "capability": "vehicles.exceptionally_reconcile_operational_engagement"
+      },
+      "source_function": "evaluateCapability",
+      "notes": "RATIFY-W3-02: Non-empty justification is required"
+    },
+    {
+      "id": "capabilities-exceptional-reconcile-whitespace-evidence-ref-denied",
+      "category": "capabilities",
+      "description": "EXCEPTIONAL_RECONCILE com ref de evidência contendo apenas espaços em branco resulta em denied",
+      "input": {
+        "identity": {
+          "uid": "uid-1",
+          "ra": "123",
+          "revision": 1,
+          "active": true,
+          "confirmed": true
+        },
+        "capability": "vehicles.exceptionally_reconcile_operational_engagement",
+        "evidence": {
+          "identity": {
+            "uid": "uid-1",
+            "ra": "123",
+            "revision": 1,
+            "active": true,
+            "confirmed": true
+          },
+          "capability": "vehicles.exceptionally_reconcile_operational_engagement",
+          "grantRevision": 1,
+          "authorityRevision": 1,
+          "designation": "operational_inspector",
+          "evidenceRefs": [
+            "   "
+          ],
+          "justification": "Valid justification text"
+        }
+      },
+      "expected": {
+        "state": "denied",
+        "reason": "designation_evidence_or_justification_missing",
+        "capability": "vehicles.exceptionally_reconcile_operational_engagement"
+      },
+      "source_function": "evaluateCapability",
+      "notes": "RATIFY-W3-02: Whitespace-only evidence refs fail validation"
+    },
+    {
+      "id": "schedule-daytime-window-valid",
+      "category": "schedule",
+      "description": "Janela diurna válida produz start/end corretos com 12h de duração",
+      "input": {
+        "scheduleId": "crew-day",
+        "revision": 2,
+        "timezone": "America/Sao_Paulo",
+        "startLocal": "07:00",
+        "endLocal": "19:00",
+        "serviceDate": "2026-11-01",
+        "source": "crew-assignment"
+      },
+      "expected": {
+        "state": "allowed",
+        "durationMs": 43200000,
+        "startIso": "2026-11-01T10:00:00.000Z",
+        "inclusiveStart": true,
+        "exclusiveEnd": true
+      },
+      "source_function": "calculateCrewWindow",
+      "notes": "Derivado de schedule.test.ts linha 6-8: 12*3600000ms duration, start at 10:00 UTC (07:00 BRT = UTC-3)"
+    },
+    {
+      "id": "schedule-overnight-window-next-day",
+      "category": "schedule",
+      "description": "Janela noturna atravessando meia-noite tem end no dia seguinte com 12h de duração",
+      "input": {
+        "scheduleId": "crew-day",
+        "revision": 2,
+        "timezone": "America/Sao_Paulo",
+        "startLocal": "19:00",
+        "endLocal": "07:00",
+        "serviceDate": "2026-11-01",
+        "source": "crew-assignment"
+      },
+      "expected": {
+        "state": "allowed",
+        "durationMs": 43200000,
+        "inclusiveStart": true,
+        "exclusiveEnd": true
+      },
+      "source_function": "calculateCrewWindow",
+      "notes": "Derivado de schedule.test.ts linha 7: overnight window also 12h, end date computed as next day per schedule.ts linha 31"
+    },
+    {
+      "id": "schedule-invalid-date-throws",
+      "category": "schedule",
+      "description": "Data inválida (2026-02-31) lança invalid_service_date",
+      "input": {
+        "scheduleId": "crew-day",
+        "revision": 2,
+        "timezone": "UTC",
+        "startLocal": "07:00",
+        "endLocal": "19:00",
+        "serviceDate": "2026-02-31",
+        "source": "crew-assignment"
+      },
+      "expected": {
+        "state": "denied",
+        "error": "invalid_service_date"
+      },
+      "source_function": "calculateCrewWindow",
+      "notes": "Derivado de schedule.test.ts linha 12: Feb 31 does not exist, localInstant throws invalid_service_date"
+    },
+    {
+      "id": "schedule-nonexistent-dst-time-throws",
+      "category": "schedule",
+      "description": "Horário inexistente DST (02:30 America/New_York 2026-03-08) lança nonexistent_local_time",
+      "input": {
+        "scheduleId": "crew-day",
+        "revision": 2,
+        "timezone": "America/New_York",
+        "startLocal": "02:30",
+        "endLocal": "04:00",
+        "serviceDate": "2026-03-08",
+        "source": "crew-assignment"
+      },
+      "expected": {
+        "state": "denied",
+        "error": "nonexistent_local_time"
+      },
+      "source_function": "calculateCrewWindow",
+      "notes": "Derivado de schedule.test.ts linha 16: spring forward gap, candidates.length === 0"
+    },
+    {
+      "id": "schedule-ambiguous-dst-time-throws",
+      "category": "schedule",
+      "description": "Horário ambíguo DST (01:30 America/New_York 2026-11-01) lança ambiguous_local_time",
+      "input": {
+        "scheduleId": "crew-day",
+        "revision": 2,
+        "timezone": "America/New_York",
+        "startLocal": "01:30",
+        "endLocal": "03:00",
+        "serviceDate": "2026-11-01",
+        "source": "crew-assignment"
+      },
+      "expected": {
+        "state": "denied",
+        "error": "ambiguous_local_time"
+      },
+      "source_function": "calculateCrewWindow",
+      "notes": "Derivado de schedule.test.ts linha 17: fall back overlap, candidates.length > 1"
+    },
+    {
+      "id": "schedule-invalid-timezone-throws",
+      "category": "schedule",
+      "description": "Timezone inválido lança invalid_timezone",
+      "input": {
+        "scheduleId": "crew-day",
+        "revision": 2,
+        "timezone": "Mars/Nope",
+        "startLocal": "07:00",
+        "endLocal": "19:00",
+        "serviceDate": "2026-11-01",
+        "source": "crew-assignment"
+      },
+      "expected": {
+        "state": "denied",
+        "error": "invalid_timezone"
+      },
+      "source_function": "calculateCrewWindow",
+      "notes": "Derivado de schedule.test.ts linha 11: Intl.DateTimeFormat throws on invalid timezone"
+    },
+    {
+      "id": "schedule-invalid-local-time-throws",
+      "category": "schedule",
+      "description": "Hora inválida (25:00) lança invalid_local_time",
+      "input": {
+        "scheduleId": "crew-day",
+        "revision": 2,
+        "timezone": "America/Sao_Paulo",
+        "startLocal": "25:00",
+        "endLocal": "19:00",
+        "serviceDate": "2026-11-01",
+        "source": "crew-assignment"
+      },
+      "expected": {
+        "state": "denied",
+        "error": "invalid_local_time"
+      },
+      "source_function": "calculateCrewWindow",
+      "notes": "Derivado de schedule.test.ts linha 13: hour >= 24 fails time() regex check"
+    },
+    {
+      "id": "snapshots-create-and-verify-deterministic",
+      "category": "snapshots",
+      "description": "Snapshot criado com serialização determinística verifica como true",
+      "input": {
+        "window": {
+          "scheduleId": "s",
+          "revision": 1,
+          "timezone": "UTC",
+          "serviceDate": "2026-11-01",
+          "start": "2026-11-01T07:00:00.000Z",
+          "end": "2026-11-01T19:00:00.000Z",
+          "inclusiveStart": true,
+          "exclusiveEnd": true
+        },
+        "source": "crew-assignment",
+        "snapshotId": "s1",
+        "createdAt": "2026-11-01T00:00:00Z"
+      },
+      "expected": {
+        "state": "allowed",
+        "verifyResult": true,
+        "frozen": true,
+        "error": null
+      },
+      "source_function": "createSnapshot",
+      "notes": "Derivado de snapshots.test.ts linha 9: Object.isFrozen true, verifySnapshot true",
+      "arg_encoding": {
+        "window.start": "Date — transportado como ISO-8601 string em JSON; o runner DEVE reconstruir new Date(value) antes de chamar createSnapshot (createSnapshot faz window.start.toISOString())",
+        "window.end": "Date — idem window.start"
+      },
+      "replayable": true
+    },
+    {
+      "id": "snapshots-supersession-valid",
+      "category": "snapshots",
+      "description": "Supersession válida produz supersededSnapshotId correto",
+      "input": {
+        "oldSnapshot": {
+          "scheduleId": "s",
+          "revision": 1,
+          "timezone": "UTC",
+          "serviceDate": "2026-11-01",
+          "start": "2026-11-01T07:00:00.000Z",
+          "end": "2026-11-01T19:00:00.000Z",
+          "inclusiveStart": true,
+          "exclusiveEnd": true,
+          "snapshotId": "s1",
+          "source": "crew-assignment",
+          "createdAt": "2026-11-01T00:00:00Z",
+          "integrity": "<computed-by-createSnapshot>"
+        },
+        "replacementSnapshot": {
+          "scheduleId": "s",
+          "revision": 2,
+          "timezone": "UTC",
+          "serviceDate": "2026-11-01",
+          "start": "2026-11-01T07:00:00.000Z",
+          "end": "2026-11-01T19:00:00.000Z",
+          "inclusiveStart": true,
+          "exclusiveEnd": true,
+          "snapshotId": "s2",
+          "source": "corrected-assignment",
+          "createdAt": "2026-11-01T01:00:00Z",
+          "integrity": "<computed-by-createSnapshot>",
+          "supersedesSnapshotId": "s1"
+        },
+        "reason": "corrected source",
+        "createdBy": "trusted-writer",
+        "recordId": "sup-1",
+        "createdAt": "2026-11-01T01:00:00Z"
+      },
+      "expected": {
+        "state": "allowed",
+        "supersededSnapshotId": "s1",
+        "error": null
+      },
+      "source_function": "buildSupersessionRecord",
+      "notes": "Derivado de snapshots.test.ts linha 10: supersededSnapshotId equals old snapshot id",
+      "arg_encoding": {
+        "note": "buildSupersessionRecord recebe DOIS objetos ScheduleSnapshot completos, não campos achatados. O campo integrity é recalculado por createSnapshot; aqui ele é placeholder não-verificado e não participa da validação de supersession."
+      },
+      "replayable": true
+    },
+    {
+      "id": "snapshots-modified-integrity-fails",
+      "category": "snapshots",
+      "description": "Snapshot modificado falha verificação de integridade não criptográfica",
+      "input": {
+        "originalSource": "crew-assignment",
+        "modifiedSource": "rewritten"
+      },
+      "expected": {
+        "state": "denied",
+        "verifyResult": false
+      },
+      "source_function": "verifySnapshot",
+      "notes": "Derivado de snapshots.test.ts linha 11: changing source breaks stable() integrity match"
+    },
+    {
+      "id": "snapshots-empty-metadata-throws",
+      "category": "snapshots",
+      "description": "Metadata vazia (source/snapshotId/createdAt sem trim) lança invalid_snapshot_metadata",
+      "input": {
+        "source": "   ",
+        "snapshotId": "s1",
+        "createdAt": "2026-11-01T00:00:00Z"
+      },
+      "expected": {
+        "state": "denied",
+        "error": "invalid_snapshot_metadata"
+      },
+      "source_function": "createSnapshot",
+      "notes": "Derivado de snapshots.ts linha 9: !source.trim() throws invalid_snapshot_metadata"
+    },
+    {
+      "id": "snapshots-invalid-supersession-same-id-throws",
+      "category": "snapshots",
+      "description": "Supersession com mesmo ID ou revision menor/igual lança invalid_supersession",
+      "input": {
+        "oldSnapshot": {
+          "scheduleId": "s",
+          "revision": 1,
+          "timezone": "UTC",
+          "serviceDate": "2026-11-01",
+          "start": "2026-11-01T07:00:00.000Z",
+          "end": "2026-11-01T19:00:00.000Z",
+          "inclusiveStart": true,
+          "exclusiveEnd": true,
+          "snapshotId": "s1",
+          "source": "crew-assignment",
+          "createdAt": "2026-11-01T00:00:00Z",
+          "integrity": "<computed-by-createSnapshot>"
+        },
+        "replacementSnapshot": {
+          "scheduleId": "s",
+          "revision": 1,
+          "timezone": "UTC",
+          "serviceDate": "2026-11-01",
+          "start": "2026-11-01T07:00:00.000Z",
+          "end": "2026-11-01T19:00:00.000Z",
+          "inclusiveStart": true,
+          "exclusiveEnd": true,
+          "snapshotId": "s1",
+          "source": "crew-assignment",
+          "createdAt": "2026-11-01T00:30:00Z",
+          "integrity": "<computed-by-createSnapshot>"
+        },
+        "reason": "same id",
+        "createdBy": "trusted-writer",
+        "recordId": "sup-x",
+        "createdAt": "2026-11-01T01:00:00Z"
+      },
+      "expected": {
+        "state": "denied",
+        "error": "invalid_supersession"
+      },
+      "source_function": "buildSupersessionRecord",
+      "notes": "Derivado de snapshots.ts linha 19: same snapshotId or replacement.revision <= old.revision throws",
+      "arg_encoding": {
+        "note": "Mesmo snapshotId nos dois lados dispara invalid_supersession (snapshots.ts:19) antes de qualquer checagem de revision."
+      },
+      "replayable": true
+    },
+    {
+      "id": "authority-revisions-missing-current-unknown",
+      "category": "authority_revisions",
+      "description": "Current revision undefined resulta em unknown",
+      "input": {
+        "expected": null,
+        "current": null
+      },
+      "expected": {
+        "state": "unknown",
+        "reason": "invalid_authority_revision"
+      },
+      "source_function": "assertAuthorityRevision",
+      "notes": "Derivado de revocation.test.ts linha 5: both undefined returns unknown"
+    },
+    {
+      "id": "authority-revisions-stale-conflicted",
+      "category": "authority_revisions",
+      "description": "Expected revision diferente da current resulta em conflicted",
+      "input": {
+        "expected": 1,
+        "current": {
+          "revision": 2,
+          "issuedAt": "x",
+          "status": "active"
+        }
+      },
+      "expected": {
+        "state": "conflicted",
+        "reason": "stale_authority_revision"
+      },
+      "source_function": "assertAuthorityRevision",
+      "notes": "Derivado de revocation.test.ts linha 6: expected !== current.revision"
+    },
+    {
+      "id": "authority-revisions-revoked-denied",
+      "category": "authority_revisions",
+      "description": "Authority com status revoked resulta em denied",
+      "input": {
+        "expected": 1,
+        "current": {
+          "revision": 1,
+          "issuedAt": "x",
+          "status": "revoked",
+          "revokedAt": "y"
+        }
+      },
+      "expected": {
+        "state": "denied",
+        "reason": "authority_revoked"
+      },
+      "source_function": "assertAuthorityRevision",
+      "notes": "Derivado de revocation.test.ts linha 7: status revoked checked before revision match"
+    },
+    {
+      "id": "authority-revisions-current-match-allowed",
+      "category": "authority_revisions",
+      "description": "Expected revision igual à current ativa resulta em allowed",
+      "input": {
+        "expected": 1,
+        "current": {
+          "revision": 1,
+          "issuedAt": "2026-11-01T00:00:00Z",
+          "status": "active"
+        }
+      },
+      "expected": {
+        "state": "allowed",
+        "reason": "authority_revision_current"
+      },
+      "source_function": "assertAuthorityRevision",
+      "notes": "Derivado de authority-revisions.ts linha 3: expected === current.revision && status active"
+    }
+  ]
+}
