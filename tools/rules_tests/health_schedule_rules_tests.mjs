@@ -598,13 +598,29 @@ test('SEC-02A.2 escopo malformado no perfil + claim global → DENY', async () =
   }
 });
 
-test('SEC-02A.2 admin conserva bypass canônico independente do espelho', async () => {
+test('SEC-02A.2 admin reconciliado com users/{ra} ativo e perfil administrador conserva bypass; sem espelho e negado', async () => {
   await seedHealthScheduleFixtures();
   await seedFirestore(async (adminDb) => {
     await deleteDoc(doc(adminDb, 'users', PRIMARY_RA));
   });
 
-  // Admin explícito (claim server-controlled) não depende de espelho/perfil.
+  // Sem users/{ra}, claim admin:true antiga nao concede bypass.
+  const staleAdminDb = dbFor(PRIMARY_RA, {admin: true, ra: PRIMARY_RA});
+  await assertFails(
+    getDoc(doc(staleAdminDb, 'dogs', DOG_B, 'health_schedule', 'sched-b1')),
+  );
+
+  // Admin legitimo reconciliado em users/{ra} conserva acesso.
+  await seedFirestore(async (adminDb) => {
+    await setDoc(doc(adminDb, 'users', PRIMARY_RA), {
+      ra: PRIMARY_RA,
+      active: true,
+      status: 'Ativo',
+      deleted_at: null,
+      access_profile_id: 'administrador',
+      admin: true,
+    });
+  });
   const adminDb = dbFor(PRIMARY_RA, {admin: true, ra: PRIMARY_RA});
   await assertSucceeds(
     getDoc(doc(adminDb, 'dogs', DOG_B, 'health_schedule', 'sched-b1')),

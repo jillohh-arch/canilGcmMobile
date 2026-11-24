@@ -176,6 +176,14 @@ async function seedAuthorizationState(adminDb) {
       access_scope: 'own_records',
     });
   }
+  await setDoc(doc(adminDb, 'users', 'admin123'), {
+    ra: 'admin123',
+    active: true,
+    status: 'Ativo',
+    deleted_at: null,
+    access_profile_id: 'administrador',
+    admin: true,
+  });
 }
 
 /**

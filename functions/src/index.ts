@@ -507,41 +507,88 @@ function legacyAccessProfileId(value: unknown): string | null {
   return normalized;
 }
 
+export function isReconciledAdmin(user: JsonMap): boolean {
+  if (user.admin === false) return false;
+  const explicitProfile =
+    stringValue(user.access_profile_id) ??
+    stringValue(user.accessProfileId) ??
+    stringValue(user.accessProfile) ??
+    stringValue(user.access_profile);
+  if (!explicitProfile) {
+    return false;
+  }
+  return legacyAccessProfileId(explicitProfile) === "administrador";
+}
+
+function isQualifiedK9Instructor(user: JsonMap): boolean {
+  if (!isPlainObject(user) || !isCurrentlyActive(user)) {
+    return false;
+  }
+  if (user.is_k9_instructor === false) {
+    return false;
+  }
+  if (user.is_k9_instructor === true) {
+    return true;
+  }
+  if (user.is_k9_instructor !== undefined && user.is_k9_instructor !== null) {
+    return false;
+  }
+  if (
+    user.training_instructor === true ||
+    user.instrutor_k9 === true ||
+    user.instrutor === true ||
+    user.adestrador === true
+  ) {
+    return true;
+  }
+  if (
+    typeof user.training_role === "string" &&
+    legacyAccessProfileId(user.training_role) === "instrutor_k9"
+  ) {
+    return true;
+  }
+  if (
+    Array.isArray(user.roles) &&
+    user.roles.some(
+      (role) =>
+        typeof role === "string" &&
+        legacyAccessProfileId(role) === "instrutor_k9",
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function instructorQualificationGrantsPermission(
+  moduleId: AccessModule,
+  action: AccessAction,
+): boolean {
+  return (
+    moduleId === "training" &&
+    (action === "view" || action === "approve")
+  );
+}
+
 function accessProfileIdFrom(
-  token: admin.auth.DecodedIdToken | undefined,
+  _token: admin.auth.DecodedIdToken | undefined,
   user: JsonMap,
 ): string {
-  const candidates = [
-    token?.access_profile_id,
+  // SEC-02A.2 / CT-I2-03: users/{ra}.access_profile_id (e aliases explicitos
+  // de perfil base) e a unica autoridade de perfil vigente. Claims antigas no
+  // token, qualificacoes funcionais ortogonais (Instructor Role) e flags
+  // residuais nunca concedem ou sintetizam perfil base.
+  const explicitProfileCandidates = [
     user.access_profile_id,
     user.accessProfileId,
     user.accessProfile,
     user.access_profile,
-    user.accessLevel,
-    user.access_level,
-    user.role,
-    user.claim_role,
-    user.training_role,
-    ...(Array.isArray(user.roles) ? user.roles : []),
-    ...(Array.isArray(token?.roles) ? token?.roles ?? [] : []),
   ];
-  for (const candidate of candidates) {
+  for (const candidate of explicitProfileCandidates) {
     const profileId = legacyAccessProfileId(candidate);
     if (profileId) return profileId;
   }
-  if (user.admin === true || token?.admin === true) return "administrador";
-  if (user.inventory_manager === true || token?.inventory_manager === true) {
-    return "almoxarifado";
-  }
-  if (
-    user.is_k9_instructor === true ||
-    user.training_instructor === true ||
-    token?.instrutor_k9 === true ||
-    token?.training_instructor === true
-  ) {
-    return "instrutor_k9";
-  }
-  return "operador_k9";
+  return "__sec02_no_profile__";
 }
 
 export function profileGrantsPermission(
@@ -563,13 +610,53 @@ async function requireAccessPermission(
   action: AccessAction,
 ): Promise<CallerIdentity> {
   const caller = requireAuth(auth);
-  if (auth && isAdminToken(auth.token)) return caller;
+  if (!caller.ra.trim()) {
+    throw new HttpsError(
+      "permission-denied",
+      "Identidade RA nao resolvida para autorizacao.",
+    );
+  }
 
   const userSnap = await db.collection("users").doc(caller.ra).get();
+  if (!userSnap.exists) {
+    throw new HttpsError(
+      "permission-denied",
+      "Cadastro de usuario ausente para autorizacao.",
+    );
+  }
+
   const user = userSnap.data() ?? {};
-  if (isAdminUserRecord(user)) return caller;
+  if (!isCurrentlyActive(user)) {
+    throw new HttpsError(
+      "permission-denied",
+      "Usuario inativo ou arquivado.",
+    );
+  }
+
+  if (isReconciledAdmin(user)) {
+    if (auth && isAdminToken(auth.token)) return caller;
+    if (isAdminUserRecord(user)) return caller;
+    return caller;
+  }
+
+  // FRONT10.ACCESS-CREDENTIALS.D: Qualificacao funcional de Instrutor K9
+  // concede ortogonalmente apenas training.view e training.approve, sem
+  // sintetizar ou depender de perfil base (CT-I2-03).
+  if (
+    isQualifiedK9Instructor(user) &&
+    instructorQualificationGrantsPermission(moduleId, action)
+  ) {
+    return caller;
+  }
 
   const profileId = accessProfileIdFrom(auth?.token, user);
+  if (profileId === "__sec02_no_profile__") {
+    throw new HttpsError(
+      "permission-denied",
+      `Perfil sem permissao para ${moduleId}.${action}.`,
+    );
+  }
+
   const profileSnap = await db.collection("access_profiles").doc(profileId).get();
   if (
     profileSnap.exists &&
@@ -583,6 +670,8 @@ async function requireAccessPermission(
     `Perfil sem permissao para ${moduleId}.${action}.`,
   );
 }
+
+export {accessProfileIdFrom, isQualifiedK9Instructor, requireAccessPermission};
 
 async function requireAnyAccessPermission(
   auth: {uid: string; token: admin.auth.DecodedIdToken} | undefined,
@@ -795,13 +884,18 @@ async function resolveAccessScope(
   caller: CallerIdentity,
 ): Promise<AccessScopeResolution> {
   if (!auth) return {kind: "denied", reason: "missing-auth"};
-  if (isAdminToken(auth.token)) return {kind: "global"};
   if (!caller.ra.trim()) return {kind: "denied", reason: "unresolved-ra"};
 
   const userSnap = await db.collection("users").doc(caller.ra).get();
   const userDoc = userSnap.exists ? userSnap.data() ?? {} : undefined;
   if (userDoc === undefined) {
     return {kind: "denied", reason: "missing-user-mirror"};
+  }
+  if (!isCurrentlyActive(userDoc)) {
+    return {kind: "denied", reason: "user-soft-deleted"};
+  }
+  if (isAdminToken(auth.token) && isReconciledAdmin(userDoc)) {
+    return {kind: "global"};
   }
 
   const profileId = accessProfileIdFrom(auth.token, userDoc);
@@ -2177,11 +2271,19 @@ const runAdminGetAccessHomologationSnapshot =
           | {uid: string; token: admin.auth.DecodedIdToken}
           | undefined;
         const caller = requireAuth(typedAuth);
-        if (typedAuth && isAdminToken(typedAuth.token)) {
-          return {uid: caller.uid, ra: caller.ra};
+        if (!caller.ra.trim()) {
+          throw new HttpsError(
+            "permission-denied",
+            "Autoridade administrativa obrigatoria.",
+          );
         }
         const user = await db.collection("users").doc(caller.ra).get();
-        if (user.exists && isAdminUserRecord(user.data() ?? {})) {
+        const userData = user.data() ?? {};
+        if (
+          user.exists &&
+          isCurrentlyActive(userData) &&
+          isReconciledAdmin(userData)
+        ) {
           return {uid: caller.uid, ra: caller.ra};
         }
         throw new HttpsError(
@@ -4392,15 +4494,6 @@ export const adminUpsertInventoryItem = onCall({region}, async (request) => {
   const id = stringValue(data.id) ?? inventoryItemIdFromName(name);
   assertDocumentId(id, "Identificador do item");
   const ref = db.collection("inventory_items").doc(id);
-  const snapshot = await ref.get();
-  if (mode === "create" && snapshot.exists) {
-    throw new HttpsError("already-exists", "Ja existe um item com este identificador.");
-  }
-  if (mode === "edit" && !snapshot.exists) {
-    throw new HttpsError("not-found", "Item de estoque nao encontrado.");
-  }
-  const previous = snapshot.data() ?? {};
-  const currentQuantity = optionalNumberValue(previous.current_quantity) ?? 0;
   const minimumQuantity = optionalNumberValue(profile.minimumQuantity) ?? 0;
   const active = profile.active !== false;
   const expirationDate = optionalString(profile, "expirationDate");
@@ -4410,14 +4503,27 @@ export const adminUpsertInventoryItem = onCall({region}, async (request) => {
   if (initialQuantity !== null && initialQuantity < 0) {
     throw new HttpsError("invalid-argument", "Quantidade inicial nao pode ser negativa.");
   }
-  const startingQuantity = mode === "create" ? initialQuantity ?? 0 : currentQuantity;
-  const status = inventoryItemStatus(startingQuantity, minimumQuantity, expirationDate, active);
   const categoryId = requiredString(profile, "categoryId");
   const categoryName = requiredString(profile, "categoryName");
   const unit = requiredString(profile, "unit");
   const now = admin.firestore.FieldValue.serverTimestamp();
 
-  await db.runTransaction(async (transaction) => {
+  return db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    if (mode === "create" && snapshot.exists) {
+      throw new HttpsError("already-exists", "Ja existe um item com este identificador.");
+    }
+    if (mode === "edit" && !snapshot.exists) {
+      throw new HttpsError("not-found", "Item de estoque nao encontrado.");
+    }
+    const previous = snapshot.data() ?? {};
+    if (mode === "edit" && previous.warehouse_managed && (
+      categoryId !== previous.category_id || unit !== previous.unit || !active
+    )) {
+      throw new HttpsError("failed-precondition", "Categoria, unidade e estado de material com lotes não podem ser alterados pelo cadastro legado.");
+    }
+    const startingQuantity = mode === "create" ? initialQuantity ?? 0 : optionalNumberValue(previous.current_quantity) ?? 0;
+    const status = inventoryItemStatus(startingQuantity, minimumQuantity, expirationDate, active);
     transaction.set(ref, {
       id,
       name,
@@ -4486,8 +4592,8 @@ export const adminUpsertInventoryItem = onCall({region}, async (request) => {
       performed_at: now,
       createdAt: now,
     });
+    return {id, status, current_quantity: startingQuantity};
   });
-  return {id, status, current_quantity: startingQuantity};
 });
 
 export const adminArchiveInventoryItem = onCall({region}, async (request) => {
@@ -4497,32 +4603,38 @@ export const adminArchiveInventoryItem = onCall({region}, async (request) => {
   const reason = requiredString(data, "reason");
   assertDocumentId(id, "Identificador do item");
   const ref = db.collection("inventory_items").doc(id);
-  if (!(await ref.get()).exists) {
-    throw new HttpsError("not-found", "Item de estoque nao encontrado.");
-  }
   const now = admin.firestore.FieldValue.serverTimestamp();
-  await ref.set({
-    active: false,
-    status: "inactive",
-    deleted_at: now,
-    deleted_by: caller.uid,
-    delete_reason: reason,
-    deleted_reason: reason,
-    updated_at: now,
-    audit_trail: admin.firestore.FieldValue.arrayUnion(
-      auditEntry("deleted", caller, reason),
-    ),
-  }, {merge: true});
-  await db.collection("auditLogs").doc().set({
-    action: "inventory_item_archived",
-    entity_type: "inventory_item",
-    entity_id: id,
-    summary: `Item de estoque arquivado: ${id}`,
-    actor: caller,
-    metadata: {reason},
-    source: "functions",
-    performed_at: now,
-    createdAt: now,
+  await db.runTransaction(async (transaction) => {
+    const itemSnap = await transaction.get(ref);
+    if (!itemSnap.exists) {
+      throw new HttpsError("not-found", "Item de estoque nao encontrado.");
+    }
+    if (itemSnap.data()?.warehouse_managed) {
+      throw new HttpsError("failed-precondition", "Material com lotes não pode ser arquivado pelo fluxo legado.");
+    }
+    transaction.set(ref, {
+      active: false,
+      status: "inactive",
+      deleted_at: now,
+      deleted_by: caller.uid,
+      delete_reason: reason,
+      deleted_reason: reason,
+      updated_at: now,
+      audit_trail: admin.firestore.FieldValue.arrayUnion(
+        auditEntry("deleted", caller, reason),
+      ),
+    }, {merge: true});
+    transaction.set(db.collection("auditLogs").doc(), {
+      action: "inventory_item_archived",
+      entity_type: "inventory_item",
+      entity_id: id,
+      summary: `Item de estoque arquivado: ${id}`,
+      actor: caller,
+      metadata: {reason},
+      source: "functions",
+      performed_at: now,
+      createdAt: now,
+    });
   });
   return {id, archived: true};
 });
@@ -4546,6 +4658,9 @@ export const adminCreateInventoryMovement = onCall({region}, async (request) => 
       throw new HttpsError("not-found", "Item de estoque nao encontrado.");
     }
     const item = itemSnap.data() ?? {};
+    if (item.warehouse_managed) {
+      throw new HttpsError("failed-precondition", "Material com lotes exige movimentação pelo fluxo de almoxarifado.");
+    }
     const active = item.active !== false && item.deleted_at == null;
     if (!active) {
       throw new HttpsError("failed-precondition", "Item arquivado nao aceita movimentacao.");
@@ -4931,7 +5046,9 @@ async function notifyK9Instructors(requestId: string, request: JsonMap): Promise
     db.collection("users").where("training_role", "==", "instrutor_k9").get(),
   ]);
   for (const doc of [...byFlag.docs, ...byRole.docs]) {
-    const ra = stringValue(doc.data().ra) ?? doc.id;
+    const userData = doc.data() ?? {};
+    if (!isQualifiedK9Instructor(userData)) continue;
+    const ra = stringValue(userData.ra) ?? doc.id;
     if (ra) recipients.add(ra);
   }
 
@@ -9956,3 +10073,27 @@ export const healthTimelineRecordShadowTelemetry = onCall(
     });
   },
 );
+
+import { createWarehouseCallables } from "./warehouse/warehouse_callables";
+
+const warehouseCallables = createWarehouseCallables(db, requireAccessPermission as any);
+
+export const adminWarehouseUpsertMaterial = warehouseCallables.adminWarehouseUpsertMaterial;
+export const adminWarehouseArchiveMaterial = warehouseCallables.adminWarehouseArchiveMaterial;
+export const adminWarehouseEntry = warehouseCallables.adminWarehouseEntry;
+export const adminWarehouseConsumption = warehouseCallables.adminWarehouseConsumption;
+export const adminWarehouseTransfer = warehouseCallables.adminWarehouseTransfer;
+export const adminWarehouseLossDisposal = warehouseCallables.adminWarehouseLossDisposal;
+export const adminWarehouseUpsertEquipment = warehouseCallables.adminWarehouseUpsertEquipment;
+export const adminWarehouseRetireEquipment = warehouseCallables.adminWarehouseRetireEquipment;
+export const adminWarehouseUpdateEquipmentStatus = warehouseCallables.adminWarehouseUpdateEquipmentStatus;
+export const adminWarehouseOpenCustody = warehouseCallables.adminWarehouseOpenCustody;
+export const adminWarehouseReturnCustody = warehouseCallables.adminWarehouseReturnCustody;
+export const adminWarehouseCancelCustody = warehouseCallables.adminWarehouseCancelCustody;
+export const adminWarehouseOpenInventorySession = warehouseCallables.adminWarehouseOpenInventorySession;
+export const adminWarehouseRecordInventoryCount = warehouseCallables.adminWarehouseRecordInventoryCount;
+export const adminWarehouseAddUnexpectedCount = warehouseCallables.adminWarehouseAddUnexpectedCount;
+export const adminWarehouseStartReconciliation = warehouseCallables.adminWarehouseStartReconciliation;
+export const adminWarehouseHomologateInventorySession = warehouseCallables.adminWarehouseHomologateInventorySession;
+export const adminWarehouseCancelInventorySession = warehouseCallables.adminWarehouseCancelInventorySession;
+export const adminWarehouseGetOverview = warehouseCallables.adminWarehouseGetOverview;

@@ -218,6 +218,10 @@ export function parseShiftCommandInput(
     shiftGroupLabel: readOptionalString(raw.shiftGroupLabel),
     vehicle: readVehicle(raw.vehicle),
     role: readOptionalString(raw.role),
+    sessionId: readOptionalString(raw.sessionId ?? raw.session_id),
+    generationId: readOptionalString(raw.generationId ?? raw.generation_id),
+    operationContext: readOptionalString(raw.operationContext ?? raw.operation_context),
+    receiptVersion: readOptionalString(raw.receiptVersion ?? raw.receipt_version),
   };
 }
 

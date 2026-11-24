@@ -1,0 +1,149 @@
+name: Backend Security CI
+
+# Validation-only CI for K9 OPS Backend (Functions + Firestore/Storage Rules).
+#
+# Safety & Fail-Closed Contract:
+#   - ZERO deploy jobs or steps (no `firebase deploy`, no Hosting/Functions/Rules publish).
+#   - ZERO GCP service account, OIDC/WIF, `GOOGLE_APPLICATION_CREDENTIALS`, `FIREBASE_TOKEN`,
+#     or production secrets.
+#   - Minimal `permissions: contents: read`.
+#   - Clean separation between `unit-security` (no emulator) and `emulator-rules`
+#     (Temurin Java 21 + Node 22 + local Firebase Emulators with `--project canil-gcm`
+#      and isolated `--project demo-k9-ops-occupancy-m1` for F40 runtime integration).
+#
+# Governance Note:
+#   Remote enforcement of GitHub branch protection / required status checks
+#   (`unit-security`, `emulator-rules`) is NOT presumed by this file and MUST be
+#   independently configured and proven in the subsequent Git promotion gate.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-security-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-security:
+    name: Unit & Security Tests (No Emulator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CI: "true"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Fail-closed environment guard (no credentials, no emulator bleed)
+        run: |
+          set -euo pipefail
+          for var in GOOGLE_APPLICATION_CREDENTIALS FIREBASE_TOKEN GCP_SERVICE_ACCOUNT GCP_WORKLOAD_IDENTITY_PROVIDER FIRESTORE_EMULATOR_HOST FIREBASE_AUTH_EMULATOR_HOST FIREBASE_STORAGE_EMULATOR_HOST STORAGE_EMULATOR_HOST; do
+            if [ -n "${!var:-}" ]; then
+              echo "::error::Forbidden environment variable ${var} is set in unit-security."
+              exit 1
+            fi
+          done
+          echo "Verified: zero credentials and zero emulator host bleed in unit-security."
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Install Functions dependencies
+        run: npm --prefix functions ci
+
+      - name: Run Backend unit, security, and endpoint contract suite
+        run: node tools/ci_backend_security.mjs --unit
+
+  emulator-rules:
+    name: Firestore & Storage Rules (Local Emulators)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: "true"
+      GCLOUD_PROJECT: canil-gcm
+      FIREBASE_PROJECT_ID: canil-gcm
+      FIRESTORE_EMULATOR_HOST: 127.0.0.1:8080
+      FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9099
+      FIREBASE_STORAGE_EMULATOR_HOST: 127.0.0.1:9199
+      STORAGE_EMULATOR_HOST: http://127.0.0.1:9199
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Fail-closed credential & local-emulator guard
+        run: |
+          set -euo pipefail
+          for var in GOOGLE_APPLICATION_CREDENTIALS FIREBASE_TOKEN GCP_SERVICE_ACCOUNT GCP_WORKLOAD_IDENTITY_PROVIDER; do
+            if [ -n "${!var:-}" ]; then
+              echo "::error::Forbidden credential variable ${var} is set in emulator-rules."
+              exit 1
+            fi
+          done
+          case "${FIRESTORE_EMULATOR_HOST}" in
+            127.0.0.1:*) ;;
+            *) echo "::error::FIRESTORE_EMULATOR_HOST must target 127.0.0.1"; exit 1 ;;
+          esac
+          case "${FIREBASE_AUTH_EMULATOR_HOST}" in
+            127.0.0.1:*) ;;
+            *) echo "::error::FIREBASE_AUTH_EMULATOR_HOST must target 127.0.0.1"; exit 1 ;;
+          esac
+          case "${FIREBASE_STORAGE_EMULATOR_HOST}" in
+            127.0.0.1:*) ;;
+            *) echo "::error::FIREBASE_STORAGE_EMULATOR_HOST must target 127.0.0.1"; exit 1 ;;
+          esac
+          echo "Verified: zero credentials and fail-closed localhost emulator bindings."
+
+      - name: Setup Java 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tools/rules_tests/package-lock.json
+
+      - name: Install Functions dependencies
+        run: npm --prefix functions ci
+
+      - name: Install Rules test dependencies
+        run: npm --prefix tools/rules_tests ci
+
+      - name: Cache Firebase emulator JARs
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}-15.30.2
+
+      - name: Install Firebase CLI (CI tooling only)
+        run: |
+          set -euo pipefail
+          npm install -g firebase-tools@15.30.2
+          firebase --version
+
+      - name: Run 14 Rules, 6 Warehouse & 1 F40 Runtime Integration emulator suites sequentially
+        run: node tools/ci_backend_security.mjs --emulator
+
+      - name: Upload emulator debug logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-emulator-logs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            *-debug.log
+          if-no-files-found: ignore
+          retention-days: 7

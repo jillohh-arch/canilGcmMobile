@@ -474,6 +474,19 @@ test('curriculo de treino tem leitura autenticada e escrita por claim tecnico', 
     }),
   );
 
+  await seedFirestore(async (adminDb) => {
+    await setDoc(doc(adminDb, 'users', PRIMARY_RA), {
+      ra: PRIMARY_RA,
+      active: true,
+      status: 'Ativo',
+      deleted_at: null,
+      archived_at: null,
+      access_profile_id: 'operador_k9',
+      access_scope: 'own_records',
+      is_k9_instructor: true,
+    });
+  });
+
   await assertSucceeds(
     setDoc(
       doc(
@@ -490,6 +503,18 @@ test('curriculo de treino tem leitura autenticada e escrita por claim tecnico', 
     ),
   );
 
+  await seedFirestore(async (adminDb) => {
+    await setDoc(doc(adminDb, 'users', PRIMARY_RA), {
+      ra: PRIMARY_RA,
+      active: true,
+      status: 'Ativo',
+      deleted_at: null,
+      archived_at: null,
+      access_profile_id: 'administrador',
+      admin: true,
+    });
+  });
+
   await assertSucceeds(
     setDoc(
       doc(
@@ -505,6 +530,19 @@ test('curriculo de treino tem leitura autenticada e escrita por claim tecnico', 
       },
     ),
   );
+
+  await seedFirestore(async (adminDb) => {
+    await setDoc(doc(adminDb, 'users', PRIMARY_RA), {
+      ra: PRIMARY_RA,
+      active: true,
+      status: 'Ativo',
+      deleted_at: null,
+      archived_at: null,
+      access_profile_id: 'operador_k9',
+      access_scope: 'own_records',
+      is_k9_instructor: true,
+    });
+  });
 
   await assertFails(
     updateDoc(
@@ -634,7 +672,12 @@ test('modulo concluido e imutavel e correcao exige trilha de instrutor', async (
     });
     await setDoc(doc(seedDb, 'users', MEMBER_RA), {
       ra: MEMBER_RA,
+      active: true,
+      status: 'Ativo',
+      deleted_at: null,
+      archived_at: null,
       access_profile_id: 'instrutor_global',
+      is_k9_instructor: true,
     });
     await setDoc(doc(seedDb, 'dogs/bono/training/busca_captura'), {
       ...trainingProgressPayload({
@@ -1052,6 +1095,19 @@ test('promotion_requests: condutor solicita e Instrutor K9 decide', async () => 
     ),
   );
 
+  await seedFirestore(async (adminDb) => {
+    await setDoc(doc(adminDb, 'users', PRIMARY_RA), {
+      ra: PRIMARY_RA,
+      active: true,
+      status: 'Ativo',
+      deleted_at: null,
+      archived_at: null,
+      access_profile_id: 'operador_k9',
+      access_scope: 'own_records',
+      is_k9_instructor: true,
+    });
+  });
+
   await assertSucceeds(
     setDoc(
       doc(
@@ -1075,6 +1131,18 @@ test('promotion_requests: condutor solicita e Instrutor K9 decide', async () => 
       audit_trail: [...audit('created'), ...audit('approved', MEMBER_RA)],
     }),
   );
+
+  await seedFirestore(async (adminDb) => {
+    await setDoc(doc(adminDb, 'users', MEMBER_RA), {
+      ra: MEMBER_RA,
+      active: true,
+      status: 'Ativo',
+      deleted_at: null,
+      archived_at: null,
+      is_k9_instructor: true,
+      training_role: 'instrutor_k9',
+    });
+  });
 
   await assertFails(
     updateDoc(
@@ -1548,6 +1616,292 @@ test('Storage permite upload valido mas recusa exclusao de evidencia', async () 
 // health_schedule (Health v1 / 4D): ver health_schedule_rules_tests.mjs
 // (runner dedicado — suíte geral tem falha preexistente em vehicle_crews).
 
+test('IR-06: usuario sem espelho em users/{ra} e negado mesmo com claims de instrutor e admin', async () => {
+  await seedFirestore(async (adminDb) => {
+    await setDoc(doc(adminDb, 'dogs/bono/training/busca_captura'), {
+      ...trainingProgressPayload({
+        status: 'operational',
+        currentModule: null,
+        auditTrail: audit('created'),
+      }),
+      completed_module_ids: ['modulo_1'],
+      completed_modules: [
+        {
+          module_id: 'modulo_1',
+          module_name: 'Modulo 1',
+          program_version: 1,
+        },
+      ],
+    });
+    await setDoc(
+      doc(adminDb, 'promotion_requests/promo-no-mirror'),
+      promotionRequestPayload(PRIMARY_RA),
+    );
+  });
+
+  const spoofDb = dbFor(OUTSIDER_RA, {
+    instrutor: true,
+    instrutor_k9: true,
+    adestrador: true,
+    training_instructor: true,
+    admin: true,
+    role: 'admin',
+    training_role: 'instrutor_k9',
+    roles: ['admin', 'administrador', 'instrutor_k9'],
+  });
+
+  await assertFails(
+    setDoc(doc(spoofDb, 'training_programs/no_mirror'), {
+      name: 'Sem espelho',
+      modality: 'no_mirror',
+      version: 1,
+      active: true,
+      audit_trail: audit('created', OUTSIDER_RA),
+    }),
+  );
+
+  await assertFails(
+    setDoc(
+      doc(
+        spoofDb,
+        'dogs/bono/training/busca_captura/completed_module_corrections/corr-no-mirror',
+      ),
+      {
+        module_id: 'modulo_1',
+        correction_type: 'observacao',
+        reason: 'Tentativa sem espelho users/{ra}.',
+        before_snapshot: {module_id: 'modulo_1', module_name: 'Modulo 1'},
+        requested_changes: {note: 'Negado.'},
+        corrected_by: OUTSIDER_RA,
+        corrected_by_uid: `uid-${OUTSIDER_RA}`,
+        corrected_by_email: `${OUTSIDER_RA}@gcm.com.br`,
+        corrected_by_name: `GCM ${OUTSIDER_RA}`,
+        created_at: now(),
+        updated_at: now(),
+        audit_trail: audit('created', OUTSIDER_RA),
+      },
+    ),
+  );
+
+  await assertFails(
+    setDoc(
+      doc(spoofDb, 'promotion_requests/promo-no-mirror-direct'),
+      promotionRequestPayload(OUTSIDER_RA, {directInstructor: true}),
+    ),
+  );
+
+  await assertFails(getDoc(doc(spoofDb, 'promotion_requests/promo-no-mirror')));
+
+  await assertFails(
+    updateDoc(doc(spoofDb, 'promotion_requests/promo-no-mirror'), {
+      status: 'approved',
+      decision: 'approved',
+      decision_by: OUTSIDER_RA,
+      decision_by_uid: `uid-${OUTSIDER_RA}`,
+      decision_by_email: `${OUTSIDER_RA}@gcm.com.br`,
+      decision_reason: null,
+      decided_at: now(),
+      updated_at: now(),
+      audit_trail: [...audit('created'), ...audit('approved', OUTSIDER_RA)],
+    }),
+  );
+});
+
+test('IR-01/IR-02: is_k9_instructor false prevalece sobre flags legadas, roles e JWT antigo', async () => {
+  await seedFirestore(async (adminDb) => {
+    await setDoc(doc(adminDb, 'access_profiles', 'instrutor_global'), {
+      status: 'active',
+      scope: 'global',
+      permissions: {},
+    });
+    await setDoc(doc(adminDb, 'users', MEMBER_RA), {
+      ra: MEMBER_RA,
+      active: true,
+      status: 'Ativo',
+      deleted_at: null,
+      archived_at: null,
+      access_profile_id: 'instrutor_global',
+      is_k9_instructor: false,
+      training_instructor: true,
+      instrutor_k9: true,
+      instrutor: true,
+      adestrador: true,
+      training_role: 'instrutor_k9',
+      roles: ['instrutor_k9', 'instrutor', 'adestrador'],
+    });
+    await setDoc(doc(adminDb, 'dogs/bono/training/busca_captura'), {
+      ...trainingProgressPayload({
+        status: 'operational',
+        currentModule: null,
+        auditTrail: audit('created'),
+      }),
+      completed_module_ids: ['modulo_1'],
+      completed_modules: [
+        {
+          module_id: 'modulo_1',
+          module_name: 'Modulo 1',
+          program_version: 1,
+        },
+      ],
+    });
+    await setDoc(
+      doc(adminDb, 'promotion_requests/promo-revoked'),
+      promotionRequestPayload(PRIMARY_RA),
+    );
+  });
+
+  const revokedDb = dbFor(MEMBER_RA, {
+    instrutor_k9: true,
+    training_instructor: true,
+    instrutor: true,
+    adestrador: true,
+    role: 'instrutor_k9',
+    training_role: 'instrutor_k9',
+    roles: ['instrutor_k9', 'instrutor', 'adestrador'],
+  });
+
+  await assertFails(
+    setDoc(doc(revokedDb, 'training_programs/revoked_prog'), {
+      name: 'Revogado',
+      modality: 'revoked_prog',
+      version: 1,
+      active: true,
+      audit_trail: audit('created', MEMBER_RA),
+    }),
+  );
+
+  await assertFails(
+    setDoc(
+      doc(
+        revokedDb,
+        'dogs/bono/training/busca_captura/completed_module_corrections/corr-revoked',
+      ),
+      {
+        module_id: 'modulo_1',
+        correction_type: 'observacao',
+        reason: 'Tentativa apos revogacao canonica.',
+        before_snapshot: {module_id: 'modulo_1', module_name: 'Modulo 1'},
+        requested_changes: {note: 'Negado.'},
+        corrected_by: MEMBER_RA,
+        corrected_by_uid: `uid-${MEMBER_RA}`,
+        corrected_by_email: `${MEMBER_RA}@gcm.com.br`,
+        corrected_by_name: `GCM ${MEMBER_RA}`,
+        created_at: now(),
+        updated_at: now(),
+        audit_trail: audit('created', MEMBER_RA),
+      },
+    ),
+  );
+
+  await assertFails(
+    setDoc(
+      doc(revokedDb, 'promotion_requests/promo-revoked-direct'),
+      promotionRequestPayload(MEMBER_RA, {directInstructor: true}),
+    ),
+  );
+
+  await assertFails(getDoc(doc(revokedDb, 'promotion_requests/promo-revoked')));
+
+  await assertFails(
+    updateDoc(doc(revokedDb, 'promotion_requests/promo-revoked'), {
+      status: 'approved',
+      decision: 'approved',
+      decision_by: MEMBER_RA,
+      decision_by_uid: `uid-${MEMBER_RA}`,
+      decision_by_email: `${MEMBER_RA}@gcm.com.br`,
+      decision_reason: null,
+      decided_at: now(),
+      updated_at: now(),
+      audit_trail: [...audit('created'), ...audit('approved', MEMBER_RA)],
+    }),
+  );
+});
+
+test('IR-05/IR-07: compatibilidade legada ativa sem campo canonico e negacao de instrutor inativo', async () => {
+  await seedFirestore(async (adminDb) => {
+    await setDoc(doc(adminDb, 'users', MEMBER_RA), {
+      ra: MEMBER_RA,
+      active: true,
+      status: 'Ativo',
+      deleted_at: null,
+      archived_at: null,
+      training_role: 'instrutor_k9',
+    });
+    await setDoc(
+      doc(adminDb, 'promotion_requests/promo-legacy-compat'),
+      promotionRequestPayload(PRIMARY_RA),
+    );
+    await setDoc(
+      doc(adminDb, 'promotion_requests/promo-inactive-compat'),
+      promotionRequestPayload(PRIMARY_RA),
+    );
+  });
+
+  const legacyDb = dbFor(MEMBER_RA);
+
+  await assertSucceeds(
+    setDoc(doc(legacyDb, 'training_programs/legacy_compat'), {
+      name: 'Compatibilidade Legada',
+      modality: 'legacy_compat',
+      version: 1,
+      active: true,
+      audit_trail: audit('created', MEMBER_RA),
+    }),
+  );
+
+  await assertSucceeds(
+    updateDoc(doc(legacyDb, 'promotion_requests/promo-legacy-compat'), {
+      status: 'approved',
+      decision: 'approved',
+      decision_by: MEMBER_RA,
+      decision_by_uid: `uid-${MEMBER_RA}`,
+      decision_by_email: `${MEMBER_RA}@gcm.com.br`,
+      decision_reason: null,
+      decided_at: now(),
+      updated_at: now(),
+      audit_trail: [...audit('created'), ...audit('approved', MEMBER_RA)],
+    }),
+  );
+
+  await seedFirestore(async (adminDb) => {
+    await setDoc(doc(adminDb, 'users', MEMBER_RA), {
+      ra: MEMBER_RA,
+      active: false,
+      status: 'Inativo',
+      deleted_at: null,
+      archived_at: null,
+      is_k9_instructor: true,
+      training_role: 'instrutor_k9',
+    });
+  });
+
+  const inactiveDb = dbFor(MEMBER_RA, {instrutor_k9: true});
+
+  await assertFails(
+    setDoc(doc(inactiveDb, 'training_programs/inactive_prog'), {
+      name: 'Inativo',
+      modality: 'inactive_prog',
+      version: 1,
+      active: true,
+      audit_trail: audit('created', MEMBER_RA),
+    }),
+  );
+
+  await assertFails(
+    updateDoc(doc(inactiveDb, 'promotion_requests/promo-inactive-compat'), {
+      status: 'approved',
+      decision: 'approved',
+      decision_by: MEMBER_RA,
+      decision_by_uid: `uid-${MEMBER_RA}`,
+      decision_by_email: `${MEMBER_RA}@gcm.com.br`,
+      decision_reason: null,
+      decided_at: now(),
+      updated_at: now(),
+      audit_trail: [...audit('created'), ...audit('approved', MEMBER_RA)],
+    }),
+  );
+});
+
 try {
   for (const {name, fn} of tests) {
     await clearAll();
@@ -1555,7 +1909,7 @@ try {
     console.log(`ok - ${name}`);
   }
 
-  assert.equal(tests.length, 26);
+  assert.equal(tests.length, 29);
   console.log(`\n${tests.length} testes de rules concluidos com sucesso.`);
 } finally {
   await testEnv.cleanup();

@@ -31,7 +31,16 @@
     "test:restriction-capability": "npm run build && node lib/restriction_capability_test.js",
     "test:health-clinical": "npm run build && node lib/clinical_domain_test.js && node lib/clinical_case_callables_test.js",
     "test:health-exam": "npm run build && node lib/exam_process_callables_test.js",
-    "test:health-treatment": "npm run build && node lib/treatment_protocol_callables_test.js"
+    "test:health-treatment": "npm run build && node lib/treatment_protocol_callables_test.js",
+    "test:f10-f03": "node --test test/f10_f03_adversarial_security.test.cjs",
+    "test:legacy-coexistence": "node legacy_coexistence_harness.cjs",
+    "test:f20-unit": "node --test lib/__tests__/f20_op_auth_adversarial_harness.test.js lib/__tests__/k9_guard_integration_contract.f20_wave2.test.js lib/__tests__/shift_authorization_callables.f20_r2.test.js lib/__tests__/shift_authorization_engine.f20_r2.test.js lib/__tests__/shift_restriction_concurrency.f20_r3.test.js lib/__tests__/shift_restriction_guard.f20_r2.test.js",
+    "test:f40-unit": "node --test lib/f40/__tests__/occupancy_decision_engine.test.js lib/f40/__tests__/occupancy_domain_contract.test.js",
+    "test:f40-runtime-emulator": "npm run build && firebase emulators:exec --project demo-k9-ops-occupancy-m1 --config ../firebase.json --non-interactive --only firestore \"node lib/f40/__tests__/occupancy_runtime_integration.emulator.test.js\"",
+    "test:warehouse-unit": "node lib/warehouse/warehouse_transactions_test.js && node lib/warehouse/staging_bucket_rejection_test.js",
+    "verify:endpoints": "node -e \"const l=require('./node_modules/firebase-functions/lib/runtime/loader.js');const i=require('./lib/index.js');const e={};l.extractStack(i,e,[],{});const c=Object.keys(e).length;console.log('endpoints:',c,'totalExports:',Object.keys(i).length);if(c!==131)process.exit(2);\"",
+    "test:ci-unit": "npm run build && npm test && npm run test:f10-f03 && npm run test:legacy-coexistence && npm run test:f20-unit && npm run test:f40-unit && npm run test:warehouse-unit && npm run verify:endpoints",
+    "test:ci-unit-runner": "node ../tools/ci_backend_security.mjs --unit"
   },
   "dependencies": {
     "firebase-admin": "^13.4.0",
