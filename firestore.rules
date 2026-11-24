@@ -20,14 +20,43 @@ service cloud.firestore {
         );
     }
 
-    function isAdmin() {
-      return signedIn()
+    function userIsCurrentlyActive(user) {
+      let status = user.get('status', '');
+      return user.get('active', true) != false
+        && user.get('deleted_at', null) == null
+        && user.get('archived_at', null) == null
+        && !(status is string && status.trim().lower() in ['inativo', 'inactive']);
+    }
+
+    function userProfileId(user, fallback) {
+      return user.get(
+        'access_profile_id',
+        user.get('accessProfileId', user.get('accessProfile', user.get('access_profile', fallback))),
+      );
+    }
+
+    function isAdminRecord(user, profileId) {
+      let token = signedIn() ? request.auth.token : {};
+      let rolesClaim = token.get('roles', []);
+      return user.get('admin', true) != false
+        && profileId == 'administrador'
         && (
-          request.auth.token.get('admin', false) == true
-          || request.auth.token.get('role', '') in ['admin', 'administrador']
-          || claimListHas('roles', 'admin')
-          || claimListHas('roles', 'administrador')
+          token.get('admin', false) == true
+          || token.get('role', '') in ['admin', 'administrador']
+          || (rolesClaim is list && rolesClaim.hasAny(['admin', 'administrador']))
+          || user.get('admin', false) == true
         );
+    }
+
+    function isAdmin() {
+      let ra = signedIn() ? request.auth.token.get('ra', '') : '';
+      let raOk = ra is string && ra.size() > 0;
+      let userPath = /databases/$(database)/documents/users/$(raOk ? ra : '__sec02_no_ra__');
+      let userOk = raOk && exists(userPath);
+      let user = userOk ? get(userPath).data : {};
+      return userOk
+        && userIsCurrentlyActive(user)
+        && isAdminRecord(user, userProfileId(user, ''));
     }
 
     function isInventoryManager() {
@@ -57,27 +86,25 @@ service cloud.firestore {
     }
 
     function hasRaClaim() {
-      return signedIn()
-        && request.auth.token.get('ra', '') is string
-        && request.auth.token.get('ra', '').size() > 0;
-    }
-
-    function tokenAccessProfileId() {
-      return request.auth.token.get('access_profile_id', '') is string
-        && request.auth.token.get('access_profile_id', '').size() > 0
-        ? request.auth.token.get('access_profile_id', '')
-        : 'operador_k9';
+      let ra = signedIn() ? request.auth.token.get('ra', '') : '';
+      return ra is string && ra.size() > 0;
     }
 
     function currentAccessProfileId() {
-      let user = get(/databases/$(database)/documents/users/$(request.auth.token.ra)).data;
+      let ra = request.auth.token.get('ra', '');
+      let userPath = /databases/$(database)/documents/users/$(ra is string && ra.size() > 0 ? ra : '__sec02_no_ra__');
+      let userOk = hasRaClaim() && exists(userPath);
+      let user = userOk ? get(userPath).data : {};
       let mirrorProfileId = user.get(
         'access_profile_id',
-        user.get('accessProfileId', ''),
+        user.get('accessProfileId', user.get('accessProfile', user.get('access_profile', ''))),
       );
-      return mirrorProfileId is string && mirrorProfileId.size() > 0
+      return userOk
+        && userIsCurrentlyActive(user)
+        && mirrorProfileId is string
+        && mirrorProfileId.size() > 0
         ? mirrorProfileId
-        : tokenAccessProfileId();
+        : '__sec02_no_profile__';
     }
 
     function activeProfileGrants(profileId, moduleId, action) {
@@ -87,12 +114,51 @@ service cloud.firestore {
         && get(profilePath).data.permissions.get(moduleId, {}).get(action, false) == true;
     }
 
-    function hasAccessPermission(moduleId, action) {
-      return isAdmin()
+    function permAllows(perms, moduleId, action) {
+      let mod = perms is map ? perms.get(moduleId, {}) : {};
+      return mod is map && mod.get(action, false) == true;
+    }
+
+    function activeAuthUser() {
+      let ra = signedIn() ? request.auth.token.get('ra', '') : '';
+      let raOk = ra is string && ra.size() > 0;
+      let userPath = /databases/$(database)/documents/users/$(raOk ? ra : '__sec02_no_ra__');
+      let userOk = raOk && exists(userPath);
+      let user = userOk ? get(userPath).data : {};
+      let active = userOk && userIsCurrentlyActive(user);
+      let profileId = active ? userProfileId(user, '') : '';
+      return {
+        'active': active,
+        'user': user,
+        'profileId': profileId,
+        'admin': active && isAdminRecord(user, profileId),
+      };
+    }
+
+    function permissionContext() {
+      let au = activeAuthUser();
+      let profileId = au.profileId;
+      let hasProfile = au.active && !au.admin && profileId is string && profileId.size() > 0;
+      let profilePath = /databases/$(database)/documents/access_profiles/$(hasProfile ? profileId : '__sec02_no_profile__');
+      let profileOk = hasProfile && exists(profilePath);
+      let profile = profileOk ? get(profilePath).data : {};
+      return {
+        'admin': au.admin,
+        'profileActive': profileOk && profile.get('status', '') == 'active',
+        'permissions': profileOk ? profile.get('permissions', {}) : {},
+      };
+    }
+
+    function ctxGrants(ctx, moduleId, action) {
+      return ctx.get('admin', false)
         || (
-          hasRaClaim()
-          && activeProfileGrants(currentAccessProfileId(), moduleId, action)
+          ctx.get('profileActive', false)
+          && permAllows(ctx.get('permissions', {}), moduleId, action)
         );
+    }
+
+    function hasAccessPermission(moduleId, action) {
+      return ctxGrants(permissionContext(), moduleId, action);
     }
 
     // =====================================================================
@@ -128,26 +194,24 @@ service cloud.firestore {
     // exists() falha e o acesso é negado, sem herdar perfil por omissão
     // (o default 'operador_k9' foi justamente o vetor corrigido no backend).
     function authState() {
-      let userPath = /databases/$(database)/documents/users/$(request.auth.token.get('ra', '__sec02_no_ra__'));
-      let userOk = hasRaClaim() && exists(userPath);
-      let user = userOk ? get(userPath).data : {};
-      let profileId = user.get('access_profile_id', user.get('accessProfileId', '__sec02_no_profile__'));
-      let profilePath = /databases/$(database)/documents/access_profiles/$(profileId is string && profileId.size() > 0 ? profileId : '__sec02_no_profile__');
-      let profileOk = userOk && exists(profilePath);
+      let au = activeAuthUser();
+      let profileId = au.profileId;
+      let hasProfile = au.active && !au.admin && profileId is string && profileId.size() > 0;
+      let profilePath = /databases/$(database)/documents/access_profiles/$(hasProfile ? profileId : '__sec02_no_profile__');
+      let profileOk = hasProfile && exists(profilePath);
       let profile = profileOk ? get(profilePath).data : {};
       // Enum persistido é 'active' | 'inactive'. AUSENTE é tolerado como ativo
       // para não divergir de activeProfileGrants nem do backend.
-      let statusOk = profile.get('status', 'active') == 'active';
       let scope = profile.get('scope', '');
       // Qualquer camada que declare own_records RESTRINGE. Ampliar é
       // impossível: só o perfil concede global.
-      let restricted = user.get('access_scope', user.get('accessScope', '')) == 'own_records'
-        || request.auth.token.get('access_scope', '') == 'own_records';
+      let restricted = au.user.get('access_scope', au.user.get('accessScope', '')) == 'own_records'
+        || (signedIn() && request.auth.token.get('access_scope', '') == 'own_records');
       return {
-        'valid': userOk
-          && user.get('deleted_at', null) == null
+        'admin': au.admin,
+        'valid': au.active
           && profileOk
-          && statusOk
+          && profile.get('status', 'active') == 'active'
           && (scope == 'global' || scope == 'own_records'),
         'global': scope == 'global' && !restricted,
       };
@@ -163,7 +227,7 @@ service cloud.firestore {
       let st = authState();
       return signedIn()
         && (
-          isAdmin()
+          st.get('admin', false)
           || (st.get('valid', false) && st.get('global', false))
         );
     }
@@ -173,14 +237,15 @@ service cloud.firestore {
     function hasOwnRecordsScope() {
       let st = authState();
       return signedIn()
-        && !isAdmin()
+        && !st.get('admin', false)
         && st.get('valid', false)
         && !st.get('global', false);
     }
 
     function dogAssignedToAuth(data) {
-      let ra = request.auth.token.get('ra', '');
-      return hasRaClaim()
+      let ra = signedIn() ? request.auth.token.get('ra', '') : '';
+      return ra is string
+        && ra.size() > 0
         && (
           data.get('conductorRa', '') == ra
           || data.get('conductor_ra', '') == ra
@@ -190,15 +255,16 @@ service cloud.firestore {
     }
 
     function activeShiftDogMatches(dogId) {
-      let ra = request.auth.token.get('ra', '');
-      let shiftPath = /databases/$(database)/documents/active_shifts/$(ra);
-      return hasRaClaim()
-        && exists(shiftPath)
-        && get(shiftPath).data.get('status', '') == 'active'
+      let ra = signedIn() ? request.auth.token.get('ra', '') : '';
+      let raOk = ra is string && ra.size() > 0;
+      let shiftPath = /databases/$(database)/documents/active_shifts/$(raOk ? ra : '__sec02_no_ra__');
+      let shift = exists(shiftPath) ? get(shiftPath).data : {};
+      return raOk
+        && shift.get('status', '') == 'active'
         && (
-          get(shiftPath).data.get('dogId', '') == dogId
-          || get(shiftPath).data.get('service_dog_id', '') == dogId
-          || get(shiftPath).data.get('currentDogId', '') == dogId
+          shift.get('dogId', '') == dogId
+          || shift.get('service_dog_id', '') == dogId
+          || shift.get('currentDogId', '') == dogId
         );
     }
 
@@ -208,10 +274,9 @@ service cloud.firestore {
     // `authState()` é chamado UMA vez e o resultado reaproveitado via `let` —
     // encadear helpers aqui re-deriva a cadeia e estoura o limite de 1000
     // expressões por avaliação.
-    function canAccessDogRecord(dogId) {
+    function canAccessDogRecordWithState(st, dogId) {
       let dogPath = /databases/$(database)/documents/dogs/$(dogId);
-      let st = authState();
-      return isAdmin()
+      return st.get('admin', false)
         || (
           st.get('valid', false)
           && (
@@ -223,6 +288,10 @@ service cloud.firestore {
             || activeShiftDogMatches(dogId)
           )
         );
+    }
+
+    function canAccessDogRecord(dogId) {
+      return canAccessDogRecordWithState(authState(), dogId);
     }
 
     function recordDogId(data) {
@@ -258,19 +327,9 @@ service cloud.firestore {
     // também está sujeito ao limite de 30 valores por `in`.
     function canReadHealthScheduleRecord(data) {
       let dogId = data.get('dog_id', '');
-      let st = authState();
       return dogId is string
         && dogId.size() > 0
-        && (
-          isAdmin()
-          || (
-            st.get('valid', false)
-            && (
-              st.get('global', false)
-              || canAccessDogRecord(dogId)
-            )
-          )
-        );
+        && canAccessDogRecord(dogId);
     }
 
     // CLIN-AUTH-BE-3B.A / CT3.AUTH-HEALTH-01 — Autoridade de LEITURA clínica (Clinical v1).
@@ -308,37 +367,36 @@ service cloud.firestore {
     function canAccessDogData(data) {
       let dogId = recordDogId(data);
       let st = authState();
-      return isAdmin()
-        || (
-          st.get('valid', false)
-          && (
-            st.get('global', false)
-            || (
-              dogId is string
-              && dogId.size() > 0
-              && canAccessDogRecord(dogId)
-            )
-          )
+      return dogId is string && dogId.size() > 0
+        ? canAccessDogRecordWithState(st, dogId)
+        : (
+          st.get('admin', false)
+          || (st.get('valid', false) && st.get('global', false))
         );
     }
 
     function canReadTrainingData(data) {
       let handlerId = trainingHandlerId(data);
+      let dogId = recordDogId(data);
       let st = authState();
-      return isAdmin()
+      return st.get('admin', false)
         || (
           st.get('valid', false)
           && (
             st.get('global', false)
             || emailMatchesRa(handlerId)
-            || canAccessDogData(data)
+            || (
+              dogId is string
+              && dogId.size() > 0
+              && canAccessDogRecordWithState(st, dogId)
+            )
           )
         );
     }
 
     function canReadAuditRecord(data) {
       let st = authState();
-      return isAdmin()
+      return st.get('admin', false)
         || (
           st.get('valid', false)
           && (
@@ -354,42 +412,41 @@ service cloud.firestore {
         );
     }
 
-    function isTrainingInstructor() {
-      return isAdmin()
+    function userQualifiesAsK9Instructor(user) {
+      let isK9 = user.get('is_k9_instructor', null);
+      let trainingRole = user.get('training_role', '');
+      let roles = user.get('roles', []);
+      return (isK9 is bool && isK9 == true)
         || (
-          signedIn()
+          isK9 == null
           && (
-            (
-              'instrutor' in request.auth.token
-              && request.auth.token.instrutor == true
+            user.get('training_instructor', false) == true
+            || user.get('instrutor_k9', false) == true
+            || user.get('instrutor', false) == true
+            || user.get('adestrador', false) == true
+            || (
+              trainingRole is string
+              && trainingRole.trim().lower() in ['instrutor', 'adestrador', 'instrutor_k9', 'adestrador_k9', 'k9_instructor']
             )
             || (
-              'adestrador' in request.auth.token
-              && request.auth.token.adestrador == true
-            )
-            || (
-              'instrutor_k9' in request.auth.token
-              && request.auth.token.instrutor_k9 == true
-            )
-            || (
-              'role' in request.auth.token
-              && request.auth.token.role == 'instrutor_k9'
-            )
-            || (
-              'training_instructor' in request.auth.token
-              && request.auth.token.training_instructor == true
-            )
-            || (
-              'training_role' in request.auth.token
-              && request.auth.token.training_role in ['instrutor', 'adestrador', 'instrutor_k9']
-            )
-            || (
-              'roles' in request.auth.token
-              &&
-              request.auth.token.roles is list
-              && request.auth.token.roles.hasAny(['instrutor', 'adestrador', 'instrutor_k9'])
+              roles is list
+              && roles.hasAny(['instrutor', 'adestrador', 'instrutor_k9', 'adestrador_k9', 'k9_instructor'])
             )
           )
+        );
+    }
+
+    function isTrainingInstructor() {
+      let ra = signedIn() ? request.auth.token.get('ra', '') : '';
+      let raOk = ra is string && ra.size() > 0;
+      let userPath = /databases/$(database)/documents/users/$(raOk ? ra : '__sec02_no_ra__');
+      let userOk = raOk && exists(userPath);
+      let user = userOk ? get(userPath).data : {};
+      return userOk
+        && userIsCurrentlyActive(user)
+        && (
+          isAdminRecord(user, userProfileId(user, ''))
+          || userQualifiesAsK9Instructor(user)
         );
     }
 
@@ -867,14 +924,25 @@ service cloud.firestore {
         && appendsInlineAuditOnUpdate();
     }
 
-    function canUpdateDogDenormalizedStats() {
+    function canUpdateDogDenormalizedStatsPayload() {
       let allowed = [
         '_last_vaccine_at', '_last_vaccine_due_at',
         '_last_exam_at',
         '_last_weight_kg', '_last_weight_at'
       ];
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowed);
+    }
+
+    function canUpdateDogDenormalizedStats() {
       return hasAccessPermission('health', 'create')
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowed);
+        && canUpdateDogDenormalizedStatsPayload();
+    }
+
+    function canUpdateDogDocument() {
+      let ctx = permissionContext();
+      return (ctxGrants(ctx, 'k9', 'edit') && canUpdateDogProfile())
+        || (ctxGrants(ctx, 'k9', 'archive') && canSoftDeleteDog())
+        || (ctxGrants(ctx, 'health', 'create') && canUpdateDogDenormalizedStatsPayload());
     }
 
     function canUpdateUserProfile() {
@@ -1961,6 +2029,61 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // ── Almoxarifado / Warehouse F60 ─────────────────────────────────────────
+    // Leituras diretas pelo cliente Web protegidas pelo predicado canônico
+    // hasAccessPermission('inventory', 'view') — restrito a operadores, gestores
+    // e administradores autorizados com perfil ativo.
+    // Todas as mutações são exclusivas das Cloud Functions (Admin SDK).
+    match /warehouse_batches/{batchId} {
+      allow read: if hasAccessPermission('inventory', 'view');
+      allow create, update, delete: if false;
+    }
+
+    match /warehouse_positions/{positionId} {
+      allow read: if hasAccessPermission('inventory', 'view');
+      allow create, update, delete: if false;
+    }
+
+    match /warehouse_equipment/{equipmentId} {
+      allow read: if hasAccessPermission('inventory', 'view');
+      allow create, update, delete: if false;
+    }
+
+    match /warehouse_custodies/{custodyId} {
+      allow read: if hasAccessPermission('inventory', 'view');
+      allow create, update, delete: if false;
+    }
+
+    match /warehouse_locations/{locationId} {
+      allow read: if hasAccessPermission('inventory', 'view');
+      allow create, update, delete: if false;
+    }
+
+    match /inventory_sessions/{sessionId} {
+      allow read: if hasAccessPermission('inventory', 'view')
+        && hasAccessPermission('inventory', 'audit');
+      allow create, update, delete: if false;
+
+      match /counts/{countId} {
+        allow read: if hasAccessPermission('inventory', 'view')
+          && hasAccessPermission('inventory', 'audit');
+        allow create, update, delete: if false;
+      }
+    }
+
+    // Tabelas internas de unicidade e controle — invisíveis ao cliente
+    match /warehouse_control/{docId} {
+      allow read, write: if false;
+    }
+
+    match /warehouse_equipment_identifiers/{docId} {
+      allow read, write: if false;
+    }
+
+    match /warehouse_equipment_codes/{docId} {
+      allow read, write: if false;
+    }
+
     match /binomials/{binomialId} {
       allow read: if signedIn();
       allow create, update, delete: if false;
@@ -1980,15 +2103,7 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create: if hasAccessPermission('k9', 'create')
         && canCreateAuditedRecord();
-      allow update: if (
-          hasAccessPermission('k9', 'edit')
-          && canUpdateDogProfile()
-        )
-        || (
-          hasAccessPermission('k9', 'archive')
-          && canSoftDeleteDog()
-        )
-        || canUpdateDogDenormalizedStats();
+      allow update: if canUpdateDogDocument();
       allow delete: if false;
 
       match /weight_history/{recordId} {
@@ -2477,13 +2592,28 @@ service cloud.firestore {
       }
     }
 
+    function canReadPromotionRequest() {
+      let au = activeAuthUser();
+      let profileId = au.profileId;
+      let hasProfile = au.active && !au.admin && profileId is string && profileId.size() > 0;
+      let profilePath = /databases/$(database)/documents/access_profiles/$(hasProfile ? profileId : '__sec02_no_profile__');
+      let profileOk = hasProfile && exists(profilePath);
+      let profile = profileOk ? get(profilePath).data : {};
+      let perms = profileOk && profile.get('status', '') == 'active' ? profile.get('permissions', {}) : {};
+      return signedIn()
+        && (
+          au.admin
+          || (au.active && userQualifiesAsK9Instructor(au.user))
+          || permAllows(perms, 'training', 'approve')
+          || permAllows(perms, 'training', 'audit')
+          || permAllows(perms, 'training_matrix', 'approve')
+          || permAllows(perms, 'training_matrix', 'audit')
+          || emailMatchesRa(resource.data.requester_ra)
+        );
+    }
+
     match /promotion_requests/{requestId} {
-      allow read: if isTrainingInstructor()
-        || hasAccessPermission('training', 'approve')
-        || hasAccessPermission('training', 'audit')
-        || hasAccessPermission('training_matrix', 'approve')
-        || hasAccessPermission('training_matrix', 'audit')
-        || emailMatchesRa(resource.data.requester_ra);
+      allow read: if canReadPromotionRequest();
       allow create: if canCreatePromotionRequest();
       allow update: if canDecidePromotionRequest();
       allow delete: if false;

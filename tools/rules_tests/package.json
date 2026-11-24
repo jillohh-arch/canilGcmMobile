@@ -16,7 +16,20 @@
     "test:health-document": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore,storage \"node health_document_rules_tests.mjs\"",
     "test:shift-dog-provenance": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only firestore \"node shift_dog_provenance_rules_tests.mjs\"",
     "test:shift-authorization-transport": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --only auth,firestore,functions \"node shift_authorization_callables_emulator_tests.mjs\"",
-    "test:direct": "node rules_tests.mjs"
+    "test:direct": "node rules_tests.mjs",
+    "test:f20-adversarial": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --non-interactive --only firestore \"node f20_sec02a2_adversarial_rules_tests.mjs\"",
+    "test:warehouse-rules": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --non-interactive --only firestore \"node test-warehouse-rules-authoritative.mjs\"",
+    "test:warehouse-read-rules": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --non-interactive --only firestore \"node warehouse_read_rules_tests.mjs\"",
+    "test:f40-shift-crew": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --non-interactive --only firestore \"node f40_tc1_shift_crew_rules_tests.mjs\"",
+    "test:f40-notifications": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --non-interactive --only firestore \"node f40_tc1_notification_and_occurrence_rules_tests.mjs\"",
+    "test:warehouse-material-flow-emulator": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --non-interactive --only firestore \"node warehouse_material_flow_emulator_tests.mjs\"",
+    "test:warehouse-concurrency-emulator": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --non-interactive --only firestore \"node warehouse_concurrency_emulator_tests.mjs\"",
+    "test:warehouse-equipment-custody-emulator": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --non-interactive --only firestore \"node warehouse_equipment_custody_emulator_tests.mjs\"",
+    "test:warehouse-hardening-emulator": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --non-interactive --only firestore \"node warehouse_hardening_emulator_tests.mjs\"",
+    "test:warehouse-inventory-scale-emulator": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --non-interactive --only firestore \"node warehouse_inventory_scale_emulator_tests.mjs\"",
+    "test:warehouse-physical-inventory-emulator": "firebase emulators:exec --project canil-gcm --config ../../firebase.json --non-interactive --only firestore \"node warehouse_physical_inventory_emulator_tests.mjs\"",
+    "test:warehouse-emulator": "npm run test:warehouse-material-flow-emulator && npm run test:warehouse-concurrency-emulator && npm run test:warehouse-equipment-custody-emulator && npm run test:warehouse-hardening-emulator && npm run test:warehouse-inventory-scale-emulator && npm run test:warehouse-physical-inventory-emulator",
+    "test:ci-emulator": "node ../ci_backend_security.mjs --emulator"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.1",

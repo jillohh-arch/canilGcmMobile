@@ -100,6 +100,31 @@
         { "fieldPath": "lifecycle_status", "order": "ASCENDING" },
         { "fieldPath": "scheduled_for", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "warehouse_batches",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "material_id", "order": "ASCENDING" },
+        { "fieldPath": "current_quantity", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "inventory_movements",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "inventory_session_id", "order": "ASCENDING" },
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "performed_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "inventory_movements",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "material_id", "order": "ASCENDING" },
+        { "fieldPath": "performed_at", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [
